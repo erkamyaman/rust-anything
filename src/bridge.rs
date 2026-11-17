@@ -860,6 +860,9 @@ pub fn refresh(crate_dir: &Path) -> Result<Refreshed> {
     if crate::codegen_tswire::uses_wire(&manifest, &fns) {
         files.push(("src/wire.rs".into(), crate::wire::WIRE_RS.into()));
     }
+    if manifest.kind == Kind::Pyo3 && !crate_dir.join("build.rs").exists() {
+        files.push(("build.rs".into(), EXTENSION_BUILD_RS.into()));
+    }
     if manifest.kind == Kind::Pyo3 && fns.needs_json() {
         files.push(("src/pyconv.rs".into(), crate::codegen_py::PYCONV_RS.into()));
         files.push(("src/pynum.rs".into(), crate::codegen_py::PYNUM_RS.into()));
@@ -1132,6 +1135,9 @@ pub fn bridge(opts: &Options) -> Result<Outcome> {
     if crate::codegen_tswire::uses_wire(&manifest, &fns) {
         files.push(("src/wire.rs".into(), crate::wire::WIRE_RS.into()));
     }
+    if kind == Kind::Pyo3 {
+        files.push(("build.rs".into(), EXTENSION_BUILD_RS.into()));
+    }
     if manifest.kind == Kind::Pyo3 && fns.needs_json() {
         files.push(("src/pyconv.rs".into(), crate::codegen_py::PYCONV_RS.into()));
         files.push(("src/pynum.rs".into(), crate::codegen_py::PYNUM_RS.into()));
@@ -1178,6 +1184,13 @@ pub fn bridge(opts: &Options) -> Result<Outcome> {
     })
 }
 
+const EXTENSION_BUILD_RS: &str = r#"fn main() {
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+        println!("cargo:rustc-cdylib-link-arg=-Wl,-undefined,dynamic_lookup");
+    }
+}
+"#;
+
 fn write_files(crate_dir: &Path, files: &[(String, String)]) -> Result<()> {
     for (path, text) in files {
         let target = crate_dir.join(path);
@@ -1216,10 +1229,7 @@ fn ffi_bindings(m: &Manifest, api: &codegen::PortApi) -> Result<Vec<(String, Str
                 "src/rbconv.rs".to_string(),
                 crate::codegen_ruby::RBCONV_RS.to_string(),
             ),
-            (
-                "build.rs".to_string(),
-                crate::codegen_ruby::BUILD_RS.to_string(),
-            ),
+            ("build.rs".to_string(), EXTENSION_BUILD_RS.to_string()),
         ]
     } else {
         let mut lib = crate::codegen_ffi::lib_rs(m, api);
