@@ -63,6 +63,7 @@ pub fn discover(root: &Path) -> Result<Workspace> {
     let mut candidates = Vec::new();
     let walker = WalkBuilder::new(root)
         .hidden(true)
+        .parents(false)
         .require_git(false)
         .filter_entry(|entry| {
             !(entry.file_type().is_some_and(|t| t.is_dir())

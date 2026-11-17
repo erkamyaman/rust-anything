@@ -212,3 +212,38 @@ fn whole_app_ports_units_that_import_each_other_as_one_piece() {
     assert!(w.decisions.iter().any(|d| d.topic == "tangled units"));
     std::fs::remove_dir_all(&root).unwrap();
 }
+
+#[test]
+fn discovery_ignores_parent_rules_but_honors_project_rules() {
+    let parent = std::env::temp_dir().join(format!(
+        "rust-anything-ignore-boundary-{}",
+        std::process::id()
+    ));
+    let root = parent.join("project");
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    std::fs::write(parent.join(".gitignore"), "*\n").unwrap();
+    std::fs::write(root.join(".gitignore"), "src/ignored.*\n").unwrap();
+    std::fs::write(root.join("package.json"), r#"{"name":"project"}"#).unwrap();
+    std::fs::write(root.join("src/kept.ts"), "export function kept() {}").unwrap();
+    std::fs::write(root.join("src/ignored.ts"), "export function ignored() {}").unwrap();
+    std::fs::write(
+        root.join("pyproject.toml"),
+        "[project]\nname = \"project\"\n",
+    )
+    .unwrap();
+    std::fs::write(root.join("src/kept.py"), "def kept():\n    pass\n").unwrap();
+    std::fs::write(root.join("src/ignored.py"), "def ignored():\n    pass\n").unwrap();
+    let ts = rust_anything::analyze::analyze_lang(&root, rust_anything::lang::Lang::Ts);
+    let python = analyze(&root);
+    std::fs::remove_dir_all(parent).unwrap();
+    let (ts, python) = (ts.unwrap(), python.unwrap());
+    let files = ts
+        .units
+        .iter()
+        .chain(&python.units)
+        .flat_map(|unit| &unit.files)
+        .collect::<Vec<_>>();
+    assert!(files.iter().any(|file| file.as_str() == "src/kept.ts"));
+    assert!(files.iter().any(|file| file.as_str() == "src/kept.py"));
+    assert!(files.iter().all(|file| !file.starts_with("src/ignored.")));
+}

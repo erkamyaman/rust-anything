@@ -60,6 +60,7 @@ impl Lang {
         let mut counts = [0usize; 6];
         for entry in ignore::WalkBuilder::new(root)
             .hidden(true)
+            .parents(false)
             .require_git(false)
             .build()
             .flatten()
