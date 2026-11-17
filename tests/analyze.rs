@@ -247,3 +247,29 @@ fn discovery_ignores_parent_rules_but_honors_project_rules() {
     assert!(files.iter().any(|file| file.as_str() == "src/kept.py"));
     assert!(files.iter().all(|file| !file.starts_with("src/ignored.")));
 }
+
+#[test]
+fn subproject_discovery_inherits_its_enclosing_repositories_ignore_rules() {
+    let parent = std::env::temp_dir().join(format!(
+        "rust-anything-ignore-worktree-{}",
+        std::process::id()
+    ));
+    let repo = parent.join("repository");
+    let root = repo.join("app");
+    std::fs::create_dir_all(repo.join(".git")).unwrap();
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    std::fs::write(parent.join(".gitignore"), "*\n").unwrap();
+    std::fs::write(repo.join(".gitignore"), "/app/src/ignored.ts\n").unwrap();
+    std::fs::write(root.join("src/kept.ts"), "export function kept() {}").unwrap();
+    std::fs::write(root.join("src/ignored.ts"), "export function ignored() {}").unwrap();
+    let report = analyze(&root);
+    std::fs::remove_dir_all(parent).unwrap();
+    let report = report.unwrap();
+    assert_eq!(report.summary.source_files, 1);
+    assert!(
+        report
+            .units
+            .iter()
+            .any(|unit| unit.files.iter().any(|file| file == "src/kept.ts"))
+    );
+}

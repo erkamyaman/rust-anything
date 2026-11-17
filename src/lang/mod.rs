@@ -58,13 +58,7 @@ impl Lang {
             return Self::Ts;
         }
         let mut counts = [0usize; 6];
-        for entry in ignore::WalkBuilder::new(root)
-            .hidden(true)
-            .parents(false)
-            .require_git(false)
-            .build()
-            .flatten()
-        {
+        for entry in crate::lang::project_walker(root).build().flatten() {
             let ext = entry
                 .path()
                 .extension()
@@ -91,6 +85,17 @@ impl Lang {
             Self::Java,
         ][best]
     }
+}
+
+/// Apply Git ignore rules within the enclosing worktree, or local ignore rules for an export
+/// with no Git metadata. Git worktrees and submodules can have a .git file instead of a directory.
+pub(crate) fn project_walker(root: &Path) -> ignore::WalkBuilder {
+    let in_git = root
+        .canonicalize()
+        .is_ok_and(|path| path.ancestors().any(|dir| dir.join(".git").exists()));
+    let mut walker = ignore::WalkBuilder::new(root);
+    walker.hidden(true).parents(in_git).require_git(in_git);
+    walker
 }
 
 /// Where an import points, for languages other than TS.

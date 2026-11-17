@@ -33,10 +33,7 @@ const SKIP_DIRS: &[&str] = &[
 pub fn discover(root: &Path) -> Result<Workspace> {
     let mut manifests = Vec::new();
     let mut files = Vec::new();
-    let walker = ignore::WalkBuilder::new(root)
-        .hidden(true)
-        .parents(false)
-        .require_git(false)
+    let walker = crate::lang::project_walker(root)
         .filter_entry(|e| {
             !(e.file_type().is_some_and(|t| t.is_dir())
                 && SKIP_DIRS.contains(&e.file_name().to_string_lossy().as_ref()))

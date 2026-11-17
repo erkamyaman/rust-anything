@@ -64,10 +64,7 @@ fn requirements(go_mod: &str) -> Vec<String> {
 pub fn discover(root: &Path) -> Result<Workspace> {
     let mut modules = Vec::new();
     let mut files = Vec::new();
-    let walker = ignore::WalkBuilder::new(root)
-        .hidden(true)
-        .parents(false)
-        .require_git(false)
+    let walker = crate::lang::project_walker(root)
         .filter_entry(|e| {
             let name = e.file_name().to_string_lossy();
             !(e.file_type().is_some_and(|t| t.is_dir())
