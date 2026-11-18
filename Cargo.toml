@@ -28,7 +28,7 @@ regex = "1"
 serde = { version = "1", features = ["derive"] }
 # float_roundtrip: recorded floats must survive parsing bit for bit.
 serde_json = { version = "1", features = ["float_roundtrip", "preserve_order"] }
-toml_edit = "0.22"
+toml_edit = "0.25"
 tree-sitter = "0.27.2"
 tree-sitter-c = "0.24.2"
 tree-sitter-c-sharp = "0.23.5"
