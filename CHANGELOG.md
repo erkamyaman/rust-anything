@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- TypeScript analysis and recording resolve path aliases against the inherited `baseUrl`,
+  including when the two options come from separate tsconfig files.
+
 - A port of [json-server](https://github.com/typicode/json-server) to a pure Rust binary in
   `demo/real-world/json-server-rs` and `docs/real-world.md`: 514/514 recorded HTTP cases match
   with no fallback, and six units pass `gate`. Against Node 24 on an M4: first response in 8 to
