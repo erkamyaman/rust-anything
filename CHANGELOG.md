@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- TypeScript analysis and recording keep inherited path aliases when a later tsconfig base
+  omits `compilerOptions.paths`.
+
 - Faster single calls on napi: every sync function crosses the binary wire with no napi
   arguments (each argument cost about 55 ns), behind one JS wrapper instead of two;
   `serde_json::Value` parameters cross as tagged values of any shape, and errors come back in the

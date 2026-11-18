@@ -21,9 +21,7 @@ impl PathAliases {
                 format!("{current}/tsconfig.json")
             };
             if root.join(&candidate).is_file() {
-                return load(root, &candidate, 0)
-                    .map(|c| c.aliases)
-                    .unwrap_or_default();
+                return load(root, &candidate, 0).unwrap_or_default();
             }
             if current.is_empty() {
                 return Self::default();
@@ -57,36 +55,32 @@ impl PathAliases {
     }
 }
 
-struct Config {
-    aliases: PathAliases,
-}
-
-/// Reads a tsconfig (JSON with comments), following relative `extends`.
-fn load(root: &Path, rel: &str, depth: usize) -> Option<Config> {
+/// Finds the effective paths map, following relative `extends`.
+fn load(root: &Path, rel: &str, depth: usize) -> Option<PathAliases> {
     if depth > 8 {
         return None;
     }
     let text = std::fs::read_to_string(root.join(rel)).ok()?;
     let json: Value = json5::from_str(&text).ok()?;
     let dir = rel.rsplit_once('/').map_or("", |(d, _)| d);
-    let mut inherited = PathAliases::default();
-    let extends: Vec<&str> = match &json["extends"] {
-        Value::String(s) => vec![s.as_str()],
-        Value::Array(items) => items.iter().filter_map(Value::as_str).collect(),
-        _ => Vec::new(),
-    };
-    for parent in extends.into_iter().filter(|p| p.starts_with('.')) {
-        let mut target = join(dir, parent);
-        if !target.ends_with(".json") {
-            target.push_str(".json");
-        }
-        if let Some(parent) = load(root, &target, depth + 1) {
-            inherited = parent.aliases;
-        }
-    }
     let options = &json["compilerOptions"];
     let Some(paths) = options["paths"].as_object() else {
-        return Some(Config { aliases: inherited });
+        let extends: Vec<&str> = match &json["extends"] {
+            Value::String(s) => vec![s.as_str()],
+            Value::Array(items) => items.iter().filter_map(Value::as_str).collect(),
+            _ => Vec::new(),
+        };
+        return extends
+            .into_iter()
+            .rev()
+            .filter(|parent| parent.starts_with('.'))
+            .find_map(|parent| {
+                let mut target = join(dir, parent);
+                if !target.ends_with(".json") {
+                    target.push_str(".json");
+                }
+                load(root, &target, depth + 1)
+            });
     };
     // Targets are relative to `baseUrl` when set, else to the config's own folder.
     let base = options["baseUrl"]
@@ -107,9 +101,7 @@ fn load(root: &Path, rel: &str, depth: usize) -> Option<Config> {
             (pattern.clone(), targets)
         })
         .collect();
-    Some(Config {
-        aliases: PathAliases { entries },
-    })
+    Some(PathAliases { entries })
 }
 
 /// `dir/rel`, with `.` and `..` collapsed; root-relative.
