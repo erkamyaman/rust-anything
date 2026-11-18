@@ -580,7 +580,10 @@ pub fn front_door(opts: &FrontDoorOptions) -> Result<FrontDoorOutcome> {
             ("Cargo.toml", http_door::cargo_toml(&binary, &config.name)),
             (".gitignore", "/target\n".to_string()),
             ("src/main.rs", http_door::main_rs()),
-            ("src/original.rs", http_door::original_rs(&config.run)),
+            (
+                "src/original.rs",
+                http_door::original_rs(&config.run, http.fresh.is_empty()),
+            ),
             ("src/units/mod.rs", http_door::units_rs(&state, false)),
         ];
         return finish_front_door(

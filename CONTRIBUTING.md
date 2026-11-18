@@ -33,8 +33,17 @@ skip a part whose runtime is missing, so install the ones you touch:
 ```sh
 git clone https://github.com/erkamyaman/rust-anything
 cd rust-anything
+git config core.hooksPath .githooks
 cargo test
 ```
+
+`cargo run -- doctor` lists which of these runtimes you have, their versions, and the command
+that installs or updates each one. To make a missing runtime fail its tests instead of skipping
+them (CI does this), name it in `RUST_ANYTHING_REQUIRE`, e.g.
+`RUST_ANYTHING_REQUIRE=node,python3,go,ruby,java cargo test`.
+
+The hook runs `scripts/check-secrets.sh`, which refuses keys, tokens and personal home-folder
+paths in what you commit. CI runs it on every file.
 
 ## Make the change
 
@@ -56,6 +65,14 @@ cargo test
 - **Style:** match the code around you. Keep comments for what the code can't say on its own, and
   put the reasoning for a change in the pull request instead.
 
+## Add a crate mapping
+
+`analyze` names the Rust crate for each library the code imports from `src/crates.toml`. To add
+one, append an entry under its language: `names` (exact package names) or `prefixes` (the start of
+a name, for Java and C#), `crates`, `fit` (`good`, `partial` or `none`) and a `note` when the fit
+needs explaining. The first matching entry wins, so put specific ones before broad prefixes. A
+library missing from the table is reported as `unknown`; never guess a crate.
+
 ## Add a language
 
 PHP and C# were added as previews in two commits worth reading first:
@@ -63,8 +80,8 @@ PHP and C# were added as previews in two commits worth reading first:
 [caea59a](https://github.com/erkamyaman/rust-anything/commit/caea59a) (C#). A new language starts
 the same way:
 
-1. A plugin in `src/lang/<name>.rs`: discovery, scan (imports and risks), resolve, the
-   package-to-crate table and exports.
+1. A plugin in `src/lang/<name>.rs`: discovery, scan (imports and risks), resolve and exports,
+   plus its libraries' crates as `[[<name>]]` entries in `src/crates.toml`.
 2. Detection and dispatch in `src/lang/mod.rs`.
 3. Whole-app support in `src/whole_app.rs`: entry points, servers, declared dependencies.
 4. The CLI and HTTP fixtures, a library fixture, and tests in `tests/analyze.rs`, `tests/app.rs`
@@ -77,12 +94,13 @@ Translations are welcome and community-maintained. A new one:
 
 1. Lives in `docs/README_<CODE>.md` (for example `docs/README_PT.md`); the root `README.md` stays
    English and is never renamed or replaced.
-2. Uses paths that work from `docs/`: `assets/logo.svg`, `../LICENSE`, `../README.md`.
+2. Uses paths that work from `docs/`: `assets/logo.png`, `../LICENSE`, `../README.md`.
 3. Starts with the same language line as the other translations, with its own language as plain
    text, followed by the note that it is community-maintained and may lag behind the English
    README (copy it from `docs/README_DE.md` and translate it).
-4. Goes at the **end** of the language line, in `README.md` and in every translation. The order of
-   the languages already listed does not change.
+4. Goes at the **end** of the language line, in `README.md` and in every translation. The line
+   always starts English, Türkçe, Українська; the order of the languages already listed does not
+   change.
 
 ## Open the pull request
 

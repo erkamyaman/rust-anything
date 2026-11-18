@@ -10,7 +10,7 @@ use tree_sitter::Node;
 
 use super::syntax::{self, named_children, text};
 use crate::risks::{Risk, regex_needs_fancy};
-use crate::ts::deps::{CrateMatch, Fit};
+use crate::ts::deps::CrateMatch;
 use crate::ts::discover::{FileKind, Package, SourceFile, Workspace};
 use crate::ts::exports::{ExportedFn, Param};
 use crate::ts::scan::{FileFacts, Import};
@@ -357,77 +357,9 @@ pub fn resolve(spec: &str, index: &HashMap<&str, usize>, ws: &Workspace) -> supe
     super::Resolution::External(spec.split('.').take(2).collect::<Vec<_>>().join("."))
 }
 
-const fn m(crates: &'static str, fit: Fit, note: &'static str) -> CrateMatch {
-    CrateMatch { crates, fit, note }
-}
-
 /// Rust counterparts of common NuGet packages, by package id or namespace.
 pub fn lookup(name: &str) -> Option<CrateMatch> {
-    let k = name;
-    Some(match k {
-        k if k.starts_with("Newtonsoft.Json") || k.starts_with("System.Text.Json") => {
-            m("serde_json", Fit::Good, "")
-        }
-        k if k.starts_with("Serilog")
-            || k.starts_with("NLog")
-            || k.starts_with("log4net")
-            || k.starts_with("Microsoft.Extensions.Logging") =>
-        {
-            m("tracing", Fit::Good, "")
-        }
-        k if k.starts_with("xunit")
-            || k.starts_with("NUnit")
-            || k.starts_with("MSTest")
-            || k.starts_with("FluentAssertions")
-            || k.starts_with("Microsoft.NET.Test.Sdk") =>
-        {
-            m("std test", Fit::Good, "")
-        }
-        k if k.starts_with("Microsoft.AspNetCore") => m(
-            "axum",
-            Fit::None,
-            "a framework is an application rewrite, not a port",
-        ),
-        k if k.starts_with("Microsoft.EntityFrameworkCore") => m(
-            "sqlx, diesel",
-            Fit::Partial,
-            "no change tracking; queries become SQL",
-        ),
-        k if k.starts_with("Dapper") => m("sqlx", Fit::Good, ""),
-        k if k.starts_with("Npgsql") => m("tokio-postgres, sqlx", Fit::Good, ""),
-        k if k.starts_with("Microsoft.Data.Sqlite") || k.starts_with("System.Data.SQLite") => {
-            m("rusqlite", Fit::Good, "")
-        }
-        k if k.starts_with("CsvHelper") => m("csv", Fit::Good, ""),
-        k if k.starts_with("YamlDotNet") => m("serde_yaml_ng", Fit::Good, ""),
-        k if k.starts_with("System.CommandLine")
-            || k.starts_with("CommandLineParser")
-            || k.starts_with("Spectre.Console.Cli") =>
-        {
-            m("clap", Fit::Good, "")
-        }
-        k if k.starts_with("RestSharp") || k.starts_with("Flurl") => m("reqwest", Fit::Good, ""),
-        k if k.starts_with("Polly") => m("backon", Fit::Partial, "retries; no circuit breakers"),
-        k if k.starts_with("NodaTime") => m("jiff, chrono", Fit::Good, ""),
-        k if k.starts_with("Humanizer") => m("", Fit::None, "reimplement what the app uses"),
-        k if k.starts_with("AutoMapper") => m("From impls", Fit::Good, "mappings become From"),
-        k if k.starts_with("MediatR")
-            || k.starts_with("Microsoft.Extensions.DependencyInjection") =>
-        {
-            m(
-                "",
-                Fit::None,
-                "plain function calls and constructors replace the container",
-            )
-        }
-        k if k.starts_with("BouncyCastle") || k.starts_with("Portable.BouncyCastle") => {
-            m("RustCrypto crates", Fit::Partial, "")
-        }
-        k if k.starts_with("Microsoft.Extensions.Configuration") => {
-            m("config, figment", Fit::Good, "")
-        }
-        _ => return None,
-    })
+    crate::crates::find("csharp", name)
 }
 
 // ---- exports ---------------------------------------------------------------------------------

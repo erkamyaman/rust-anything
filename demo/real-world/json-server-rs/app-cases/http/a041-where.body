@@ -1,0 +1,18 @@
+[
+  {
+    "id": "2",
+    "title": "another title",
+    "views": 200,
+    "published": false,
+    "userId": "2",
+    "author": {
+      "name": "Ana",
+      "age": 25
+    }
+  },
+  {
+    "id": "5",
+    "title": "numeric id",
+    "views": 1e+21
+  }
+]

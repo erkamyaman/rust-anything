@@ -1,0 +1,25 @@
+{
+  "first": 1,
+  "prev": null,
+  "next": 2,
+  "last": 6,
+  "pages": 6,
+  "items": 6,
+  "data": [
+    {
+      "id": "1",
+      "title": "a title",
+      "views": 100,
+      "published": true,
+      "userId": "1",
+      "author": {
+        "name": "typicode",
+        "age": 30
+      },
+      "tags": [
+        "json",
+        "rest"
+      ]
+    }
+  ]
+}

@@ -11,7 +11,7 @@ use tree_sitter::Node;
 
 use super::syntax::{self, named_children, text};
 use crate::risks::{Risk, regex_needs_fancy};
-use crate::ts::deps::{CrateMatch, Fit};
+use crate::ts::deps::CrateMatch;
 use crate::ts::discover::{FileKind, Package, SourceFile, Workspace};
 use crate::ts::exports::{ExportedFn, Param};
 use crate::ts::scan::{FileFacts, Import};
@@ -495,54 +495,9 @@ fn normalize(path: &str) -> Option<String> {
     Some(parts.join("/"))
 }
 
-const fn m(crates: &'static str, fit: Fit, note: &'static str) -> CrateMatch {
-    CrateMatch { crates, fit, note }
-}
-
 /// Rust counterparts of common Composer packages.
 pub fn lookup(package: &str) -> Option<CrateMatch> {
-    Some(match package {
-        "laravel/framework"
-        | "slim/slim"
-        | "symfony/framework-bundle"
-        | "laminas/laminas-mvc"
-        | "cakephp/cakephp"
-        | "yiisoft/yii2" => m(
-            "axum",
-            Fit::None,
-            "a web framework is an application rewrite, not a port",
-        ),
-        "symfony/http-foundation" | "psr/http-message" | "nyholm/psr7" | "guzzlehttp/psr7" => {
-            m("http, axum", Fit::Partial, "")
-        }
-        "symfony/console" => m("clap", Fit::Good, ""),
-        "symfony/yaml" => m("serde_yaml", Fit::Good, ""),
-        "symfony/process" => m("std::process", Fit::Good, ""),
-        "symfony/finder" => m("walkdir, globset", Fit::Good, ""),
-        "symfony/string" => m("unicode-segmentation, heck", Fit::Partial, ""),
-        "guzzlehttp/guzzle" => m("reqwest", Fit::Good, ""),
-        "monolog/monolog" | "psr/log" => m("tracing, log", Fit::Good, ""),
-        "doctrine/orm" | "illuminate/database" => m(
-            "sqlx, diesel, sea-orm",
-            Fit::Partial,
-            "an ORM's dynamic queries need redesign",
-        ),
-        "doctrine/dbal" => m("sqlx", Fit::Good, ""),
-        "nesbot/carbon" => m("chrono, jiff", Fit::Good, ""),
-        "ramsey/uuid" => m("uuid", Fit::Good, ""),
-        "league/commonmark" | "erusev/parsedown" => m("pulldown-cmark, comrak", Fit::Good, ""),
-        "twig/twig" => m("minijinja, tera", Fit::Partial, "template syntax differs"),
-        "league/csv" => m("csv", Fit::Good, ""),
-        "league/flysystem" => m("object_store, opendal", Fit::Partial, ""),
-        "vlucas/phpdotenv" => m("dotenvy", Fit::Good, ""),
-        "firebase/php-jwt" | "lcobucci/jwt" => m("jsonwebtoken", Fit::Good, ""),
-        "predis/predis" => m("redis", Fit::Good, ""),
-        "phpunit/phpunit" | "pestphp/pest" => m("std test", Fit::Good, ""),
-        "respect/validation" => m("validator, garde", Fit::Partial, ""),
-        "brick/math" => m("num-bigint, rust_decimal", Fit::Good, ""),
-        "composer/composer" => m("(none)", Fit::None, "PHP's package manager: drop it"),
-        _ => return None,
-    })
+    crate::crates::find("php", package)
 }
 
 // ---- exports ---------------------------------------------------------------------------------

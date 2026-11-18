@@ -1,6 +1,8 @@
 //! `record` fingerprints the original, so a recording made before the original changed is
 //! reported as stale instead of passing against old behavior.
 
+mod common;
+
 use std::process::Command;
 
 use rust_anything::bridge::Manifest;
@@ -8,12 +10,7 @@ use rust_anything::recording;
 
 #[test]
 fn a_changed_original_makes_the_recording_stale() {
-    if !Command::new("python3")
-        .arg("--version")
-        .output()
-        .is_ok_and(|o| o.status.success())
-    {
-        eprintln!("skipped: python3 not found");
+    if !common::have("python3") {
         return;
     }
     let root = std::env::temp_dir().join(format!("rust-anything-stale-{}", std::process::id()));
@@ -101,12 +98,7 @@ fn from_tests(root: &std::path::Path, unit: &str, test: &[&str]) -> (String, Str
 
 #[test]
 fn records_the_calls_a_python_test_suite_makes() {
-    if !Command::new("python3")
-        .arg("--version")
-        .output()
-        .is_ok_and(|o| o.status.success())
-    {
-        eprintln!("skipped: python3 not found");
+    if !common::have("python3") {
         return;
     }
     let root = project(
@@ -142,12 +134,7 @@ fn records_the_calls_a_python_test_suite_makes() {
 
 #[test]
 fn records_the_calls_a_js_test_suite_makes_and_restores_the_source() {
-    if !Command::new("node")
-        .arg("--version")
-        .output()
-        .is_ok_and(|o| o.status.success())
-    {
-        eprintln!("skipped: node not found");
+    if !common::have("node") {
         return;
     }
     let source = "export function label(n: number): string {\n  return `${n}u`;\n}\n\nexport const unwrapped = (s: string): string => s;\n";
@@ -181,4 +168,50 @@ fn records_the_calls_a_js_test_suite_makes_and_restores_the_source() {
         "{inputs}"
     );
     assert!(inputs.contains(r#"{"fn":"label","args":[7]}"#), "{inputs}");
+}
+
+#[test]
+fn record_reports_lines_of_the_original_no_case_reached() {
+    if !common::have("node") {
+        return;
+    }
+    let root = project(
+        "coverage",
+        &[
+            (
+                "package.json",
+                "{\"name\": \"sign\", \"type\": \"module\"}\n",
+            ),
+            (
+                "sign.ts",
+                "export function sign(n: number, word: string): string {\n  if (word === 'xyzzy-never-generated') {\n    return 'magic'\n  }\n  return n < 0 ? 'negative' : 'other'\n}\n",
+            ),
+        ],
+    );
+    let cli = env!("CARGO_BIN_EXE_rust-anything");
+    let crate_dir = root.join("port");
+    let run = |args: &[&std::ffi::OsStr]| {
+        let out = Command::new(cli).args(args).output().unwrap();
+        assert!(out.status.success(), "{out:?}");
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+    run(&[
+        "bridge".as_ref(),
+        root.as_os_str(),
+        "sign.ts".as_ref(),
+        "--out".as_ref(),
+        crate_dir.as_os_str(),
+    ]);
+    let printed = run(&["record".as_ref(), crate_dir.as_os_str()]);
+    let coverage = recording::saved_coverage(&crate_dir);
+    std::fs::remove_dir_all(&root).unwrap();
+    let coverage = coverage.expect("record saves coverage");
+    assert_eq!(coverage["lines"], 6, "{coverage}");
+    assert_eq!(coverage["reached"], 4, "{coverage}");
+    assert_eq!(coverage["files"][0]["missed"], "3-4", "{coverage}");
+    assert!(
+        printed.contains("ran 4 of the original's 6 lines"),
+        "{printed}"
+    );
+    assert!(printed.contains("sign.ts: 3-4"), "{printed}");
 }

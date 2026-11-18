@@ -84,6 +84,10 @@ enum Cmd {
         /// Rust, on all cores (what `profile` recommends for leaves called in loops).
         #[arg(long)]
         batch: Vec<String>,
+        /// Bridge a type parameter as JSON values (`--as-json T`) when the app only fills it
+        /// with data, instead of keeping the generic export in TS. Repeatable.
+        #[arg(long, value_name = "TYPE_PARAM")]
+        as_json: Vec<String>,
     },
     /// 2b. Regenerate the bindings (`lib.rs`, `index.cjs`, `js.rs`) from the signatures in `port.rs`.
     Refresh {
@@ -219,6 +223,12 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
+    /// Check the language runtimes, the agent setup and the MCP server, with the command that
+    /// fixes each problem. Exits 1 when something required is missing.
+    Doctor {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -253,6 +263,21 @@ enum AppCmd {
         /// A port the server always listens on (implies --http).
         #[arg(long)]
         port: Option<u16>,
+        /// An argument every server start gets after its command, the original's and every
+        /// build's, so the Rust binary is started as the original is (`--arg db.json`).
+        /// Repeatable; implies --http; saved with the cases.
+        #[arg(long = "arg", value_name = "ARG", allow_hyphen_values = true)]
+        server_args: Vec<String>,
+        /// A file or folder of the repository the server reads or writes (a database file, a
+        /// public folder): snapshotted into `http/files/` and copied into a fresh working
+        /// directory before every start. Repeatable; implies --http; saved with the cases.
+        #[arg(long)]
+        fresh: Vec<String>,
+        /// Milliseconds to wait after each response before the next request, for work a server
+        /// does after answering (a file watcher reloading what it just wrote). Implies --http;
+        /// saved with the cases and used by replay; 0 removes it.
+        #[arg(long, value_name = "MS")]
+        pace: Option<u64>,
         /// Numbers in the output match when they differ by at most this times the larger
         /// magnitude (absolute below 1), e.g. 1e-9 for numeric code. Saved with the cases; 0
         /// removes it.
@@ -413,6 +438,7 @@ fn run() -> Result<ExitCode> {
             force,
             keep,
             batch,
+            as_json,
         } => {
             let outcome = bridge::bridge(&bridge::Options {
                 root: &root,
@@ -427,6 +453,7 @@ fn run() -> Result<ExitCode> {
                 keep,
                 lang: None,
                 batch,
+                as_json,
             })?;
             say!(
                 "Created {} ({:?}) for {}",
@@ -520,6 +547,13 @@ fn run() -> Result<ExitCode> {
                     say!("  {}({})", c["fn"].as_str().unwrap_or("?"), c["args"]);
                 }
             }
+            if let Some(line) = outcome
+                .coverage
+                .as_ref()
+                .and_then(rust_anything::recording::coverage_line)
+            {
+                say!("Coverage: {line}");
+            }
         }
         Cmd::Refresh { crate_dir, batch } => {
             let r = if batch.is_empty() {
@@ -569,6 +603,17 @@ fn run() -> Result<ExitCode> {
                     );
                 } else {
                     say!("{}/{} cases match", d.passed, d.total);
+                }
+                if let Some(t) = d.trend.as_ref().filter(|t| t.stalled) {
+                    let shown: Vec<String> = t.passed.iter().map(ToString::to_string).collect();
+                    say!(
+                        "Stalled: the last {} changes to port.rs gained no matching case ({} of {}). \
+                         Stop and look at the remaining mismatches with a person, or keep these \
+                         functions in the original for now.",
+                        rust_anything::recording::STALL_AFTER,
+                        shown.join(", "),
+                        t.total
+                    );
                 }
                 for e in &d.stale_known {
                     say!(
@@ -708,6 +753,9 @@ fn run() -> Result<ExitCode> {
                         for line in check.detail.lines().skip(1) {
                             say!("            {line}");
                         }
+                        if let Some(fix) = &check.fix {
+                            say!("            fix: {fix}");
+                        }
                     }
                 }
                 say!(
@@ -748,6 +796,17 @@ fn run() -> Result<ExitCode> {
                 print!("{}", rust_anything::setup::text(&report));
             }
         }
+        Cmd::Doctor { json } => {
+            let report = rust_anything::doctor::run();
+            if json {
+                say!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                say_raw!("{}", rust_anything::doctor::text(&report));
+            }
+            if !report.ok() {
+                return Ok(ExitCode::FAILURE);
+            }
+        }
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -763,6 +822,9 @@ fn run_app(command: AppCmd) -> Result<ExitCode> {
             timeout,
             http,
             port,
+            server_args,
+            fresh,
+            pace,
             float_tolerance,
             json,
             run,
@@ -777,6 +839,9 @@ fn run_app(command: AppCmd) -> Result<ExitCode> {
                 timeout_secs: timeout,
                 http,
                 port,
+                server_args: &server_args,
+                fresh: &fresh,
+                pace_ms: pace,
                 float_tolerance,
             })?;
             if json {

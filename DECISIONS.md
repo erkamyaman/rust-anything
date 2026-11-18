@@ -25,7 +25,7 @@ Choices made so far, with reasons. Each one can be revisited.
 | A6 | Risks are heuristics: method names like `slice` also match arrays. | False positives cost a look; false negatives cost silent bugs. Each risk lists its first lines so a human or agent can check quickly. |
 | A7 | Readiness = 100 - weighted risks (log of count) - size - fan-in - dependency penalties + test bonus. | Log keeps big files from drowning in counts; fan-in pushes widely-used units later, where a mistake costs more. |
 | A8 | Priority = half readiness, half value (loops and string work per line, tests, size between 80 and 600 lines). | Readiness alone picks trivial declaration files. A first port should be safe and worth the bridge. |
-| A9 | npm to crate table is hand-curated; unknown packages are reported as `unknown`, never guessed. | The prompt: flag missing equivalents instead of hand-rolling silently. |
+| A9 | The library-to-crate table (`src/crates.toml`, every language) is hand-curated; unknown packages are reported as `unknown`, never guessed. | The prompt: flag missing equivalents instead of hand-rolling silently. |
 | A10 | JSON output carries `schema: rust-anything/analyze@1`. | Agents read it; it is a wire contract and gets versioned. |
 
 ## The loop

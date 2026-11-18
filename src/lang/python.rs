@@ -9,7 +9,7 @@ use tree_sitter::Node;
 
 use super::syntax::{self, named_children, text};
 use crate::risks::{Risk, regex_needs_fancy};
-use crate::ts::deps::{CrateMatch, Fit};
+use crate::ts::deps::CrateMatch;
 use crate::ts::discover::{FileKind, Package, SourceFile, Workspace};
 use crate::ts::exports::{ExportedClass, ExportedFn, Param};
 use crate::ts::scan::{FileFacts, Import};
@@ -713,62 +713,9 @@ const STDLIB: &[&str] = &[
 
 // ---- dependencies ----------------------------------------------------------------------------
 
-const fn m(crates: &'static str, fit: Fit, note: &'static str) -> CrateMatch {
-    CrateMatch { crates, fit, note }
-}
-
 /// The Rust counterpart of a PyPI package (or import name).
 pub fn lookup(package: &str) -> Option<CrateMatch> {
-    Some(match package {
-        "requests" | "httpx" | "urllib3" | "aiohttp" => m("reqwest", Fit::Good, ""),
-        "numpy" => m(
-            "ndarray",
-            Fit::Partial,
-            "Broadcasting and dtype rules differ; check numerics.",
-        ),
-        "pandas" => m(
-            "polars",
-            Fit::Partial,
-            "Different API; port by behavior, not by call.",
-        ),
-        "pyyaml" | "yaml" | "ruamel-yaml" => m(
-            "serde_yaml_ng, saphyr",
-            Fit::Partial,
-            "Round-tripping comments is not covered.",
-        ),
-        "regex" => m(
-            "fancy-regex",
-            Fit::Partial,
-            "Python `regex` features beyond fancy-regex need checks.",
-        ),
-        "click" | "typer" | "docopt" => m("clap", Fit::Good, ""),
-        "toml" | "tomli" | "tomli-w" => m("toml", Fit::Good, ""),
-        "pydantic" | "attrs" | "marshmallow" => m(
-            "serde, garde",
-            Fit::Partial,
-            "Validation errors will differ.",
-        ),
-        "jinja2" => m(
-            "minijinja",
-            Fit::Good,
-            "Same template language, by Jinja's author.",
-        ),
-        "lxml" | "beautifulsoup4" | "bs4" => m("quick-xml, scraper", Fit::Partial, ""),
-        "python-dateutil" | "dateutil" | "pendulum" | "arrow" => m("jiff", Fit::Good, ""),
-        "orjson" | "ujson" | "simplejson" => m("serde_json", Fit::Good, ""),
-        "rich" | "colorama" | "termcolor" => m("owo-colors, anstream", Fit::Good, ""),
-        "tqdm" => m("indicatif", Fit::Good, ""),
-        "cryptography" | "pycryptodome" => m("ring, RustCrypto crates", Fit::Partial, ""),
-        "pillow" | "pil" => m("image", Fit::Partial, ""),
-        "sqlalchemy" | "psycopg2" | "psycopg" => {
-            m("sqlx", Fit::Partial, "ORM layers port by hand.")
-        }
-        "django" | "flask" | "fastapi" | "starlette" => {
-            m("-", Fit::None, "Web framework: keep the app in Python.")
-        }
-        "pytest" | "hypothesis" | "mypy" => m("-", Fit::None, "Tooling, not runtime."),
-        _ => return None,
-    })
+    crate::crates::find("python", package)
 }
 
 // ---- exports ---------------------------------------------------------------------------------

@@ -291,12 +291,17 @@ pub(crate) fn rank_body(ret: &str) -> Option<String> {
 pub fn js_rs(m: &Manifest, api: &PortApi) -> Result<String, String> {
     let mut out = String::new();
     let parallel = m.kind == Kind::Napi;
-    if parallel
-        && fast_batches(m, api)
-            .iter()
-            .any(|b| b.items == Items::Strings || b.strings_out)
-    {
-        out.push_str(JOINED_RS);
+    let fast = if parallel {
+        fast_batches(m, api)
+    } else {
+        Vec::new()
+    };
+    let strings_out = fast.iter().any(|b| b.strings_out);
+    if strings_out {
+        out.push_str(JOINED_OUT_RS);
+    }
+    if fast.iter().any(|b| b.items == Items::Strings) {
+        out.push_str(JOINED_IN_RS);
     }
     for b in &m.batches {
         let s = spec(b, api)?;
@@ -466,7 +471,7 @@ pub(crate) fn fast_batches(m: &Manifest, api: &PortApi) -> Vec<FastBatch> {
         .collect()
 }
 
-const JOINED_RS: &str = r#"
+const JOINED_OUT_RS: &str = r#"
 /// Strings joined into one, with the UTF-16 end offset of each (what JS `slice` takes).
 #[napi(object)]
 pub struct JoinedStrings {
@@ -490,6 +495,9 @@ fn joined(out: Vec<String>) -> JoinedStrings {
     }
 }
 
+"#;
+
+const JOINED_IN_RS: &str = r#"
 /// Splits `text` at UTF-16 end offsets. A lone surrogate arrived as U+FFFD, one unit as before.
 fn split_joined(text: &str, ends: &[u32]) -> Vec<String> {
     let ascii = text.is_ascii()

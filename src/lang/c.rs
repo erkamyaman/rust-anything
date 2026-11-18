@@ -9,7 +9,7 @@ use tree_sitter::Node;
 
 use super::syntax::{self, named_children, text};
 use crate::risks::Risk;
-use crate::ts::deps::{CrateMatch, Fit};
+use crate::ts::deps::CrateMatch;
 use crate::ts::discover::{FileKind, Package, SourceFile, Workspace};
 use crate::ts::exports::{ExportedFn, Param};
 use crate::ts::scan::{FileFacts, Import};
@@ -317,44 +317,9 @@ const STANDARD: &[&str] = &[
     "<wctype.h>",
 ];
 
-const fn m(crates: &'static str, fit: Fit, note: &'static str) -> CrateMatch {
-    CrateMatch { crates, fit, note }
-}
-
 /// Rust counterparts of common C libraries, by header.
 pub fn lookup(header: &str) -> Option<CrateMatch> {
-    Some(match header {
-        "<zlib.h>" => m("flate2", Fit::Good, ""),
-        "<openssl/ssl.h>" | "<openssl/evp.h>" => m("rustls, ring", Fit::Partial, ""),
-        "<sqlite3.h>" => m("rusqlite", Fit::Good, ""),
-        "<curl/curl.h>" => m("reqwest, ureq", Fit::Good, ""),
-        "<pcre.h>" | "<pcre2.h>" | "<regex.h>" => {
-            m("regex, fancy-regex", Fit::Partial, "Syntax differs.")
-        }
-        "<pthread.h>" => m("std::thread", Fit::Good, ""),
-        "<sys/socket.h>" | "<netinet/in.h>" | "<arpa/inet.h>" | "<netdb.h>" => m(
-            "std::net, socket2",
-            Fit::Good,
-            "std covers TCP and UDP; socket2 for raw socket options.",
-        ),
-        "<unistd.h>" | "<fcntl.h>" | "<sys/stat.h>" | "<sys/types.h>" | "<dirent.h>" => {
-            m("std::fs, std::process, libc", Fit::Good, "")
-        }
-        "<sys/wait.h>" => m("std::process", Fit::Good, ""),
-        "<poll.h>" | "<sys/select.h>" | "<sys/epoll.h>" | "<sys/event.h>" => {
-            m("mio, tokio", Fit::Good, "")
-        }
-        "<getopt.h>" => m("clap", Fit::Good, ""),
-        "<dlfcn.h>" => m("libloading", Fit::Good, ""),
-        "<sys/mman.h>" => m("memmap2", Fit::Good, ""),
-        "<syslog.h>" => m("syslog, tracing", Fit::Partial, ""),
-        "<iconv.h>" => m("encoding_rs", Fit::Good, ""),
-        "<math.h>" | "<string.h>" | "<stdlib.h>" | "<stdio.h>" | "<ctype.h>" | "<stdint.h>"
-        | "<stdbool.h>" | "<stddef.h>" | "<limits.h>" | "<errno.h>" | "<assert.h>" => {
-            m("std", Fit::Good, "")
-        }
-        _ => return None,
-    })
+    crate::crates::find("c", header)
 }
 
 // ---- exports ---------------------------------------------------------------------------------

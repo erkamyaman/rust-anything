@@ -1,14 +1,12 @@
-use std::{path::Path, process::Command};
+mod common;
+
+use std::path::Path;
 
 use rust_anything::{bridge, harness};
 
 #[test]
 fn record_resolves_versioned_go_modules_in_directories_with_spaces() {
-    if !Command::new("go")
-        .arg("version")
-        .output()
-        .is_ok_and(|o| o.status.success())
-    {
+    if !common::have("go") {
         return;
     }
 
@@ -42,6 +40,7 @@ fn record(root: &Path, module: &str) -> anyhow::Result<()> {
         keep: Vec::new(),
         lang: None,
         batch: Vec::new(),
+        as_json: Vec::new(),
     })?;
     let recording = harness::record(&harness::RecordOptions {
         crate_dir: &out,

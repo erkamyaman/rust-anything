@@ -6,7 +6,7 @@ the plan's choice: core must keep running in browsers. Nothing in the x18n repos
 
 ## Result
 
-**Correctness: every port matches the TS original exactly**, on 6,925 recorded cases plus 4,600
+**Correctness: every port matches the TS original exactly**, on 7,925 recorded cases plus 4,600
 shadow-mode calls with zero mismatches. **Performance: as called from JS, the Rust versions are
 slower** for nearly every function: the bridge costs more than the work.
 

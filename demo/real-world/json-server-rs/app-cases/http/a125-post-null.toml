@@ -1,0 +1,16 @@
+[request]
+method = "POST"
+path = "/posts"
+body = "null"
+
+[request.headers]
+Content-Type = "application/json"
+
+[response]
+status = 400
+
+[response.headers]
+access-control-allow-headers = "content-type"
+access-control-allow-methods = "GET, HEAD, PUT, PATCH, POST, DELETE"
+access-control-allow-origin = "*"
+content-type = "application/json"

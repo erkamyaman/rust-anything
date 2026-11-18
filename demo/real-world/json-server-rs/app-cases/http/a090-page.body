@@ -1,0 +1,20 @@
+{
+  "first": 1,
+  "prev": 2,
+  "next": null,
+  "last": 3,
+  "pages": 3,
+  "items": 6,
+  "data": [
+    {
+      "id": "5",
+      "title": "numeric id",
+      "views": 1e+21
+    },
+    {
+      "title": "no id at all",
+      "views": 0,
+[..]
+    }
+  ]
+}

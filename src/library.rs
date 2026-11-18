@@ -168,7 +168,7 @@ pub(crate) fn cargo_build_lib(app_dir: &Path, target_dir: Option<&Path>) -> Resu
     if let Some(dir) = target_dir {
         cmd.env("CARGO_TARGET_DIR", dir);
     }
-    let out = cmd.output().context("running cargo")?;
+    let out = crate::process::output(&mut cmd, crate::process::BUILD).context("running cargo")?;
     ensure!(
         out.status.success(),
         "cargo build in {} failed:\n{}",

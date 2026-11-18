@@ -16,7 +16,7 @@ pub const NAME: &str = "rust-anything";
 
 /// The workflow skill, as shipped in `skills/rust-anything/SKILL.md`.
 pub const SKILL: &str = include_str!("../skills/rust-anything/SKILL.md");
-const SKILL_FILES: &[(&str, &str)] = &[
+pub(crate) const SKILL_FILES: &[(&str, &str)] = &[
     ("SKILL.md", SKILL),
     (
         "whole-app.md",
@@ -59,8 +59,27 @@ impl Agent {
         }
     }
 
+    /// The settings file that holds the agent's MCP servers.
+    pub(crate) fn config(self, home: &Path) -> PathBuf {
+        home.join(match self {
+            Agent::Claude => ".claude.json",
+            Agent::Codex => ".codex/config.toml",
+            Agent::Cursor => ".cursor/mcp.json",
+            Agent::Gemini => ".gemini/settings.json",
+        })
+    }
+
+    /// Where the workflow skill goes, for agents that read skills.
+    pub(crate) fn skill_dir(self, home: &Path) -> Option<PathBuf> {
+        match self {
+            Agent::Claude => Some(home.join(".claude/skills").join(NAME)),
+            Agent::Codex => Some(home.join(".codex/skills").join(NAME)),
+            Agent::Cursor | Agent::Gemini => None,
+        }
+    }
+
     /// Whether the agent seems installed: its folder exists or its command is on `PATH`.
-    fn present(self, home: &Path) -> bool {
+    pub(crate) fn present(self, home: &Path) -> bool {
         let (dir, command) = self.markers();
         home.join(dir).is_dir() || on_path(command)
     }
@@ -133,45 +152,13 @@ pub fn setup(opts: &Options) -> Result<Report> {
     let command = opts.command.to_string_lossy().into_owned();
     let mut changes = Vec::new();
     for &agent in &agents {
-        let home = opts.home;
-        match agent {
-            Agent::Claude => {
-                changes.push(json_server(
-                    agent,
-                    &home.join(".claude.json"),
-                    &command,
-                    opts,
-                    true,
-                )?);
-                changes.push(skill(agent, &home.join(".claude/skills").join(NAME), opts)?);
-            }
-            Agent::Codex => {
-                changes.push(codex_server(
-                    agent,
-                    &home.join(".codex/config.toml"),
-                    &command,
-                    opts,
-                )?);
-                changes.push(skill(agent, &home.join(".codex/skills").join(NAME), opts)?);
-            }
-            Agent::Cursor => {
-                changes.push(json_server(
-                    agent,
-                    &home.join(".cursor/mcp.json"),
-                    &command,
-                    opts,
-                    false,
-                )?);
-            }
-            Agent::Gemini => {
-                changes.push(json_server(
-                    agent,
-                    &home.join(".gemini/settings.json"),
-                    &command,
-                    opts,
-                    false,
-                )?);
-            }
+        let config = agent.config(opts.home);
+        changes.push(match agent {
+            Agent::Codex => codex_server(agent, &config, &command, opts)?,
+            _ => json_server(agent, &config, &command, opts, agent == Agent::Claude)?,
+        });
+        if let Some(dir) = agent.skill_dir(opts.home) {
+            changes.push(skill(agent, &dir, opts)?);
         }
     }
     Ok(Report {

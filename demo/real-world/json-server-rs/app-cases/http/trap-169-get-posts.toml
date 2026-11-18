@@ -1,0 +1,12 @@
+[request]
+method = "GET"
+path = "/posts?author.name:contains=h%C3%A9llo%20w%C3%B6rld"
+
+[response]
+status = 200
+
+[response.headers]
+access-control-allow-headers = "content-type"
+access-control-allow-methods = "GET, HEAD, PUT, PATCH, POST, DELETE"
+access-control-allow-origin = "*"
+content-type = "application/json"

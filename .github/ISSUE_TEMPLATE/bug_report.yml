@@ -6,6 +6,10 @@ body:
     attributes:
       value: |
         Thanks for reporting. A security problem goes through the private report in SECURITY.md instead.
+
+        **Don't paste secrets or private data.** Leave out API keys, tokens, private code, and the
+        recorded `cases.jsonl` (or `rust/app-cases/`) of a private project: recordings contain real
+        inputs and outputs. A minimal repro with made-up data is enough.
   - type: textarea
     id: what
     attributes:
@@ -50,11 +54,12 @@ body:
         - Not language specific
     validations:
       required: true
-  - type: input
-    id: platform
+  - type: textarea
+    id: environment
     attributes:
-      label: Platform
-      description: OS and architecture, plus the runtime version if it matters (Node, Python, JDK...).
+      label: Environment
+      description: Output of `rust-anything doctor` (1.6+), or your OS, Node/Python/etc. versions. Check it for paths or names you'd rather not share.
+      render: text
       placeholder: macOS 26 arm64, Node 22
     validations:
       required: true

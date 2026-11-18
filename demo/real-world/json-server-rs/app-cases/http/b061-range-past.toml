@@ -1,0 +1,12 @@
+[request]
+method = "GET"
+path = "/test.html"
+
+[request.headers]
+Range = "bytes=1000-"
+
+[response]
+status = 416
+
+[response.headers]
+content-range = "bytes */73"

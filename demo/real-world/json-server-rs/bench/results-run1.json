@@ -1,0 +1,351 @@
+{
+  "node": "v24.15.0",
+  "small/node/startup_ms": 84.6339169984276,
+  "small/node/idle_rss_mb": 74.265625,
+  "small/rust/startup_ms": 9.888166998280212,
+  "small/rust/idle_rss_mb": 3.453125,
+  "big/node/startup_ms": 95.23662500214414,
+  "big/node/idle_rss_mb": 94.046875,
+  "big/rust/startup_ms": 48.10029099826352,
+  "big/rust/idle_rss_mb": 41.21875,
+  "small/node/GET /posts/c1": {
+    "rps": 11098.58,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 0
+  },
+  "small/node/GET /posts/c50": {
+    "rps": 19717.06,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 2,
+    "p99_ms": 5
+  },
+  "small/node/GET /posts/1/c1": {
+    "rps": 11006.12,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 0
+  },
+  "small/node/GET /posts/1/c50": {
+    "rps": 21879.42,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 2,
+    "p99_ms": 5
+  },
+  "small/node/GET /posts?views:gt=10&_sort=-views&_page=1&_per_page=2/c1": {
+    "rps": 10452.09,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 0
+  },
+  "small/node/GET /posts?views:gt=10&_sort=-views&_page=1&_per_page=2/c50": {
+    "rps": 18259.64,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 2,
+    "p99_ms": 7
+  },
+  "small/node/GET /posts?_embed=comments/c1": {
+    "rps": 8692.81,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 0
+  },
+  "small/node/GET /posts?_embed=comments/c50": {
+    "rps": 13814.39,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 3,
+    "p99_ms": 6
+  },
+  "small/node/GET //c1": {
+    "rps": 7289.5,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 0
+  },
+  "small/node/GET //c50": {
+    "rps": 10183.77,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 5,
+    "p99_ms": 6
+  },
+  "small/node/GET /test.html/c1": {
+    "rps": 11982.89,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 1
+  },
+  "small/node/GET /test.html/c50": {
+    "rps": 30335.85,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 1,
+    "p99_ms": 3
+  },
+  "small/node/POST /comments/c10": {
+    "rps": 2973.11,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 3,
+    "p99_ms": 13
+  },
+  "small/node/peak_rss_mb": 423.859375,
+  "small/rust/GET /posts/c1": {
+    "rps": 27260.55,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 0
+  },
+  "small/rust/GET /posts/c50": {
+    "rps": 114987.47,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 1
+  },
+  "small/rust/GET /posts/1/c1": {
+    "rps": 27699.72,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 0
+  },
+  "small/rust/GET /posts/1/c50": {
+    "rps": 119913.42,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 1
+  },
+  "small/rust/GET /posts?views:gt=10&_sort=-views&_page=1&_per_page=2/c1": {
+    "rps": 25163.53,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 0
+  },
+  "small/rust/GET /posts?views:gt=10&_sort=-views&_page=1&_per_page=2/c50": {
+    "rps": 107515.9,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 1
+  },
+  "small/rust/GET /posts?_embed=comments/c1": {
+    "rps": 22456.47,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 0
+  },
+  "small/rust/GET /posts?_embed=comments/c50": {
+    "rps": 98330.35,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 1
+  },
+  "small/rust/GET //c1": {
+    "rps": 27642.71,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 0
+  },
+  "small/rust/GET //c50": {
+    "rps": 135096.8,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 1
+  },
+  "small/rust/GET /test.html/c1": {
+    "rps": 25847.31,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 0
+  },
+  "small/rust/GET /test.html/c50": {
+    "rps": 103949.56,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 1
+  },
+  "small/rust/POST /comments/c10": {
+    "rps": 5820.63,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 1,
+    "p99_ms": 4
+  },
+  "small/rust/peak_rss_mb": 17.6875,
+  "big/node/GET /posts/5000/c1": {
+    "rps": 8418.28,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 0
+  },
+  "big/node/GET /posts/5000/c50": {
+    "rps": 15471.84,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 3,
+    "p99_ms": 7
+  },
+  "big/node/GET /posts?_page=3&_per_page=10/c1": {
+    "rps": 4609.31,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 1
+  },
+  "big/node/GET /posts?_page=3&_per_page=10/c50": {
+    "rps": 6485.54,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 7,
+    "p99_ms": 18
+  },
+  "big/node/GET /posts?title:contains=number%2099&_sort=-views/c1": {
+    "rps": 430.55,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 2,
+    "p99_ms": 5
+  },
+  "big/node/GET /posts?title:contains=number%2099&_sort=-views/c50": {
+    "rps": 464.95,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 104,
+    "p99_ms": 178
+  },
+  "big/node/GET /posts?_embed=comments&_page=1&_per_page=5/c1": {
+    "rps": 2.41,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 408,
+    "p99_ms": 564
+  },
+  "big/node/GET /posts?_embed=comments&_page=1&_per_page=5/c10": {
+    "rps": 2.44,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 4066,
+    "p99_ms": 4198
+  },
+  "big/node/GET /posts/c1": {
+    "rps": 328.32,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 3,
+    "p99_ms": 4
+  },
+  "big/node/GET /posts/c10": {
+    "rps": 381.18,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 25,
+    "p99_ms": 32
+  },
+  "big/node/POST /comments/c10": {
+    "rps": 235.78,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 41,
+    "p99_ms": 59
+  },
+  "big/node/peak_rss_mb": 462.1875,
+  "big/rust/GET /posts/5000/c1": {
+    "rps": 14640.87,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 0
+  },
+  "big/rust/GET /posts/5000/c50": {
+    "rps": 69502.36,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 1,
+    "p99_ms": 1
+  },
+  "big/rust/GET /posts?_page=3&_per_page=10/c1": {
+    "rps": 8826.43,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 0,
+    "p99_ms": 0
+  },
+  "big/rust/GET /posts?_page=3&_per_page=10/c50": {
+    "rps": 47437.66,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 1,
+    "p99_ms": 2
+  },
+  "big/rust/GET /posts?title:contains=number%2099&_sort=-views/c1": {
+    "rps": 599.99,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 2,
+    "p99_ms": 2
+  },
+  "big/rust/GET /posts?title:contains=number%2099&_sort=-views/c50": {
+    "rps": 2516.0,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 19,
+    "p99_ms": 44
+  },
+  "big/rust/GET /posts?_embed=comments&_page=1&_per_page=5/c1": {
+    "rps": 80.65,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 12,
+    "p99_ms": 22
+  },
+  "big/rust/GET /posts?_embed=comments&_page=1&_per_page=5/c10": {
+    "rps": 253.24,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 36,
+    "p99_ms": 71
+  },
+  "big/rust/GET /posts/c1": {
+    "rps": 398.56,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 2,
+    "p99_ms": 6
+  },
+  "big/rust/GET /posts/c10": {
+    "rps": 1514.06,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 6,
+    "p99_ms": 10
+  },
+  "big/rust/POST /comments/c10": {
+    "rps": 292.46,
+    "failed": 0,
+    "non2xx": 0,
+    "p50_ms": 32,
+    "p99_ms": 77
+  },
+  "big/rust/peak_rss_mb": 288.484375
+}

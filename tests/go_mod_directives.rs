@@ -1,14 +1,12 @@
-use std::{path::Path, process::Command};
+mod common;
+
+use std::path::Path;
 
 use rust_anything::{bridge, harness};
 
 #[test]
 fn record_reads_tabbed_go_mod_directives_with_comments() {
-    if !Command::new("go")
-        .arg("version")
-        .output()
-        .is_ok_and(|o| o.status.success())
-    {
+    if !common::have("go") {
         return;
     }
 
@@ -42,6 +40,7 @@ fn record(root: &Path) -> anyhow::Result<()> {
         keep: Vec::new(),
         lang: None,
         batch: Vec::new(),
+        as_json: Vec::new(),
     })?;
     let manifest = bridge::Manifest::load(&out)?;
     assert_eq!(

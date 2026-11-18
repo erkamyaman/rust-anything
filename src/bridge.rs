@@ -207,6 +207,9 @@ pub struct Options<'a> {
     pub lang: Option<crate::lang::Lang>,
     /// `function:param` pairs: batch classes running `function` over many `param` values.
     pub batch: Vec<String>,
+    /// Type parameters the app only fills with data: bridged as JSON values instead of keeping
+    /// the export in TS.
+    pub as_json: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -548,6 +551,26 @@ pub fn substitute_constraints(f: &mut ExportedFn, types: &[LocalType]) {
             p.ts_type = replace_word(&p.ts_type, name, &replacement);
         }
         f.returns = replace_word(&f.returns, name, &replacement);
+    }
+    f.type_params = remaining;
+}
+
+/// Turns the type parameters named in `names` into `unknown` (a JSON value on the Rust side).
+pub fn substitute_json(f: &mut ExportedFn, names: &[String]) {
+    let mut remaining = Vec::new();
+    for tp in std::mem::take(&mut f.type_params) {
+        let name = tp
+            .split_once(" extends ")
+            .map_or(tp.as_str(), |(n, _)| n)
+            .trim();
+        if !names.iter().any(|n| n == name) {
+            remaining.push(tp);
+            continue;
+        }
+        for p in &mut f.params {
+            p.ts_type = replace_word(&p.ts_type, name, "unknown");
+        }
+        f.returns = replace_word(&f.returns, name, "unknown");
     }
     f.type_params = remaining;
 }
@@ -1085,6 +1108,7 @@ pub fn bridge(opts: &Options) -> Result<Outcome> {
             }
             f.returns = resolve_aliases(&f.returns, &types);
             substitute_constraints(&mut f, &types);
+            substitute_json(&mut f, &opts.as_json);
             let kept = keep_reason(&opts.keep, &f.name);
             match kept.or_else(|| js_only_reason(&f, &types)) {
                 Some(reason) => js_only.push(JsOnly {
@@ -1717,6 +1741,20 @@ mod tests {
         assert_eq!(fns[1].type_params, ["T"]);
         assert_eq!(fns[2].params[0].ts_type, "(readonly string[])");
         assert!(js_only_reason(&fns[0], &[]).is_none() && js_only_reason(&fns[1], &[]).is_some());
+    }
+
+    #[test]
+    fn as_json_bridges_a_data_generic() {
+        let mut fns = exported_functions(
+            "a.ts",
+            "export function paginate<T>(items: T[], page: number): { data: T[] } { return { data: items } }\n",
+        );
+        assert!(js_only_reason(&fns[0], &[]).is_some());
+        substitute_json(&mut fns[0], &["T".to_string()]);
+        assert!(fns[0].type_params.is_empty());
+        assert_eq!(fns[0].params[0].ts_type, "unknown[]");
+        assert_eq!(fns[0].returns, "{ data: unknown[] }");
+        assert!(js_only_reason(&fns[0], &[]).is_none());
     }
 
     #[test]

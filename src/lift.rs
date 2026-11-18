@@ -241,6 +241,50 @@ fn port_modules(src: &Path) -> BTreeSet<String> {
 /// Turns a unit crate into a plain library: no `cdylib`, no binding dependencies, `lib.rs` that
 /// only exposes `port` (and the modules it uses), and, for a crate `bridge` made, no generated
 /// wrappers. Returns the paths it removed.
+/// The crates under `rust_dir` that `roots` depend on by path, transitively, roots excluded.
+fn path_dependencies(roots: &[PathBuf], rust_dir: &Path) -> Vec<PathBuf> {
+    let mut seen: BTreeSet<PathBuf> = roots.iter().cloned().collect();
+    let mut found = Vec::new();
+    let mut queue: Vec<PathBuf> = roots.to_vec();
+    while let Some(dir) = queue.pop() {
+        let Ok(text) = std::fs::read_to_string(dir.join("Cargo.toml")) else {
+            continue;
+        };
+        let Ok(doc) = text.parse::<DocumentMut>() else {
+            continue;
+        };
+        for table in ["dependencies", "dev-dependencies", "build-dependencies"] {
+            let Some(deps) = doc.get(table).and_then(TomlItem::as_table_like) else {
+                continue;
+            };
+            for (_, dep) in deps.iter() {
+                let Some(path) = dep.get("path").and_then(TomlItem::as_str) else {
+                    continue;
+                };
+                let Ok(target) = dir.join(path).canonical() else {
+                    continue;
+                };
+                if target.starts_with(rust_dir) && seen.insert(target.clone()) {
+                    found.push(target.clone());
+                    queue.push(target);
+                }
+            }
+        }
+    }
+    found.sort();
+    found
+}
+
+/// `lib.rs` of a stripped unit: `port` and the generated modules it uses, in the order rustfmt
+/// keeps module declarations.
+fn stripped_lib_rs(keep: &[String]) -> String {
+    let mut modules: Vec<&str> = keep.iter().map(String::as_str).collect();
+    modules.push("port");
+    modules.sort_unstable();
+    modules.dedup();
+    modules.iter().map(|m| format!("pub mod {m};\n")).collect()
+}
+
 pub fn strip_unit(dir: &Path) -> Result<Vec<PathBuf>> {
     let cargo = dir.join("Cargo.toml");
     let mut doc: DocumentMut = std::fs::read_to_string(&cargo)
@@ -278,11 +322,8 @@ pub fn strip_unit(dir: &Path) -> Result<Vec<PathBuf>> {
     }
     let src = dir.join("src");
     let keep = port_modules(&src);
-    let mut lib = String::from("pub mod port;\n");
-    for module in &keep {
-        lib += &format!("pub mod {module};\n");
-    }
-    std::fs::write(src.join("lib.rs"), lib)?;
+    let kept: Vec<String> = keep.iter().cloned().collect();
+    std::fs::write(src.join("lib.rs"), stripped_lib_rs(&kept))?;
     for file in GENERATED_FILES {
         let path = dir.join(file);
         if path.is_file() {
@@ -359,12 +400,16 @@ fn same_code(a: &str, b: &str) -> bool {
     squash(a) == squash(b)
 }
 
-fn generated_main(state: &State) -> String {
+fn generated_mains(state: &State) -> Vec<String> {
     match state.kind {
-        AppKind::Cli => MAIN_RS.to_string(),
-        AppKind::Http => http_door::main_rs(),
-        AppKind::Library => String::new(),
+        AppKind::Cli => vec![MAIN_RS.to_string()],
+        AppKind::Http => http_door::main_rs_versions(),
+        AppKind::Library => Vec::new(),
     }
+}
+
+fn is_generated_main(code: &str, state: &State) -> bool {
+    generated_mains(state).iter().any(|m| same_code(code, m))
 }
 
 fn lift_library(stage_app: &Path, state: &mut State) -> Result<()> {
@@ -398,7 +443,7 @@ fn lift_app(
     }
     let http = state.kind == AppKind::Http;
     let main = stage_app.join("src/main.rs");
-    if same_code(&std::fs::read_to_string(&main)?, &generated_main(state)) {
+    if is_generated_main(&std::fs::read_to_string(&main)?, state) {
         let lifted = if http {
             http_door::lifted_main_rs()
         } else {
@@ -646,7 +691,7 @@ pub fn lift(opts: &LiftOptions) -> Result<LiftOutcome> {
         units.push((unit.clone(), dir));
     }
     let main = std::fs::read_to_string(app_dir.join("src/main.rs")).unwrap_or_default();
-    if !library && !same_code(&main, &generated_main(&state)) && main.contains("original::") {
+    if !library && !is_generated_main(&main, &state) && main.contains("original::") {
         blockers.push(
             "src/main.rs was changed and still calls the original: remove `mod original`, `original::report_fallbacks()` and `original::run` by hand, then lift again"
                 .to_string(),
@@ -759,6 +804,18 @@ pub fn lift(opts: &LiftOptions) -> Result<LiftOutcome> {
         strip_unit(&staged)?;
         staged_units.push((unit.clone(), dir.clone(), staged));
     }
+    let unit_dirs: Vec<PathBuf> = units.iter().map(|(_, dir)| dir.clone()).collect();
+    let mut staged_deps = Vec::new();
+    for dir in path_dependencies(&unit_dirs, &rust_dir) {
+        if dir == app_dir.canonical().unwrap_or_else(|_| app_dir.clone()) {
+            continue;
+        }
+        let rel = dir.strip_prefix(&rust_dir).unwrap_or(&dir);
+        let staged = stage_rust.join(rel);
+        copy_tree(&dir, &staged)?;
+        strip_unit(&staged)?;
+        staged_deps.push((dir, staged));
+    }
     let stage_app = stage_rust.join("app");
     lift_app(&stage_app, &mut state, &case_bin, &unordered)?;
 
@@ -766,6 +823,14 @@ pub fn lift(opts: &LiftOptions) -> Result<LiftOutcome> {
     for (unit, dir, staged) in &staged_units {
         for check in gate::rust_checks(staged, &dir.join("target")) {
             checklist.push(Item::from_check(&unit.crate_name, check));
+        }
+    }
+    for (dir, staged) in &staged_deps {
+        let name = dir
+            .file_name()
+            .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+        for check in gate::rust_checks(staged, &dir.join("target")) {
+            checklist.push(Item::from_check(&name, check));
         }
     }
     for check in gate::rust_checks(&stage_app, &target_dir) {
@@ -884,6 +949,9 @@ pub fn lift(opts: &LiftOptions) -> Result<LiftOutcome> {
     for (_, dir, staged) in &staged_units {
         removed.extend(sync(staged, dir)?);
     }
+    for (dir, staged) in &staged_deps {
+        removed.extend(sync(staged, dir)?);
+    }
     let _ = std::fs::remove_dir_all(&stage);
     let binary = if library {
         crate::library::cargo_build_lib(&app_dir, Some(&target_dir))?;
@@ -913,6 +981,40 @@ pub fn lift(opts: &LiftOptions) -> Result<LiftOutcome> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn stripped_lib_rs_lists_modules_as_rustfmt_orders_them() {
+        assert_eq!(
+            super::stripped_lib_rs(&["utf16".into(), "js".into()]),
+            "pub mod js;\npub mod port;\npub mod utf16;\n"
+        );
+    }
+
+    #[test]
+    fn path_dependencies_are_found_transitively_under_rust() {
+        let root = crate::app::temp_dir("lift-deps").unwrap();
+        let rust = root.join("rust");
+        let write = |name: &str, deps: &str| {
+            let dir = rust.join(name);
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(
+                dir.join("Cargo.toml"),
+                format!("[package]\nname = \"{name}\"\n\n[dependencies]\n{deps}"),
+            )
+            .unwrap();
+        };
+        std::fs::create_dir_all(root.join("outside")).unwrap();
+        write(
+            "unit-rs",
+            "shared = { path = \"../shared\" }\nother = { path = \"../../outside\" }\nserde = \"1\"\n",
+        );
+        write("shared", "leaf = { path = \"../leaf\" }\n");
+        write("leaf", "");
+        let rust = rust.canonical().unwrap();
+        let found = super::path_dependencies(&[rust.join("unit-rs")], &rust);
+        std::fs::remove_dir_all(&root).unwrap();
+        assert_eq!(found, [rust.join("leaf"), rust.join("shared")]);
+    }
+
     use super::*;
 
     #[test]

@@ -1,0 +1,36 @@
+{
+  "first": 1,
+  "prev": null,
+  "next": null,
+  "last": 1,
+  "pages": 1,
+  "items": 2,
+  "data": [
+    {
+      "id": "1",
+      "title": "a title",
+      "views": 100,
+      "published": true,
+      "userId": "1",
+      "author": {
+        "name": "typicode",
+        "age": 30
+      },
+      "tags": [
+        "json",
+        "rest"
+      ]
+    },
+    {
+      "id": "3",
+      "title": "Ünïcödé 👍🏽 thumbs",
+      "views": 50.5,
+      "published": true,
+      "userId": "1",
+      "author": {
+        "name": "zoë",
+        "age": null
+      }
+    }
+  ]
+}

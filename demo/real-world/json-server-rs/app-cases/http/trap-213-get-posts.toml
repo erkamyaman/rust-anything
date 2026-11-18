@@ -1,0 +1,12 @@
+[request]
+method = "GET"
+path = "/posts?views_gt=-9223372036854775808"
+
+[response]
+status = 200
+
+[response.headers]
+access-control-allow-headers = "content-type"
+access-control-allow-methods = "GET, HEAD, PUT, PATCH, POST, DELETE"
+access-control-allow-origin = "*"
+content-type = "application/json"

@@ -98,10 +98,10 @@ pub fn shadow(crate_dir: &Path, out: Option<&Path>) -> Result<ShadowOutcome> {
                 &manifest.crate_name,
             ),
         )?;
-        let _ = std::process::Command::new("gofmt")
-            .arg("-w")
-            .arg(&path)
-            .output();
+        let _ = crate::process::output(
+            std::process::Command::new("gofmt").arg("-w").arg(&path),
+            crate::process::QUICK,
+        );
         return Ok(ShadowOutcome {
             path,
             exports: manifest.exports.iter().map(|f| f.name.clone()).collect(),

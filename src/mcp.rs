@@ -1,11 +1,19 @@
 //! MCP server over stdio: every step as a tool, for any agent.
 //!
 //! Newline-delimited JSON-RPC 2.0, as the MCP stdio transport specifies. The protocol surface
-//! is small (initialize, tools/list, tools/call, ping), so it is implemented directly on
-//! serde_json instead of pulling in an SDK.
+//! is small (initialize, tools/list, tools/call, prompts/list, prompts/get, ping, progress and
+//! cancellation), so it is implemented directly on serde_json instead of pulling in an SDK.
+//!
+//! Each tools/call runs on its own thread, so ping and notifications/cancelled are answered
+//! while a long call runs; one writer thread owns stdout and writes whole lines.
 
+use std::collections::HashMap;
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex, PoisonError};
+use std::thread::JoinHandle;
 
 use anyhow::{Context, Result};
 use serde_json::{Value, json};
@@ -15,23 +23,137 @@ use crate::{analyze, app, bridge, front_door, gate, harness, lift, shadow};
 const PROTOCOL_VERSION: &str = "2025-06-18";
 
 pub fn serve() -> Result<()> {
-    let stdin = std::io::stdin();
-    let mut stdout = std::io::stdout().lock();
-    for line in stdin.lock().lines() {
+    serve_io(std::io::stdin().lock(), std::io::stdout())
+}
+
+/// In-flight tools/call requests by id, each with its cancelled flag.
+type Running = Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>;
+
+fn serve_io(input: impl BufRead, output: impl Write + Send + 'static) -> Result<()> {
+    let (tx, rx) = std::sync::mpsc::channel::<Value>();
+    let writer = std::thread::spawn(move || -> std::io::Result<()> {
+        let mut output = output;
+        for message in rx {
+            if message.is_null() {
+                break;
+            }
+            let mut line = message.to_string();
+            line.push('\n');
+            output.write_all(line.as_bytes())?;
+            output.flush()?;
+        }
+        Ok(())
+    });
+    let running = Running::default();
+    let mut workers: Vec<(Arc<AtomicBool>, JoinHandle<()>)> = Vec::new();
+    for line in input.lines() {
         let line = line?;
         if line.trim().is_empty() {
             continue;
         }
-        let response = match serde_json::from_str::<Value>(&line) {
-            Ok(request) => handle(&request),
-            Err(e) => Some(error(Value::Null, -32700, &format!("parse error: {e}"))),
+        let request = match serde_json::from_str::<Value>(&line) {
+            Ok(request) => request,
+            Err(e) => {
+                let _ = tx.send(error(Value::Null, -32700, &format!("parse error: {e}")));
+                continue;
+            }
         };
-        if let Some(response) = response {
-            writeln!(stdout, "{response}")?;
-            stdout.flush()?;
+        match request["method"].as_str() {
+            Some("tools/call") if request.get("id").is_some() => {
+                workers.retain(|(_, worker)| !worker.is_finished());
+                workers.push(spawn_call(request, tx.clone(), running.clone()));
+            }
+            Some("notifications/cancelled") => {
+                let key = request["params"]["requestId"].to_string();
+                if let Some(flag) = lock(&running).get(&key) {
+                    flag.store(true, Ordering::SeqCst);
+                }
+            }
+            _ => {
+                if let Some(response) = handle(&request) {
+                    let _ = tx.send(response);
+                }
+            }
         }
     }
+    for (cancelled, worker) in workers {
+        if !cancelled.load(Ordering::SeqCst) {
+            let _ = worker.join();
+        }
+    }
+    let _ = tx.send(Value::Null);
+    writer
+        .join()
+        .map_err(|_| anyhow::anyhow!("the MCP writer thread panicked"))??;
     Ok(())
+}
+
+fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// Runs one tools/call on its own thread. A cancelled request gets no response and no further
+/// progress; the check and the send happen under the `running` lock, so a cancellation lands
+/// either before the response (nothing is sent) or after it (the request is already gone).
+fn spawn_call(
+    request: Value,
+    tx: Sender<Value>,
+    running: Running,
+) -> (Arc<AtomicBool>, JoinHandle<()>) {
+    let key = request["id"].to_string();
+    let cancelled = Arc::new(AtomicBool::new(false));
+    lock(&running).insert(key.clone(), cancelled.clone());
+    let flag = cancelled.clone();
+    let worker = std::thread::spawn(move || {
+        let token = progress_token(&request);
+        let name = request["params"]["name"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        if let Some(token) = &token {
+            let _ = tx.send(progress(token, 0, &format!("running {name}")));
+        }
+        let response = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| handle(&request)))
+            .unwrap_or_else(|_| {
+                Some(error(
+                    request["id"].clone(),
+                    -32603,
+                    &format!("tool `{name}` panicked"),
+                ))
+            });
+        let mut running = lock(&running);
+        if running.get(&key).is_some_and(|f| Arc::ptr_eq(f, &flag)) {
+            running.remove(&key);
+        }
+        if flag.load(Ordering::SeqCst) {
+            return;
+        }
+        if let Some(token) = &token {
+            let failed = response
+                .as_ref()
+                .is_none_or(|r| r["result"]["isError"] != false);
+            let done = if failed { "failed" } else { "finished" };
+            let _ = tx.send(progress(token, 1, &format!("{name} {done}")));
+        }
+        if let Some(response) = response {
+            let _ = tx.send(response);
+        }
+    });
+    (cancelled, worker)
+}
+
+/// `params._meta.progressToken` when it is a string or an integer, as the spec requires.
+fn progress_token(request: &Value) -> Option<Value> {
+    let token = &request["params"]["_meta"]["progressToken"];
+    (token.is_string() || token.is_i64() || token.is_u64()).then(|| token.clone())
+}
+
+fn progress(token: &Value, done: u64, message: &str) -> Value {
+    json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/progress",
+        "params": { "progressToken": token, "progress": done, "total": 1, "message": message },
+    })
 }
 
 /// The response to one JSON-RPC message; `None` for notifications.
@@ -42,7 +164,7 @@ pub fn handle(request: &Value) -> Option<Value> {
     let result = match method {
         "initialize" => json!({
             "protocolVersion": request["params"]["protocolVersion"].as_str().unwrap_or(PROTOCOL_VERSION),
-            "capabilities": { "tools": {} },
+            "capabilities": { "tools": {}, "prompts": {} },
             "serverInfo": { "name": "rust-anything", "version": env!("CARGO_PKG_VERSION") },
             "instructions": "Incremental TS/JS to Rust migration. Loop per unit: analyze -> bridge -> \
                 record -> (port src/port.rs) -> build -> diff -> shadow -> gate. Never mark a port done \
@@ -59,10 +181,25 @@ pub fn handle(request: &Value) -> Option<Value> {
                     "structuredContent": value,
                     "isError": false,
                 }),
-                Err(e) => json!({
-                    "content": [{ "type": "text", "text": format!("{e:#}") }],
-                    "isError": true,
-                }),
+                Err(e) => {
+                    let text = format!("{e:#}");
+                    json!({
+                        "content": [{ "type": "text", "text": text }],
+                        "structuredContent": failure(&text, args),
+                        "isError": true,
+                    })
+                }
+            }
+        }
+        "prompts/list" => crate::mcp_prompts::list(),
+        "prompts/get" => {
+            let params = &request["params"];
+            match crate::mcp_prompts::get(
+                params["name"].as_str().unwrap_or_default(),
+                &params["arguments"],
+            ) {
+                Ok(prompt) => prompt,
+                Err(message) => return Some(error(id, -32602, &message)),
             }
         }
         _ => return Some(error(id, -32601, &format!("unknown method `{method}`"))),
@@ -74,7 +211,187 @@ fn error(id: Value, code: i64, message: &str) -> Value {
     json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } })
 }
 
+/// One kind of tool failure: a stable code, whether the same call may succeed when retried,
+/// and the next step, where `{path}` is the call's crate, repo or root.
+struct FailureKind {
+    code: &'static str,
+    retryable: bool,
+    matches: fn(&str) -> bool,
+    next: Option<&'static str>,
+}
+
+/// Checked in order; the first match wins, `failed` otherwise.
+const FAILURES: &[FailureKind] = &[
+    FailureKind {
+        code: "timed_out",
+        retryable: true,
+        matches: |t| t.contains("still running after"),
+        next: Some(
+            "retry; if it times out again, restart the MCP server with RUST_ANYTHING_COMMAND_TIMEOUT set higher",
+        ),
+    },
+    FailureKind {
+        code: "no_recording",
+        retryable: false,
+        matches: |t| {
+            (t.contains("no recorded cases") || t.contains("no cases in"))
+                && t.contains("app record` first")
+        },
+        next: Some("rust-anything app record {path} -- <command that runs the original>"),
+    },
+    FailureKind {
+        code: "no_recording",
+        retryable: false,
+        matches: |t| t.contains("no recorded cases"),
+        next: Some("rust-anything record {path}"),
+    },
+    FailureKind {
+        code: "stale_recording",
+        retryable: false,
+        matches: |t| t.contains("changed since it was recorded"),
+        next: Some("rust-anything record {path}"),
+    },
+    FailureKind {
+        code: "stale_build",
+        retryable: false,
+        matches: |t| t.contains("is older than the crate's sources"),
+        next: Some("rust-anything build {path}"),
+    },
+    FailureKind {
+        code: "build_failed",
+        retryable: false,
+        matches: |t| t.contains("cargo build") && t.contains("failed"),
+        next: Some("fix the compiler errors in the message, then rust-anything build {path}"),
+    },
+    FailureKind {
+        code: "invalid_arguments",
+        retryable: false,
+        matches: |t| t.starts_with("missing `") && !t.contains('\n') && !t.contains(": "),
+        next: None,
+    },
+    FailureKind {
+        code: "unknown_tool",
+        retryable: false,
+        matches: |t| t.starts_with("unknown tool `"),
+        next: Some("call tools/list for the tool names"),
+    },
+];
+
+/// The structuredContent of a failed tool call.
+fn failure(text: &str, args: &Value) -> Value {
+    let kind = FAILURES.iter().find(|k| (k.matches)(text));
+    let path = ["crate", "repo", "root"]
+        .iter()
+        .find_map(|key| args[key].as_str())
+        .unwrap_or("<crate>");
+    json!({
+        "code": kind.map_or("failed", |k| k.code),
+        "message": text,
+        "retryable": kind.is_some_and(|k| k.retryable),
+        "next": kind.and_then(|k| k.next).map(|n| n.replace("{path}", path)),
+    })
+}
+
+/// How a tool behaves, for the MCP tool annotations.
+struct ToolMeta {
+    name: &'static str,
+    title: &'static str,
+    read_only: bool,
+    destructive: bool,
+    idempotent: bool,
+    open_world: bool,
+}
+
+const fn meta(
+    name: &'static str,
+    title: &'static str,
+    [read_only, destructive, idempotent, open_world]: [bool; 4],
+) -> ToolMeta {
+    ToolMeta {
+        name,
+        title,
+        read_only,
+        destructive,
+        idempotent,
+        open_world,
+    }
+}
+
+/// `[readOnly, destructive, idempotent, openWorld]` per tool. Tools that run the original's
+/// code, test commands or cargo are open-world; only app_lift rewrites files the user wrote.
+const TOOL_META: &[ToolMeta] = &[
+    meta("analyze", "Analyze repository", [true, false, true, false]),
+    meta(
+        "bridge",
+        "Scaffold unit crate",
+        [false, false, false, false],
+    ),
+    meta(
+        "refresh",
+        "Regenerate bindings",
+        [false, false, true, false],
+    ),
+    meta(
+        "record",
+        "Record original behavior",
+        [false, false, false, true],
+    ),
+    meta("build", "Build crate", [false, false, true, true]),
+    meta(
+        "diff",
+        "Diff port against recording",
+        [false, false, true, true],
+    ),
+    meta("profile", "Profile workload", [false, false, true, true]),
+    meta("bench", "Benchmark port", [false, false, true, true]),
+    meta(
+        "shadow",
+        "Generate shadow module",
+        [false, false, false, true],
+    ),
+    meta(
+        "gate",
+        "Check definition of done",
+        [false, false, true, true],
+    ),
+    meta(
+        "app_record",
+        "Record whole app",
+        [false, false, false, true],
+    ),
+    meta("app_replay", "Replay app cases", [false, false, true, true]),
+    meta(
+        "app_front_door",
+        "Scaffold Rust front door",
+        [false, false, false, true],
+    ),
+    meta("app_wire", "Wire unit into app", [false, false, true, true]),
+    meta(
+        "app_lift",
+        "Lift to pure Rust app",
+        [false, true, false, true],
+    ),
+];
+
 fn tools() -> Value {
+    let mut tools = tool_schemas();
+    for tool in tools.as_array_mut().into_iter().flatten() {
+        let name = tool["name"].as_str().unwrap_or_default();
+        if let Some(m) = TOOL_META.iter().find(|m| m.name == name) {
+            tool["title"] = json!(m.title);
+            tool["annotations"] = json!({
+                "title": m.title,
+                "readOnlyHint": m.read_only,
+                "destructiveHint": m.destructive,
+                "idempotentHint": m.idempotent,
+                "openWorldHint": m.open_world,
+            });
+        }
+    }
+    tools
+}
+
+fn tool_schemas() -> Value {
     let crate_dir = json!({ "type": "string", "description": "Folder of the generated crate (holds rust-anything.json)." });
     json!([
         {
@@ -82,6 +399,7 @@ fn tools() -> Value {
             "description": "Map a repository (TypeScript/JavaScript, Python, C, Go, Ruby or Java): units, port order (waves), risks with file:line, bridge per unit, dependency-to-crate fit, and `start_here`: the best first ports.",
             "inputSchema": { "type": "object", "properties": {
                 "root": { "type": "string", "description": "Repository root." },
+                "lang": { "type": "string", "enum": ["ts", "python", "c", "go", "ruby", "java", "php", "csharp"], "description": "Source language; detected from the repository when omitted." },
                 "whole_app": { "type": "boolean", "description": "Plan a whole-app port: entry points and shape (cli, server, library), every dependency imported or declared with its crate and fit, pieces in port order (units that import each other together), and numbered decisions with a recommended answer for the grilling round." },
             }, "required": ["root"] },
         },
@@ -93,9 +411,11 @@ fn tools() -> Value {
                 "unit": { "type": "string", "description": "Unit id from analyze." },
                 "kind": { "type": "string", "enum": ["napi", "wasm"], "description": "Defaults to the plan's bridge." },
                 "out": { "type": "string", "description": "Crate folder; defaults to <root>/rust/<name>." },
+                "name": { "type": "string", "description": "Crate name; defaults to `<unit>-rs`." },
                 "force": { "type": "boolean", "description": "Bridge a unit the plan marks blocked or keep." },
                 "keep": { "type": "array", "items": { "type": "string" }, "description": "Exports to keep in the source language: `name` or `name: reason`." },
                 "batch": { "type": "array", "items": { "type": "string" }, "description": "Batch classes, `function:param`: the function runs over many `param` values kept in Rust, on all cores, in one call. A `<Function>Index` struct in port.rs replaces the default per-item loop." },
+                "as_json": { "type": "array", "items": { "type": "string" }, "description": "Type parameters the app only fills with data (`T` in `paginate<T>(items: T[])`): bridged as JSON values instead of keeping the export in TS." },
             }, "required": ["root", "unit"] },
         },
         {
@@ -116,6 +436,7 @@ fn tools() -> Value {
                 "module": { "type": "string", "description": "JS only: import the original from this JS module instead of the TS source." },
                 "resolve_from": { "type": "string", "description": "Resolve npm packages from this folder's node_modules." },
                 "float_tolerance": { "type": "number", "description": "Numeric code: floats match when they differ by at most this times the larger magnitude (absolute below 1), e.g. 1e-9. Saved with the crate for diff and gate; 0 removes it." },
+                "node_args": { "type": "array", "items": { "type": "string" }, "description": "Extra arguments for node, e.g. [\"--import=tsx\"]." },
                 "test_command": { "type": "array", "items": { "type": "string" }, "description": "TS/JS or Python: also record every call the original's own test suite makes to the unit's functions, e.g. [\"npx\", \"jest\"] or [\"pytest\"]. Runs in the original's folder." },
             }, "required": ["crate"] },
         },
@@ -130,6 +451,8 @@ fn tools() -> Value {
             "inputSchema": { "type": "object", "properties": {
                 "crate": crate_dir,
                 "ignore_key_order": { "type": "boolean" },
+                "module": { "type": "string", "description": "Test this JS module instead of the crate's `index.cjs`." },
+                "node_args": { "type": "array", "items": { "type": "string" }, "description": "Extra arguments for node, e.g. [\"--import=tsx\"]." },
                 "float_tolerance": { "type": "number", "description": "Floats match within this tolerance for this run (the one saved by record otherwise)." },
             }, "required": ["crate"] },
         },
@@ -148,6 +471,8 @@ fn tools() -> Value {
             "inputSchema": { "type": "object", "properties": {
                 "crate": crate_dir,
                 "resolve_from": { "type": "string" },
+                "min_ms": { "type": "integer", "description": "Minimum measured time per function and side, in milliseconds (default 200)." },
+                "node_args": { "type": "array", "items": { "type": "string" }, "description": "Extra arguments for node, e.g. [\"--import=tsx\"]." },
             }, "required": ["crate"] },
         },
         {
@@ -158,7 +483,7 @@ fn tools() -> Value {
         {
             "name": "gate",
             "description": "Definition of done: fmt, clippy -D warnings, cargo test, unsafe with SAFETY comments only, no unimplemented functions, build, API present, recorded behavior matches.",
-            "inputSchema": { "type": "object", "properties": { "crate": crate_dir }, "required": ["crate"] },
+            "inputSchema": { "type": "object", "properties": { "crate": crate_dir, "node_args": { "type": "array", "items": { "type": "string" }, "description": "Extra arguments for node, e.g. [\"--import=tsx\"]." } }, "required": ["crate"] },
         },
         {
             "name": "app_record",
@@ -169,9 +494,13 @@ fn tools() -> Value {
                 "inputs": { "type": "string", "description": "JSONL of extra cases: {\"name\", \"args\": [...], \"stdin\", \"env\": {...}, \"files\": {path: text}}." },
                 "normalize": { "type": "array", "items": { "type": "string" }, "description": "Normalizers: timestamps, uuids, key-order, or name=regex." },
                 "name": { "type": "string", "description": "Name the app is invoked by in its docs." },
+                "timeout": { "type": "integer", "description": "Seconds before a run is killed (default 30)." },
                 "traps": { "type": "boolean", "description": "Add semantic-trap cases (default true)." },
                 "http": { "type": "boolean", "description": "The app is a server: `run` starts it (it takes its port from PORT or {port}); cases are requests from curl lines in its docs, `inputs` ({\"name\", \"method\", \"path\", \"headers\", \"body\"}) and traps." },
                 "port": { "type": "integer", "description": "A port the server always listens on (implies http)." },
+                "args": { "type": "array", "items": { "type": "string" }, "description": "Servers: arguments every start gets after its command, the original's and every build's ([\"db.json\"]). Implies http; saved." },
+                "fresh": { "type": "array", "items": { "type": "string" }, "description": "Servers: repository files or folders the server reads or writes, snapshotted and copied into a fresh working directory before every start. Implies http; saved." },
+                "pace": { "type": "integer", "description": "Servers: milliseconds to wait after each response, for work the server does after answering (a file watcher). Implies http; saved and used by replay; 0 removes it." },
                 "float_tolerance": { "type": "number", "description": "Numeric output: numbers match when they differ by at most this times the larger magnitude (absolute below 1), e.g. 1e-9. Saved with the cases; 0 removes it." },
             }, "required": ["repo"] },
         },
@@ -182,6 +511,7 @@ fn tools() -> Value {
                 "repo": { "type": "string", "description": "Repository root." },
                 "build": { "type": "string", "description": "Command line of the build to test; the original when omitted." },
                 "port": { "type": "integer", "description": "Servers: the port the build always listens on; otherwise it gets a free one through PORT and {port}." },
+                "timeout": { "type": "integer", "description": "Seconds before a run is killed (default 30)." },
                 "case": { "type": "string", "description": "Replay only this case, by the name the report gives it (a library: only this unit): the fast loop for fixing one mismatch." },
             }, "required": ["repo"] },
         },
@@ -234,11 +564,14 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             })
             .unwrap_or_default()
     };
-    let no_node_args: [String; 0] = [];
     Ok(match name {
         "analyze" => {
             let root = path("root")?;
-            let mut report = analyze::analyze(&root)?;
+            let lang = match args.get("lang") {
+                Some(v) if !v.is_null() => serde_json::from_value(v.clone()).context("`lang`")?,
+                _ => crate::lang::Lang::detect(&root),
+            };
+            let mut report = analyze::analyze_lang(&root, lang)?;
             if args["whole_app"].as_bool().unwrap_or(false) {
                 report.whole_app = Some(crate::whole_app::whole_app(&root, &report));
             }
@@ -256,11 +589,12 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                 unit: args["unit"].as_str().context("missing `unit`")?,
                 kind,
                 out: opt_path("out"),
-                name: None,
+                name: args["name"].as_str().map(str::to_string),
                 force: args["force"].as_bool().unwrap_or(false),
                 keep: strings("keep"),
                 lang: None,
                 batch: strings("batch"),
+                as_json: strings("as_json"),
             })?)?
         }
         "record" => {
@@ -297,7 +631,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                 inputs: inputs.as_deref(),
                 module: module.as_deref(),
                 resolve_from: resolve_from.as_deref(),
-                node_args: &no_node_args,
+                node_args: &strings("node_args"),
             })?)?;
             if let Some(c) = captured {
                 out["from_tests"] = c;
@@ -327,11 +661,12 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         "build" => json!({ "artifact": harness::build(&path("crate")?)? }),
         "diff" => {
             let crate_dir = path("crate")?;
+            let module = opt_path("module");
             serde_json::to_value(harness::diff(&harness::DiffOptions {
                 crate_dir: &crate_dir,
-                module: None,
+                module: module.as_deref(),
                 ignore_key_order: args["ignore_key_order"].as_bool().unwrap_or(false),
-                node_args: &no_node_args,
+                node_args: &strings("node_args"),
                 float_tolerance: args["float_tolerance"].as_f64(),
             })?)?
         }
@@ -340,9 +675,9 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             let resolve_from = opt_path("resolve_from");
             let rows = harness::bench(&harness::BenchOptions {
                 crate_dir: &crate_dir,
-                min_ms: 200,
+                min_ms: args["min_ms"].as_u64().unwrap_or(200),
                 resolve_from: resolve_from.as_deref(),
-                node_args: &no_node_args,
+                node_args: &strings("node_args"),
             })?;
             let lang = bridge::Manifest::load(&crate_dir)
                 .map(|m| m.language)
@@ -354,7 +689,10 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             let out = opt_path("out");
             serde_json::to_value(shadow::shadow(&path("crate")?, out.as_deref())?)?
         }
-        "gate" => serde_json::to_value(gate::gate(Path::new(&path("crate")?), &no_node_args)?)?,
+        "gate" => serde_json::to_value(gate::gate(
+            Path::new(&path("crate")?),
+            &strings("node_args"),
+        )?)?,
         "app_record" => {
             let repo = path("repo")?;
             let inputs = opt_path("inputs");
@@ -365,9 +703,12 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                 normalize: &strings("normalize"),
                 name: args["name"].as_str(),
                 traps: args["traps"].as_bool().unwrap_or(true),
-                timeout_secs: None,
+                timeout_secs: args["timeout"].as_u64(),
                 http: args["http"].as_bool().unwrap_or(false),
                 port: args["port"].as_u64().and_then(|p| u16::try_from(p).ok()),
+                server_args: &strings("args"),
+                fresh: &strings("fresh"),
+                pace_ms: args["pace"].as_u64(),
                 float_tolerance: args["float_tolerance"].as_f64(),
             })?)?
         }
@@ -376,7 +717,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             serde_json::to_value(app::replay(&app::ReplayOptions {
                 repo: &repo,
                 build: args["build"].as_str(),
-                timeout_secs: None,
+                timeout_secs: args["timeout"].as_u64(),
                 port: args["port"].as_u64().and_then(|p| u16::try_from(p).ok()),
                 case: args["case"].as_str(),
             })?)?
@@ -403,6 +744,13 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         "app_lift" => serde_json::to_value(lift::lift(&lift::LiftOptions {
             repo: &path("repo")?,
         })?)?,
+        #[cfg(test)]
+        "test_sleep" => {
+            std::thread::sleep(std::time::Duration::from_millis(
+                args["ms"].as_u64().unwrap_or(0),
+            ));
+            json!({ "slept": true })
+        }
         _ => anyhow::bail!("unknown tool `{name}`"),
     })
 }
@@ -447,7 +795,212 @@ mod tests {
         );
         let bad = handle(&json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": { "name": "gate", "arguments": {} } })).unwrap();
         assert_eq!(bad["result"]["isError"], true);
+        assert_eq!(
+            bad["result"]["structuredContent"]["code"],
+            "invalid_arguments"
+        );
         let unknown = handle(&json!({ "jsonrpc": "2.0", "id": 4, "method": "nope" })).unwrap();
         assert_eq!(unknown["error"]["code"], -32601);
+    }
+
+    #[test]
+    fn tools_carry_annotations() {
+        let list = handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" })).unwrap();
+        let tools = list["result"]["tools"].as_array().unwrap();
+        assert_eq!(tools.len(), TOOL_META.len());
+        for tool in tools {
+            assert!(tool["title"].is_string(), "{}", tool["name"]);
+            for hint in [
+                "readOnlyHint",
+                "destructiveHint",
+                "idempotentHint",
+                "openWorldHint",
+            ] {
+                assert!(
+                    tool["annotations"][hint].is_boolean(),
+                    "{} {hint}",
+                    tool["name"]
+                );
+            }
+        }
+        let by_name =
+            |n: &str| tools.iter().find(|t| t["name"] == n).unwrap()["annotations"].clone();
+        assert_eq!(by_name("analyze")["readOnlyHint"], true);
+        assert_eq!(by_name("analyze")["openWorldHint"], false);
+        for n in [
+            "record",
+            "diff",
+            "gate",
+            "shadow",
+            "bench",
+            "profile",
+            "app_record",
+            "app_replay",
+        ] {
+            assert_eq!(by_name(n)["readOnlyHint"], false, "{n}");
+            assert_eq!(by_name(n)["openWorldHint"], true, "{n}");
+        }
+        assert_eq!(by_name("app_lift")["destructiveHint"], true);
+        assert_eq!(by_name("bridge")["destructiveHint"], false);
+    }
+
+    #[test]
+    fn failures_are_structured() {
+        let dir = std::env::temp_dir().join(format!("ra-mcp-missing-{}", std::process::id()));
+        let response = handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": { "name": "gate", "arguments": { "crate": dir } } }))
+        .unwrap();
+        let result = &response["result"];
+        assert_eq!(result["isError"], true);
+        let s = &result["structuredContent"];
+        assert_eq!(s["message"], result["content"][0]["text"]);
+        assert!(s["code"].is_string() && s["retryable"].is_boolean());
+
+        let args = json!({ "crate": "rust/slug" });
+        let cases = [
+            (
+                "no recorded cases to compare; run `rust-anything record` first",
+                "no_recording",
+                false,
+                Some("rust-anything record rust/slug"),
+            ),
+            (
+                "no cases in rust/app-cases: run `rust-anything app record` first",
+                "no_recording",
+                false,
+                Some("rust-anything app record rust/slug -- <command that runs the original>"),
+            ),
+            (
+                "slug changed since it was recorded: re-run `rust-anything record rust/slug`",
+                "stale_recording",
+                false,
+                Some("rust-anything record rust/slug"),
+            ),
+            (
+                "cargo build failed (exit status: 101):\nerror[E0308]",
+                "build_failed",
+                false,
+                Some("fix the compiler errors in the message, then rust-anything build rust/slug"),
+            ),
+            (
+                "`node x.mjs` was still running after 600s and was stopped",
+                "timed_out",
+                true,
+                None,
+            ),
+            ("missing `crate`", "invalid_arguments", false, None),
+            ("something else broke", "failed", false, None),
+        ];
+        for (text, code, retryable, next) in cases {
+            let f = failure(text, &args);
+            assert_eq!(f["code"], code, "{text}");
+            assert_eq!(f["retryable"], retryable, "{text}");
+            if let Some(next) = next {
+                assert_eq!(f["next"], next, "{text}");
+            }
+        }
+        assert!(failure("something else broke", &args)["next"].is_null());
+    }
+
+    #[test]
+    fn serves_prompts() {
+        let init =
+            handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {} }))
+                .unwrap();
+        assert!(init["result"]["capabilities"]["prompts"].is_object());
+        let list = handle(&json!({ "jsonrpc": "2.0", "id": 2, "method": "prompts/list" })).unwrap();
+        let names: Vec<&str> = list["result"]["prompts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(names, ["port_unit", "port_whole_app"]);
+        let get = |id: i64, name: &str, arguments: Value| {
+            handle(
+                &json!({ "jsonrpc": "2.0", "id": id, "method": "prompts/get",
+                "params": { "name": name, "arguments": arguments } }),
+            )
+            .unwrap()
+        };
+        let unit = get(
+            3,
+            "port_unit",
+            json!({ "path": "/repo", "unit": "src/slug.ts" }),
+        );
+        let text = unit["result"]["messages"][0]["content"]["text"]
+            .as_str()
+            .unwrap();
+        assert!(text.contains("`src/slug.ts`") && text.contains("/repo"));
+        assert!(text.contains("# Migration to Rust with rust-anything"));
+        assert!(!text.starts_with("---"));
+        let whole = get(4, "port_whole_app", json!({ "path": "/repo" }));
+        let text = whole["result"]["messages"][0]["content"]["text"]
+            .as_str()
+            .unwrap();
+        assert!(text.contains("/repo") && text.contains("# Whole app to a pure Rust app"));
+        assert_eq!(get(5, "port_unit", json!({}))["error"]["code"], -32602);
+        assert_eq!(
+            get(6, "nope", json!({ "path": "/repo" }))["error"]["code"],
+            -32602
+        );
+    }
+
+    #[derive(Clone, Default)]
+    struct Shared(Arc<Mutex<Vec<u8>>>);
+
+    impl Write for Shared {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            lock(&self.0).extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn answers_ping_during_a_slow_call_and_honors_cancel() {
+        let input = [
+            json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": { "name": "test_sleep", "arguments": { "ms": 400 }, "_meta": { "progressToken": "p1" } } }),
+            json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                "params": { "name": "test_sleep", "arguments": { "ms": 5000 }, "_meta": { "progressToken": null } } }),
+            json!({ "jsonrpc": "2.0", "method": "notifications/cancelled", "params": { "requestId": 2 } }),
+            json!({ "jsonrpc": "2.0", "id": 3, "method": "ping" }),
+        ]
+        .iter()
+        .map(|m| format!("{m}\n"))
+        .collect::<String>();
+        let out = Shared::default();
+        let start = std::time::Instant::now();
+        serve_io(std::io::Cursor::new(input), out.clone()).unwrap();
+        assert!(start.elapsed() < std::time::Duration::from_secs(3));
+        let text = String::from_utf8(lock(&out.0).clone()).unwrap();
+        let messages: Vec<Value> = text
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .collect();
+        let position = |id: i64| messages.iter().position(|m| m["id"] == id);
+        assert!(position(3).unwrap() < position(1).unwrap(), "{text}");
+        assert_eq!(
+            messages[position(1).unwrap()]["result"]["structuredContent"]["slept"],
+            true
+        );
+        assert_eq!(position(2), None, "{text}");
+        let progress: Vec<&Value> = messages
+            .iter()
+            .filter(|m| m["method"] == "notifications/progress")
+            .collect();
+        assert_eq!(progress.len(), 2, "{text}");
+        assert!(
+            progress
+                .iter()
+                .all(|p| p["params"]["progressToken"] == "p1")
+        );
+        assert_eq!(progress[0]["params"]["progress"], 0);
+        assert_eq!(progress[1]["params"]["progress"], 1);
+        assert_eq!(progress[1]["params"]["total"], 1);
+        assert!(progress[1]["params"]["message"].is_string());
     }
 }

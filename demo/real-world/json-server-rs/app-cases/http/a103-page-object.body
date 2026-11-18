@@ -1,0 +1,12 @@
+{
+  "name": "typicode",
+  "nested": {
+    "deep": [
+      1,
+      2,
+      {
+        "x": "y"
+      }
+    ]
+  }
+}

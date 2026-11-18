@@ -1,0 +1,279 @@
+{"name": "a001-index", "method": "GET", "path": "/"}
+{"name": "a002-static-file", "method": "GET", "path": "/test.html"}
+{"name": "a003-static-missing", "method": "GET", "path": "/missing.html"}
+{"name": "a004-posts", "method": "GET", "path": "/posts"}
+{"name": "a005-comments", "method": "GET", "path": "/comments"}
+{"name": "a006-users", "method": "GET", "path": "/users"}
+{"name": "a007-empty-collection", "method": "GET", "path": "/people"}
+{"name": "a008-object", "method": "GET", "path": "/profile"}
+{"name": "a009-number", "method": "GET", "path": "/count"}
+{"name": "a010-string", "method": "GET", "path": "/label"}
+{"name": "a011-unknown", "method": "GET", "path": "/nothing"}
+{"name": "a012-item", "method": "GET", "path": "/posts/1"}
+{"name": "a013-item-numeric-id", "method": "GET", "path": "/posts/5"}
+{"name": "a014-item-missing", "method": "GET", "path": "/posts/999"}
+{"name": "a015-item-of-object", "method": "GET", "path": "/profile/name"}
+{"name": "a016-item-of-unknown", "method": "GET", "path": "/nothing/1"}
+{"name": "a017-item-encoded", "method": "GET", "path": "/posts/%31"}
+{"name": "a018-too-deep", "method": "GET", "path": "/posts/1/comments"}
+{"name": "a019-trailing-slash", "method": "GET", "path": "/posts/"}
+{"name": "a020-double-slash", "method": "GET", "path": "//posts"}
+{"name": "a021-schema-key", "method": "GET", "path": "/$schema"}
+{"name": "a022-where", "method": "GET", "path": "/posts?views:gt=100"}
+{"name": "a023-where", "method": "GET", "path": "/posts?views:gte=100"}
+{"name": "a024-where", "method": "GET", "path": "/posts?views:lt=100"}
+{"name": "a025-where", "method": "GET", "path": "/posts?views:lte=100"}
+{"name": "a026-where", "method": "GET", "path": "/posts?views:ne=100"}
+{"name": "a027-where", "method": "GET", "path": "/posts?views:eq=100"}
+{"name": "a028-where", "method": "GET", "path": "/posts?views=100"}
+{"name": "a029-where", "method": "GET", "path": "/posts?id:in=1,3"}
+{"name": "a030-where", "method": "GET", "path": "/posts?id:in=1, 3 ,x"}
+{"name": "a031-where", "method": "GET", "path": "/posts?title:contains=TITLE"}
+{"name": "a032-where", "method": "GET", "path": "/posts?title:startsWith=a"}
+{"name": "a033-where", "method": "GET", "path": "/posts?title:endsWith=TITLE"}
+{"name": "a034-where", "method": "GET", "path": "/posts?title:contains=ü"}
+{"name": "a035-where", "method": "GET", "path": "/posts?author.name=typicode"}
+{"name": "a036-where", "method": "GET", "path": "/posts?author.name:contains=a"}
+{"name": "a037-where", "method": "GET", "path": "/posts?author.age:gte=26"}
+{"name": "a038-where", "method": "GET", "path": "/posts?published=true"}
+{"name": "a039-where", "method": "GET", "path": "/posts?published=false"}
+{"name": "a040-where", "method": "GET", "path": "/posts?userId=null"}
+{"name": "a041-where", "method": "GET", "path": "/posts?views_gt=100"}
+{"name": "a042-where", "method": "GET", "path": "/posts?views_lte=50.5"}
+{"name": "a043-where", "method": "GET", "path": "/posts?views_ne=0"}
+{"name": "a044-where", "method": "GET", "path": "/posts?title_like=a"}
+{"name": "a045-where", "method": "GET", "path": "/posts?views:foo=1"}
+{"name": "a046-where", "method": "GET", "path": "/posts?views:=100"}
+{"name": "a047-where", "method": "GET", "path": "/posts?title="}
+{"name": "a048-where", "method": "GET", "path": "/posts?title=%20"}
+{"name": "a049-where", "method": "GET", "path": "/posts?views=1e21"}
+{"name": "a050-where", "method": "GET", "path": "/posts?views:gt=1e3"}
+{"name": "a051-where", "method": "GET", "path": "/posts?views=abc"}
+{"name": "a052-where", "method": "GET", "path": "/posts?views:gt=abc"}
+{"name": "a053-where", "method": "GET", "path": "/posts?title:lt=b"}
+{"name": "a054-where", "method": "GET", "path": "/posts?id=1&id=2"}
+{"name": "a055-where", "method": "GET", "path": "/posts?views:gt=10&views:lt=150"}
+{"name": "a056-where", "method": "GET", "path": "/posts?_start=0&_end=2"}
+{"name": "a057-where", "method": "GET", "path": "/posts?_limit=1"}
+{"name": "a058-where", "method": "GET", "path": "/posts?q=title"}
+{"name": "a059-where", "method": "GET", "path": "/posts?tags=json"}
+{"name": "a060-where", "method": "GET", "path": "/posts?nested.missing=1"}
+{"name": "a061-where", "method": "GET", "path": "/posts?author=typicode"}
+{"name": "a062-where", "method": "GET", "path": "/posts?views:in=100,200"}
+{"name": "a063-where", "method": "GET", "path": "/posts?views:contains=1"}
+{"name": "a064-where", "method": "GET", "path": "/posts?title:in=Zebra"}
+{"name": "a065-where-comments", "method": "GET", "path": "/comments?postId=1"}
+{"name": "a066-where-likes", "method": "GET", "path": "/comments?likes:gt=5"}
+{"name": "a067-where-on-object", "method": "GET", "path": "/profile?name=x"}
+{"name": "a068-where-json-or", "method": "GET", "path": "/posts?_where=%7B%22or%22%3A%20%5B%7B%22views%22%3A%20%7B%22gt%22%3A%20150%7D%7D%2C%20%7B%22title%22%3A%20%7B%22eq%22%3A%20%22Zebra%22%7D%7D%5D%7D"}
+{"name": "a069-where-json-empty-or", "method": "GET", "path": "/posts?_where=%7B%22or%22%3A%20%5B%5D%7D"}
+{"name": "a070-where-json-nested", "method": "GET", "path": "/posts?_where=%7B%22author%22%3A%20%7B%22name%22%3A%20%7B%22startsWith%22%3A%20%22t%22%7D%7D%7D"}
+{"name": "a071-where-json-plain", "method": "GET", "path": "/posts?_where=%7B%22title%22%3A%20%22a%20title%22%7D"}
+{"name": "a072-where-json-eq-false", "method": "GET", "path": "/posts?_where=%7B%22published%22%3A%20%7B%22eq%22%3A%20false%7D%7D"}
+{"name": "a073-where-json-array", "method": "GET", "path": "/posts?_where=%5B1%2C%202%5D"}
+{"name": "a074-where-json-bad", "method": "GET", "path": "/posts?_where=%7Bbad"}
+{"name": "a075-where-json-and-query", "method": "GET", "path": "/posts?_where=%7B%22views%22%3A%20%7B%22lt%22%3A%2060%7D%7D&title=Zebra"}
+{"name": "a076-where-json-in-scalar", "method": "GET", "path": "/posts?_where=%7B%22id%22%3A%20%7B%22in%22%3A%20%222%22%7D%7D"}
+{"name": "a077-where-json-mixed-ops", "method": "GET", "path": "/posts?_where=%7B%22views%22%3A%20%7B%22gt%22%3A%200%2C%20%22lt%22%3A%20150%2C%20%22ne%22%3A%20100%2C%20%22x%22%3A%201%7D%7D"}
+{"name": "a078-sort", "method": "GET", "path": "/posts?_sort=views"}
+{"name": "a079-sort", "method": "GET", "path": "/posts?_sort=-views"}
+{"name": "a080-sort", "method": "GET", "path": "/posts?_sort=title"}
+{"name": "a081-sort", "method": "GET", "path": "/posts?_sort=-title"}
+{"name": "a082-sort", "method": "GET", "path": "/posts?_sort=author.name,views"}
+{"name": "a083-sort", "method": "GET", "path": "/posts?_sort=-author.age"}
+{"name": "a085-sort", "method": "GET", "path": "/posts?_sort=published,-views"}
+{"name": "a086-sort", "method": "GET", "path": "/posts?_sort=missing"}
+{"name": "a087-sort", "method": "GET", "path": "/posts?_sort="}
+{"name": "a088-page", "method": "GET", "path": "/posts?_page=1"}
+{"name": "a089-page", "method": "GET", "path": "/posts?_page=2&_per_page=2"}
+{"name": "a090-page", "method": "GET", "path": "/posts?_page=3&_per_page=2"}
+{"name": "a091-page", "method": "GET", "path": "/posts?_page=0"}
+{"name": "a092-page", "method": "GET", "path": "/posts?_page=-1"}
+{"name": "a093-page", "method": "GET", "path": "/posts?_page=abc"}
+{"name": "a094-page", "method": "GET", "path": "/posts?_page=99"}
+{"name": "a095-page", "method": "GET", "path": "/posts?_page=1&_per_page=0"}
+{"name": "a096-page", "method": "GET", "path": "/posts?_page=1&_per_page=-2"}
+{"name": "a097-page", "method": "GET", "path": "/posts?_page=1&_per_page=abc"}
+{"name": "a098-page", "method": "GET", "path": "/posts?_per_page=2"}
+{"name": "a099-page", "method": "GET", "path": "/posts?_page=1.7&_per_page=2.9"}
+{"name": "a100-page", "method": "GET", "path": "/posts?_page=2&_per_page=4&_sort=-views&published=true"}
+{"name": "a101-page", "method": "GET", "path": "/posts?_page=1&views:gt=1000000"}
+{"name": "a102-page-empty", "method": "GET", "path": "/people?_page=1"}
+{"name": "a103-page-object", "method": "GET", "path": "/profile?_page=1"}
+{"name": "a104-embed-many", "method": "GET", "path": "/posts?_embed=comments"}
+{"name": "a105-embed-one", "method": "GET", "path": "/comments?_embed=post"}
+{"name": "a106-embed-item", "method": "GET", "path": "/posts/1?_embed=comments"}
+{"name": "a107-embed-two", "method": "GET", "path": "/posts?_embed=comments&_embed=user"}
+{"name": "a108-embed-unknown", "method": "GET", "path": "/posts?_embed=nothing"}
+{"name": "a109-embed-unknown-singular", "method": "GET", "path": "/posts?_embed=thing"}
+{"name": "a110-embed-item-one", "method": "GET", "path": "/comments/3?_embed=post"}
+{"name": "a111-embed-and-where", "method": "GET", "path": "/posts?_embed=comments&views:gte=100"}
+{"name": "a112-embed-user", "method": "GET", "path": "/posts?_embed=user&_sort=-views"}
+{"name": "a113-options", "method": "OPTIONS", "path": "/posts", "headers": {"Origin": "http://example.com", "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "X-A, x-b"}}
+{"name": "a114-options-plain", "method": "OPTIONS", "path": "/posts/1"}
+{"name": "a115-get-origin", "method": "GET", "path": "/posts/2", "headers": {"Origin": "http://example.com"}}
+{"name": "a116-get-req-headers", "method": "GET", "path": "/users", "headers": {"Access-Control-Request-Headers": "Authorization,  X-Y"}}
+{"name": "a117-head", "method": "HEAD", "path": "/posts"}
+{"name": "a118-head-item", "method": "HEAD", "path": "/posts/1"}
+{"name": "a119-post", "method": "POST", "path": "/posts", "body": "{\"title\": \"new post\", \"views\": 10}", "headers": {"Content-Type": "application/json"}}
+{"name": "a120-post-with-id", "method": "POST", "path": "/posts", "body": "{\"id\": \"custom\", \"title\": \"custom id\"}", "headers": {"Content-Type": "application/json"}}
+{"name": "a121-post-unicode", "method": "POST", "path": "/comments", "body": "{\"text\": \"héllo 👍🏽\", \"postId\": \"2\"}", "headers": {"Content-Type": "application/json"}}
+{"name": "a122-post-empty-object", "method": "POST", "path": "/users", "body": "{}", "headers": {"Content-Type": "application/json"}}
+{"name": "a123-post-array", "method": "POST", "path": "/posts", "body": "[1, 2]", "headers": {"Content-Type": "application/json"}}
+{"name": "a124-post-string", "method": "POST", "path": "/posts", "body": "\"text\"", "headers": {"Content-Type": "application/json"}}
+{"name": "a125-post-null", "method": "POST", "path": "/posts", "body": "null", "headers": {"Content-Type": "application/json"}}
+{"name": "a126-post-bad-json", "method": "POST", "path": "/posts", "body": "{bad", "headers": {"Content-Type": "application/json"}}
+{"name": "a127-post-text", "method": "POST", "path": "/posts", "body": "hello", "headers": {"Content-Type": "text/plain"}}
+{"name": "a128-post-no-body", "method": "POST", "path": "/posts"}
+{"name": "a129-post-form", "method": "POST", "path": "/posts", "body": "a=1", "headers": {"Content-Type": "application/x-www-form-urlencoded"}}
+{"name": "a130-post-json-charset", "method": "POST", "path": "/posts", "body": "{\"title\": \"charset\"}", "headers": {"Content-Type": "application/json; charset=utf-8"}}
+{"name": "a131-post-object", "method": "POST", "path": "/profile", "body": "{\"x\": 1}", "headers": {"Content-Type": "application/json"}}
+{"name": "a132-post-unknown", "method": "POST", "path": "/nothing", "body": "{\"x\": 1}", "headers": {"Content-Type": "application/json"}}
+{"name": "a133-post-item", "method": "POST", "path": "/posts/1", "body": "{\"x\": 1}", "headers": {"Content-Type": "application/json"}}
+{"name": "a134-post-new-root", "method": "POST", "path": "/", "body": "{\"x\": 1}", "headers": {"Content-Type": "application/json"}}
+{"name": "a135-put", "method": "PUT", "path": "/posts/1", "body": "{\"title\": \"replaced\", \"views\": 101}", "headers": {"Content-Type": "application/json"}}
+{"name": "a136-put-id-in-body", "method": "PUT", "path": "/posts/2", "body": "{\"id\": \"zzz\", \"title\": \"id kept\"}", "headers": {"Content-Type": "application/json"}}
+{"name": "a137-put-missing", "method": "PUT", "path": "/posts/999", "body": "{\"title\": \"x\"}", "headers": {"Content-Type": "application/json"}}
+{"name": "a138-put-array", "method": "PUT", "path": "/posts/1", "body": "[1]", "headers": {"Content-Type": "application/json"}}
+{"name": "a139-put-object", "method": "PUT", "path": "/profile", "body": "{\"name\": \"replaced\"}", "headers": {"Content-Type": "application/json"}}
+{"name": "a140-put-collection", "method": "PUT", "path": "/posts", "body": "{\"x\": 1}", "headers": {"Content-Type": "application/json"}}
+{"name": "a141-put-unknown", "method": "PUT", "path": "/nothing", "body": "{\"x\": 1}", "headers": {"Content-Type": "application/json"}}
+{"name": "a142-patch", "method": "PATCH", "path": "/posts/3", "body": "{\"views\": 51, \"extra\": {\"a\": [1, \"b\"]}}", "headers": {"Content-Type": "application/json"}}
+{"name": "a143-patch-id", "method": "PATCH", "path": "/posts/3", "body": "{\"id\": \"changed\"}", "headers": {"Content-Type": "application/json"}}
+{"name": "a144-patch-missing", "method": "PATCH", "path": "/posts/999", "body": "{\"x\": 1}", "headers": {"Content-Type": "application/json"}}
+{"name": "a145-patch-object", "method": "PATCH", "path": "/profile", "body": "{\"age\": 40, \"name\": \"patched\"}", "headers": {"Content-Type": "application/json"}}
+{"name": "a146-patch-number", "method": "PATCH", "path": "/count", "body": "{\"x\": 1}", "headers": {"Content-Type": "application/json"}}
+{"name": "a147-patch-collection", "method": "PATCH", "path": "/posts", "body": "{\"x\": 1}", "headers": {"Content-Type": "application/json"}}
+{"name": "a148-patch-text", "method": "PATCH", "path": "/posts/3", "body": "x", "headers": {"Content-Type": "text/plain"}}
+{"name": "a149-after-writes-posts", "method": "GET", "path": "/posts"}
+{"name": "a150-after-writes-profile", "method": "GET", "path": "/profile"}
+{"name": "a151-delete", "method": "DELETE", "path": "/posts/1"}
+{"name": "a152-after-delete-comments", "method": "GET", "path": "/comments"}
+{"name": "a153-delete-dependent", "method": "DELETE", "path": "/posts/2?_dependent=comments"}
+{"name": "a154-after-dependent-comments", "method": "GET", "path": "/comments"}
+{"name": "a155-delete-missing", "method": "DELETE", "path": "/posts/999"}
+{"name": "a156-delete-collection", "method": "DELETE", "path": "/posts"}
+{"name": "a157-delete-object", "method": "DELETE", "path": "/profile"}
+{"name": "a158-delete-object-item", "method": "DELETE", "path": "/profile/name"}
+{"name": "a159-delete-user", "method": "DELETE", "path": "/users/1?_dependent=posts"}
+{"name": "a160-after-delete-user-posts", "method": "GET", "path": "/posts?_sort=views"}
+{"name": "a161-delete-with-body", "method": "DELETE", "path": "/users/2", "body": "{\"x\": 1}", "headers": {"Content-Type": "application/json"}}
+{"name": "a162-patch-users", "method": "PATCH", "path": "/users", "body": "{\"x\": 1}", "headers": {"Content-Type": "application/json"}}
+{"name": "a163-index-after", "method": "GET", "path": "/"}
+{"name": "a164-unknown-method", "method": "PROPFIND", "path": "/posts"}
+{"name": "a165-connect-like", "method": "GET", "path": "/posts?_page=1&_per_page=1&_embed=comments&_sort=-views"}
+{"name": "b001-get", "method": "GET", "path": "/__proto__"}
+{"name": "b002-get", "method": "GET", "path": "/constructor"}
+{"name": "b003-get", "method": "GET", "path": "/toString"}
+{"name": "b004-get", "method": "GET", "path": "/hasOwnProperty/1"}
+{"name": "b005-get", "method": "GET", "path": "/__proto__/1"}
+{"name": "b006-get", "method": "GET", "path": "/POSTS"}
+{"name": "b007-get", "method": "GET", "path": "/Posts/3"}
+{"name": "b008-get", "method": "GET", "path": "/posts/%E0"}
+{"name": "b009-get", "method": "GET", "path": "/%E0"}
+{"name": "b010-get", "method": "GET", "path": "/posts?title=%E0"}
+{"name": "b011-get", "method": "GET", "path": "/posts?_where=%7B%22a"}
+{"name": "b012-get", "method": "GET", "path": "/posts?a[b]=1"}
+{"name": "b013-get", "method": "GET", "path": "/posts?a[0]=1"}
+{"name": "b014-get", "method": "GET", "path": "/posts?a[]=1"}
+{"name": "b015-get", "method": "GET", "path": "/posts?a%5C.b=1"}
+{"name": "b016-get", "method": "GET", "path": "/posts?__proto__.x=1"}
+{"name": "b017-get", "method": "GET", "path": "/posts?constructor=1"}
+{"name": "b018-get", "method": "GET", "path": "/posts?_sort=a[x]"}
+{"name": "b019-get", "method": "GET", "path": "/posts?_sort=tags.0"}
+{"name": "b020-get", "method": "GET", "path": "/posts?_sort=tags[1]"}
+{"name": "b021-get", "method": "GET", "path": "/posts?_sort=title.length"}
+{"name": "b022-get", "method": "GET", "path": "/posts?title=Zebra+"}
+{"name": "b023-get", "method": "GET", "path": "/posts?title=%5A%65bra"}
+{"name": "b024-get", "method": "GET", "path": "/posts?title:contains=a+t"}
+{"name": "b025-get", "method": "GET", "path": "/posts?_embed=comments&_embed=comments"}
+{"name": "b026-get", "method": "GET", "path": "/posts?_page=1&_page=2&_per_page=1"}
+{"name": "b027-get", "method": "GET", "path": "/posts?_page=1&_where=%7B%22views%22%3A%7B%22gt%22%3A0%7D%7D"}
+{"name": "b028-get", "method": "GET", "path": "/posts?_per_page=1"}
+{"name": "b029-get", "method": "GET", "path": "/posts?id:in="}
+{"name": "b030-get", "method": "GET", "path": "/posts?views:in=50.5,-3"}
+{"name": "b031-get", "method": "GET", "path": "/posts?views:lt=0x10"}
+{"name": "b032-get", "method": "GET", "path": "/posts?views:gt=%201%20"}
+{"name": "b033-get", "method": "GET", "path": "/posts?views=Infinity"}
+{"name": "b034-get", "method": "GET", "path": "/posts?views:gte=-0"}
+{"name": "b035-get", "method": "GET", "path": "/posts?userId:ne=null"}
+{"name": "b036-get", "method": "GET", "path": "/posts?title:startsWith=%C3%9C"}
+{"name": "b037-get", "method": "GET", "path": "/posts?title:contains=%C4%B0"}
+{"name": "b038-get", "method": "GET", "path": "/posts?author.age=null"}
+{"name": "b039-get", "method": "GET", "path": "/people?_embed=tickets"}
+{"name": "b040-get", "method": "GET", "path": "/people/p1?_embed=tickets"}
+{"name": "b041-get", "method": "GET", "path": "/tickets?_embed=person"}
+{"name": "b042-get", "method": "GET", "path": "/tickets?_embed=status"}
+{"name": "b043-get", "method": "GET", "path": "/tickets?_embed=statuses"}
+{"name": "b044-get", "method": "GET", "path": "/statuses?_embed=tickets"}
+{"name": "b045-get", "method": "GET", "path": "/tickets/t1?_embed=status&_embed=person"}
+{"name": "b046-get", "method": "GET", "path": "/users?_embed=posts"}
+{"name": "b047-get", "method": "GET", "path": "/comments?_embed=posts"}
+{"name": "b048-get", "method": "GET", "path": "/10"}
+{"name": "b049-get", "method": "GET", "path": "/2"}
+{"name": "b050-get", "method": "GET", "path": "/10/x"}
+{"name": "b051-get", "method": "GET", "path": "/"}
+{"name": "b052-get", "method": "GET", "path": "/test"}
+{"name": "b053-get", "method": "GET", "path": "/test.htm"}
+{"name": "b054-get", "method": "GET", "path": "/test.html?x=1"}
+{"name": "b055-get", "method": "GET", "path": "/public/test.html"}
+{"name": "b056-get", "method": "GET", "path": "/%74est.html"}
+{"name": "b057-get", "method": "GET", "path": "/../package.json"}
+{"name": "b058-get", "method": "GET", "path": "/rust/fixtures/db.json"}
+{"name": "b059-range", "method": "GET", "path": "/test.html", "headers": {"Range": "bytes=0-9"}}
+{"name": "b060-range-open", "method": "GET", "path": "/test.html", "headers": {"Range": "bytes=5-"}}
+{"name": "b061-range-past", "method": "GET", "path": "/test.html", "headers": {"Range": "bytes=1000-"}}
+{"name": "b062-head-static", "method": "HEAD", "path": "/test.html"}
+{"name": "b063-post-static", "method": "POST", "path": "/test.html", "body": "{\"x\":1}", "headers": {"Content-Type": "application/json"}}
+{"name": "b064-options-double", "method": "OPTIONS", "path": "//posts"}
+{"name": "b065-post-double", "method": "POST", "path": "//posts", "body": "{\"x\":1}", "headers": {"Content-Type": "application/json"}}
+{"name": "b066-head-root", "method": "HEAD", "path": "/"}
+{"name": "b067-options-root", "method": "OPTIONS", "path": "/", "headers": {"Access-Control-Request-Headers": ""}}
+{"name": "b068-delete-root", "method": "DELETE", "path": "/"}
+{"name": "b069-get-deep", "method": "GET", "path": "/a/b/c"}
+{"name": "b070-put-deep", "method": "PUT", "path": "/posts/3/x", "body": "{}", "headers": {"Content-Type": "application/json"}}
+{"name": "b071-trailing-item", "method": "GET", "path": "/posts/3/"}
+{"name": "b072-patch-trailing", "method": "PATCH", "path": "/profile/", "body": "{\"t\":1}", "headers": {"Content-Type": "application/json"}}
+{"name": "b073-post-body", "method": "POST", "path": "/posts", "body": "{\"zebra\":1,\"apple\":2,\"10\":3,\"2\":4,\"é\":5,\"Apple\":6}", "headers": {"Content-Type": "application/json"}}
+{"name": "b074-post-body", "method": "POST", "path": "/posts", "body": "{\"n\":9007199254740993,\"f\":1e21,\"t\":0.1,\"neg\":-7,\"z\":-0,\"e\":1E400,\"s\":\"\\u00e9\\ud83d\\ude00\\n\\t\\\"q\\\" \\u0001\"}", "headers": {"Content-Type": "application/json"}}
+{"name": "b075-post-body", "method": "POST", "path": "/posts", "body": "﻿{\"bom\":true}", "headers": {"Content-Type": "application/json"}}
+{"name": "b076-post-body", "method": "POST", "path": "/posts", "body": "{\"a\":1,\"a\":2,\"b\":3}", "headers": {"Content-Type": "application/json"}}
+{"name": "b077-post-body", "method": "POST", "path": "/posts", "body": "{\"__proto__\":{\"x\":1},\"y\":2}", "headers": {"Content-Type": "application/json"}}
+{"name": "b078-post-body", "method": "POST", "path": "/posts", "body": "{\"nested\":{\"10\":1,\"b\":{\"2\":2,\"a\":1}},\"arr\":[3,{\"9\":0,\"k\":1}]}", "headers": {"Content-Type": "application/json"}}
+{"name": "b079-post-json", "method": "POST", "path": "/comments", "body": "{\"a\":1,}", "headers": {"Content-Type": "application/json"}}
+{"name": "b080-post-json", "method": "POST", "path": "/comments", "body": "[1,", "headers": {"Content-Type": "application/json"}}
+{"name": "b081-post-json", "method": "POST", "path": "/comments", "body": "{\"a\" 1}", "headers": {"Content-Type": "application/json"}}
+{"name": "b082-post-json", "method": "POST", "path": "/comments", "body": "{\"a\":1 \"b\":2}", "headers": {"Content-Type": "application/json"}}
+{"name": "b083-post-json", "method": "POST", "path": "/comments", "body": "\"\\x\"", "headers": {"Content-Type": "application/json"}}
+{"name": "b084-post-json", "method": "POST", "path": "/comments", "body": "tru", "headers": {"Content-Type": "application/json"}}
+{"name": "b085-post-json", "method": "POST", "path": "/comments", "body": "-", "headers": {"Content-Type": "application/json"}}
+{"name": "b086-post-json", "method": "POST", "path": "/comments", "body": "1.", "headers": {"Content-Type": "application/json"}}
+{"name": "b087-post-json", "method": "POST", "path": "/comments", "body": "1e", "headers": {"Content-Type": "application/json"}}
+{"name": "b088-post-json", "method": "POST", "path": "/comments", "body": "{\"a\":1}x", "headers": {"Content-Type": "application/json"}}
+{"name": "b089-post-json", "method": "POST", "path": "/comments", "body": "{\"a\":\"\\u12\"}", "headers": {"Content-Type": "application/json"}}
+{"name": "b090-post-json", "method": "POST", "path": "/comments", "body": "{\"a\":\"b\nc\"}", "headers": {"Content-Type": "application/json"}}
+{"name": "b091-post-json", "method": "POST", "path": "/comments", "body": "{\"a\":\"unterminated", "headers": {"Content-Type": "application/json"}}
+{"name": "b092-post-json", "method": "POST", "path": "/comments", "body": "", "headers": {"Content-Type": "application/json"}}
+{"name": "b093-post-json", "method": "POST", "path": "/comments", "body": "   ", "headers": {"Content-Type": "application/json"}}
+{"name": "b094-post-json", "method": "POST", "path": "/comments", "body": "undefined", "headers": {"Content-Type": "application/json"}}
+{"name": "b095-post-json", "method": "POST", "path": "/comments", "body": "NaN", "headers": {"Content-Type": "application/json"}}
+{"name": "b096-post-json", "method": "POST", "path": "/comments", "body": "[object Object]", "headers": {"Content-Type": "application/json"}}
+{"name": "b097-post-json", "method": "POST", "path": "/comments", "body": "{\"aaaaaaaaaaaaaaaaaaaa\": 1 x}", "headers": {"Content-Type": "application/json"}}
+{"name": "b098-post-json", "method": "POST", "path": "/comments", "body": "{\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\": 1, \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\": x}", "headers": {"Content-Type": "application/json"}}
+{"name": "b099-post-json", "method": "POST", "path": "/comments", "body": "{\"title\": \"👍🏽👍🏽👍🏽👍🏽👍🏽👍🏽\", x}", "headers": {"Content-Type": "application/json"}}
+{"name": "b100-post-json", "method": "POST", "path": "/comments", "body": "{\"t\":\"日本語日本語日本語日本語日本語\"}}", "headers": {"Content-Type": "application/json"}}
+{"name": "b101-post-json", "method": "POST", "path": "/comments", "body": "{\"a\":01}", "headers": {"Content-Type": "application/json"}}
+{"name": "b102-post-json", "method": "POST", "path": "/comments", "body": "{\"a\":.5}", "headers": {"Content-Type": "application/json"}}
+{"name": "b103-post-json", "method": "POST", "path": "/comments", "body": "{\"a\":+1}", "headers": {"Content-Type": "application/json"}}
+{"name": "b104-post-json", "method": "POST", "path": "/comments", "body": "{'a':1}", "headers": {"Content-Type": "application/json"}}
+{"name": "b105-post-json", "method": "POST", "path": "/comments", "body": "{\"a\":tru}", "headers": {"Content-Type": "application/json"}}
+{"name": "b106-post-json", "method": "POST", "path": "/comments", "body": "{\"a\":nul}", "headers": {"Content-Type": "application/json"}}
+{"name": "b107-post-json", "method": "POST", "path": "/comments", "body": "[1,2,3,4,5,6,7,8,9,10,11,12,13]]", "headers": {"Content-Type": "application/json"}}
+{"name": "b108-post-json", "method": "POST", "path": "/comments", "body": "{\"x\":1}\n\n ", "headers": {"Content-Type": "application/json"}}
+{"name": "b109-put-no-body", "method": "PUT", "path": "/posts/3"}
+{"name": "b110-delete-bad-body", "method": "DELETE", "path": "/comments/3", "body": "{bad", "headers": {"Content-Type": "application/json"}}
+{"name": "b111-post-octet", "method": "POST", "path": "/users", "body": "{\"from\":\"octet\"}", "headers": {"Content-Type": "application/octet-stream"}}
+{"name": "b112-post-no-ct", "method": "POST", "path": "/users", "body": "{\"from\":\"no content type\"}"}
+{"name": "b113-index-final", "method": "GET", "path": "/"}
+{"name": "b114-posts-final", "method": "GET", "path": "/posts"}
+{"name": "b115-comments-final", "method": "GET", "path": "/comments"}

@@ -2,6 +2,8 @@
 //! gate (the original package reaches them through their shadows, which honor the kill switch),
 //! replay runs every wired unit's recorded cases, and the lift leaves one pure Rust library.
 
+mod common;
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -9,13 +11,6 @@ use rust_anything::bridge::{self, Manifest};
 use rust_anything::front_door::{self, AppKind, FrontDoorOptions, State, WireOptions};
 use rust_anything::harness::{self, RecordOptions};
 use rust_anything::lift::{self, LiftOptions};
-
-fn available(program: &str, arg: &str) -> bool {
-    Command::new(program)
-        .arg(arg)
-        .output()
-        .is_ok_and(|o| o.status.success())
-}
 
 fn copy_dir(from: &Path, to: &Path) {
     std::fs::create_dir_all(to).unwrap();
@@ -58,6 +53,7 @@ fn bridged(repo: &Path, unit: &str) -> PathBuf {
         keep: Vec::new(),
         lang: None,
         batch: Vec::new(),
+        as_json: Vec::new(),
     })
     .unwrap()
     .crate_dir
@@ -106,7 +102,7 @@ fn the_public_api_is_found_in_every_language() {
         ("ruby", "slugify"),
         ("java", "slugify"),
     ];
-    if !available("cargo", "--version") {
+    if !common::have("cargo") {
         return;
     }
     for (name, export) in cases {
@@ -169,8 +165,7 @@ const STAND_IN: &str = "exports.shout = text => text.toUpperCase() + '!'\n\
 
 #[test]
 fn a_ts_library_moves_unit_by_unit() {
-    if !available("node", "--version") || !available("cargo", "--version") {
-        eprintln!("skipped: node or cargo not found");
+    if !common::have("node") || !common::have("cargo") {
         return;
     }
     let repo = fixture("lib/ts");
@@ -215,8 +210,7 @@ fn a_ts_library_moves_unit_by_unit() {
 
 #[test]
 fn a_python_library_keeps_what_cannot_move() {
-    if !available("python3", "--version") || !available("cargo", "--version") {
-        eprintln!("skipped: python3 or cargo not found");
+    if !common::have("python3") || !common::have("cargo") {
         return;
     }
     let repo = fixture("python");
@@ -276,11 +270,7 @@ pub fn is_palindrome(s: Option<&[u8]>) -> bool {
 
 #[test]
 fn a_c_library_lifts_to_one_pure_rust_crate() {
-    if !available("cc", "--version")
-        || !available("python3", "--version")
-        || !available("cargo", "--version")
-    {
-        eprintln!("skipped: cc, python3 or cargo not found");
+    if !common::have("cc") || !common::have("python3") || !common::have("cargo") {
         return;
     }
     let repo = fixture("lib/c");

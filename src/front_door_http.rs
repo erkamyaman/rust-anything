@@ -138,6 +138,9 @@ fn serve(app: &str) -> String {
     let listener = tokio::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], port)))
         .await
         .expect(\"binding the port\");
+    let listener = listener.tap_io(|tcp| {{
+        let _ = tcp.set_nodelay(true);
+    }});
     axum::serve(listener, {app})
         .with_graceful_shutdown(shutdown_signal())
         .await
@@ -153,6 +156,7 @@ mod units;
 
 use std::net::SocketAddr;
 
+use axum::serve::ListenerExt;
 use original::shutdown_signal;
 
 #[tokio::main]
@@ -167,11 +171,26 @@ async fn main() {{
     )
 }
 
+/// `main.rs` of the front door as this version writes it, then as earlier versions did (before
+/// `TCP_NODELAY`): lift recognizes either as untouched.
+pub(crate) fn main_rs_versions() -> Vec<String> {
+    let current = main_rs();
+    let before_nodelay = current
+        .replace(
+            "    let listener = listener.tap_io(|tcp| {\n        let _ = tcp.set_nodelay(true);\n    });\n",
+            "",
+        )
+        .replace("use axum::serve::ListenerExt;\n", "");
+    vec![current, before_nodelay]
+}
+
 pub(crate) fn lifted_main_rs() -> String {
     format!(
         "mod units;
 
 use std::net::SocketAddr;
+
+use axum::serve::ListenerExt;
 
 #[tokio::main]
 async fn main() {{
@@ -181,8 +200,16 @@ async fn main() {{
     )
 }
 
-pub(crate) fn original_rs(run: &[String]) -> String {
+/// `in_root`: the original runs in the repository, as recorded; otherwise in the front door's
+/// own working directory (the recording copies fresh files there).
+pub(crate) fn original_rs(run: &[String], in_root: bool) -> String {
     let words: Vec<String> = run.iter().map(|w| format!("{w:?}")).collect();
+    let cwd = if in_root {
+        ".current_dir(ROOT)
+            "
+    } else {
+        ""
+    };
     format!(
         "use std::ffi::OsString;
 use std::io::Write;
@@ -245,8 +272,8 @@ impl Original {{
         let (program, rest) = RUN.split_first().expect(\"the original's command\");
         let mut child = Command::new(resolve(program, port))
             .args(rest.iter().map(|w| resolve(w, port)))
-            .current_dir(ROOT)
-            .env(\"PORT\", port.to_string())
+            .args(std::env::args_os().skip(1))
+            {cwd}.env(\"PORT\", port.to_string())
             .env_remove(FALLBACK_LOG)
             .stdin(Stdio::null())
             .spawn()
@@ -336,6 +363,48 @@ pub async fn proxy(State(original): State<Original>, req: Request) -> Response {
     )
 }
 
+/// Path parameters are read from the URI here rather than by axum's extractors, which answer a
+/// 400 of their own when an escape is not UTF-8: the unit gets every request, as the original does.
+const PATH_PARAMS: &str = "
+/// The parameters of `route` (`/users/{id}`, `/files/{*rest}`) in `path`, percent-decoded; one
+/// whose escapes are not UTF-8 stays as sent.
+fn path_params(route: &str, path: &str) -> HashMap<String, String> {
+    let mut out = HashMap::new();
+    let mut segments = path.trim_start_matches('/').split('/');
+    for part in route.trim_start_matches('/').split('/') {
+        if let Some(name) = part.strip_prefix(\"{*\").and_then(|p| p.strip_suffix('}')) {
+            let rest: Vec<&str> = segments.by_ref().collect();
+            out.insert(name.to_string(), decode(&rest.join(\"/\")));
+            break;
+        }
+        let segment = segments.next().unwrap_or_default();
+        if let Some(name) = part.strip_prefix('{').and_then(|p| p.strip_suffix('}')) {
+            out.insert(name.to_string(), decode(segment));
+        }
+    }
+    out
+}
+
+fn decode(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let hex = |at: usize| bytes.get(at).and_then(|b| char::from(*b).to_digit(16));
+        if bytes[i] == b'%'
+            && let (Some(high), Some(low)) = (hex(i + 1), hex(i + 2))
+        {
+            out.push((high * 16 + low) as u8);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).unwrap_or_else(|_| text.to_string())
+}
+";
+
 fn method_fn(method: &Option<String>) -> String {
     method
         .as_deref()
@@ -375,7 +444,7 @@ pub(crate) fn units_rs(state: &State, lifted: bool) -> String {
     out += "use std::collections::HashMap;\n\nuse axum::Router;\n";
     out += &format!(
         "use axum::extract::{{{}Request{}}};\n",
-        if any_params { "Path, " } else { "" },
+        "",
         if lifted { "" } else { ", State" }
     );
     out += "use axum::response::Response;\n";
@@ -399,6 +468,9 @@ pub(crate) fn units_rs(state: &State, lifted: bool) -> String {
                  std::env::var(format!(\"{KILL_SWITCH_PREFIX}{{unit}}\")).is_ok_and(|v| v == \"original\")\n\
              }}\n"
         );
+    }
+    if any_params {
+        out += PATH_PARAMS;
     }
     let star = handlers.iter().position(|(_, r, _)| r.path == "*");
     let fallback = match (star, lifted) {
@@ -445,9 +517,6 @@ pub(crate) fn units_rs(state: &State, lifted: bool) -> String {
         if !lifted {
             params.push("State(original): State<Original>".to_string());
         }
-        if route.has_params() {
-            params.push("Path(params): Path<HashMap<String, String>>".to_string());
-        }
         params.push("req: Request".to_string());
         out += &format!("\nasync fn {name}({}) -> Response {{\n", params.join(", "));
         if !lifted {
@@ -460,9 +529,9 @@ pub(crate) fn units_rs(state: &State, lifted: bool) -> String {
             "    {module}::handle({:?}, {}, req).await\n}}\n",
             route.key(),
             if route.has_params() {
-                "params"
+                format!("path_params({:?}, req.uri().path())", route.path)
             } else {
-                "HashMap::new()"
+                "HashMap::new()".to_string()
             }
         );
     }
@@ -513,6 +582,16 @@ mod tests {
     }
 
     #[test]
+    fn generated_servers_send_without_nagle_delays() {
+        for code in [main_rs(), lifted_main_rs()] {
+            assert!(code.contains("tcp.set_nodelay(true)"), "{code}");
+            assert!(code.contains("use axum::serve::ListenerExt;"), "{code}");
+        }
+        let versions = main_rs_versions();
+        assert!(!versions[1].contains("nodelay") && !versions[1].contains("ListenerExt"));
+    }
+
+    #[test]
     fn routes_parse_and_overlaps_are_refused() {
         assert_eq!(
             Route::parse("get /div/{a}/{b}").unwrap().key(),
@@ -542,6 +621,10 @@ mod tests {
         assert!(code.contains("if sent_to_original(\"API\")"), "{code}");
         assert!(
             code.contains("api::handle(\"*\", HashMap::new(), req).await"),
+            "{code}"
+        );
+        assert!(
+            code.contains("api::handle(\"GET /div/{a}/{b}\", path_params(\"/div/{a}/{b}\", req.uri().path()), req)"),
             "{code}"
         );
         let lifted = units_rs(&s, true);

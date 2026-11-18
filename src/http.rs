@@ -43,6 +43,98 @@ pub struct HttpConfig {
     /// the `PORT` environment variable and `{port}` in the command.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub port: Option<u16>,
+    /// Arguments every start gets after its command: the original's and every build's.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+    /// Repository paths copied (from the snapshot in `http/files/`) into a fresh working
+    /// directory before every start, so state the server writes never leaks between runs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fresh: Vec<String>,
+    /// Milliseconds to wait after each response before the next request.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pace_ms: Option<u64>,
+}
+
+/// The `http` config of a recording: the saved one, changed by what this record was given.
+pub(crate) fn merge_config(saved: Option<HttpConfig>, opts: &RecordOptions) -> Option<HttpConfig> {
+    let asked = opts.http
+        || opts.port.is_some()
+        || !opts.server_args.is_empty()
+        || !opts.fresh.is_empty()
+        || opts.pace_ms.is_some();
+    let mut config = match (saved, asked) {
+        (Some(c), _) => c,
+        (None, true) => HttpConfig::default(),
+        (None, false) => return None,
+    };
+    if opts.port.is_some() {
+        config.port = opts.port;
+    }
+    if !opts.server_args.is_empty() {
+        config.args = opts.server_args.to_vec();
+    }
+    if !opts.fresh.is_empty() {
+        config.fresh = opts.fresh.to_vec();
+    }
+    if let Some(pace) = opts.pace_ms {
+        config.pace_ms = (pace > 0).then_some(pace);
+    }
+    Some(config)
+}
+
+pub(crate) const FILES_DIR: &str = "files";
+
+fn copy_tree(from: &Path, to: &Path) -> Result<()> {
+    if from.is_dir() {
+        std::fs::create_dir_all(to)?;
+        for entry in std::fs::read_dir(from)?.flatten() {
+            copy_tree(&entry.path(), &to.join(entry.file_name()))?;
+        }
+    } else {
+        if let Some(parent) = to.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::copy(from, to)
+            .with_context(|| format!("copying {} to {}", from.display(), to.display()))?;
+    }
+    Ok(())
+}
+
+/// Copies the `fresh` paths from the repository into `http/files/`, replacing the last snapshot.
+fn snapshot(repo: &Path, fresh: &[String]) -> Result<Option<PathBuf>> {
+    if fresh.is_empty() {
+        return Ok(None);
+    }
+    let dir = app::cases_dir(repo).join(HTTP_DIR).join(FILES_DIR);
+    let _ = std::fs::remove_dir_all(&dir);
+    for path in fresh {
+        let rel = Path::new(path);
+        ensure!(
+            rel.is_relative()
+                && rel
+                    .components()
+                    .all(|c| matches!(c, std::path::Component::Normal(_))),
+            "--fresh `{path}`: give a path inside the repository, relative to it"
+        );
+        let from = repo.join(rel);
+        ensure!(from.exists(), "--fresh `{path}`: no such file or folder");
+        copy_tree(&from, &dir.join(rel))?;
+    }
+    Ok(Some(dir))
+}
+
+/// The snapshot replay starts every build from, when the recording has `fresh` paths.
+fn saved_snapshot(repo: &Path, config: &Config) -> Result<Option<PathBuf>> {
+    if config.http.as_ref().is_none_or(|h| h.fresh.is_empty()) {
+        return Ok(None);
+    }
+    let dir = app::cases_dir(repo).join(HTTP_DIR).join(FILES_DIR);
+    ensure!(
+        dir.is_dir(),
+        "no {}: record again to snapshot the fresh files",
+        dir.display()
+    );
+    Ok(Some(dir))
 }
 
 fn get() -> String {
@@ -245,7 +337,7 @@ struct Server {
 }
 
 impl Server {
-    fn start(command: &[String], repo: &Path, port: u16) -> Result<Server> {
+    fn start(command: &[String], launch: &Launch, repo: &Path, port: u16) -> Result<Server> {
         let dir = app::temp_dir("server")?;
         let words: Vec<String> = command
             .iter()
@@ -253,9 +345,23 @@ impl Server {
             .collect();
         let (program, rest) = words.split_first().context("empty command")?;
         let log = dir.join("fallback.log");
+        let cwd = match launch.files {
+            Some(files) => {
+                let cwd = dir.join("cwd");
+                copy_tree(files, &cwd)?;
+                cwd
+            }
+            None => repo.to_path_buf(),
+        };
         let mut child = Command::new(program)
             .args(rest)
-            .current_dir(repo)
+            .args(
+                launch
+                    .args
+                    .iter()
+                    .map(|a| a.replace("{port}", &port.to_string())),
+            )
+            .current_dir(&cwd)
             .env("PORT", port.to_string())
             .env(app::FALLBACK_ENV, &log)
             .stdin(Stdio::null())
@@ -342,19 +448,30 @@ impl Drop for Server {
 
 type Answer = (std::result::Result<Resp, String>, Option<bool>);
 
+/// What every start gets besides its command: the server's arguments and its fresh files.
+struct Launch<'a> {
+    args: &'a [String],
+    files: Option<&'a Path>,
+    pace: Option<Duration>,
+}
+
 /// Starts the server once and sends every request in order.
 fn run_all(
     command: &[String],
+    launch: &Launch,
     repo: &Path,
     port: u16,
     reqs: &[&Req],
     timeout: Duration,
 ) -> Result<Vec<Answer>> {
-    let mut server = Server::start(command, repo, port)?;
+    let mut server = Server::start(command, launch, repo, port)?;
     let mut out = Vec::new();
     for req in reqs {
         let before = server.fallbacks().unwrap_or(0);
         let resp = send(server.port, req, timeout).map_err(|e| format!("{e:#}"));
+        if let Some(pace) = launch.pace {
+            std::thread::sleep(pace);
+        }
         let fell_back = server.fallbacks().map(|after| after > before);
         out.push((resp, fell_back));
     }
@@ -768,8 +885,16 @@ pub(crate) fn record(
     let timeout = Duration::from_secs(config.timeout_secs);
     let fixed = config.http.as_ref().and_then(|h| h.port);
     let reqs: Vec<&Req> = planned.iter().map(|(_, r)| r).collect();
+    let http = config.http.clone().unwrap_or_default();
+    let files = snapshot(repo, &http.fresh)?;
+    let launch = Launch {
+        args: &http.args,
+        files: files.as_deref(),
+        pace: http.pace_ms.map(Duration::from_millis),
+    };
     let one = run_all(
         &config.run,
+        &launch,
         repo,
         fixed.map_or_else(free_port, Ok)?,
         &reqs,
@@ -777,6 +902,7 @@ pub(crate) fn record(
     )?;
     let two = run_all(
         &config.run,
+        &launch,
         repo,
         fixed.map_or_else(free_port, Ok)?,
         &reqs,
@@ -947,7 +1073,14 @@ pub(crate) fn replay(
         None => free_port()?,
     };
     let reqs: Vec<&Req> = specs.iter().map(|s| &s.req).collect();
-    let answers = run_all(command, repo, port, &reqs, timeout)?;
+    let files = saved_snapshot(repo, config)?;
+    let http = config.http.clone().unwrap_or_default();
+    let launch = Launch {
+        args: &http.args,
+        files: files.as_deref(),
+        pace: http.pace_ms.map(Duration::from_millis),
+    };
+    let answers = run_all(command, &launch, repo, port, &reqs, timeout)?;
     let mut outcome = ReplayOutcome {
         build: command.to_vec(),
         passed: 0,

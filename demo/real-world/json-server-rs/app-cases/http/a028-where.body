@@ -1,0 +1,17 @@
+[
+  {
+    "id": "1",
+    "title": "a title",
+    "views": 100,
+    "published": true,
+    "userId": "1",
+    "author": {
+      "name": "typicode",
+      "age": 30
+    },
+    "tags": [
+      "json",
+      "rest"
+    ]
+  }
+]

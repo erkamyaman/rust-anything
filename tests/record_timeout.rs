@@ -1,15 +1,10 @@
 //! `record` on an original that never returns for some inputs (#80): the case is stopped after
 //! the time limit, the other cases are kept, and the stuck inputs are reported.
 
+mod common;
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
-
-fn available(program: &str) -> bool {
-    Command::new(program)
-        .arg("--version")
-        .output()
-        .is_ok_and(|o| o.status.success())
-}
 
 fn project(name: &str, files: &[(&str, &str)]) -> PathBuf {
     let root = std::env::temp_dir().join(format!(
@@ -70,8 +65,7 @@ fn check((printed, cases): &(String, Vec<serde_json::Value>)) {
 
 #[test]
 fn python_cases_that_never_return_are_left_out() {
-    if !available("python3") {
-        eprintln!("skipped: python3 not found");
+    if !common::have("python3") {
         return;
     }
     let root = project(
@@ -94,8 +88,7 @@ fn python_cases_that_never_return_are_left_out() {
 
 #[test]
 fn node_cases_that_never_return_are_left_out() {
-    if !available("node") {
-        eprintln!("skipped: node not found");
+    if !common::have("node") {
         return;
     }
     let root = project(

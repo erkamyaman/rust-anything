@@ -3,19 +3,14 @@
 //! every route to a Rust unit, the lift, and a replay of the pure binary with the original gone.
 //! A language is skipped when its runtime is missing.
 
+mod common;
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use rust_anything::app::{self, RecordOptions, ReplayOptions};
 use rust_anything::front_door::{self, FrontDoorOptions, WireOptions};
 use rust_anything::lift::{self, LiftOptions};
-
-fn available(program: &str, arg: &str) -> bool {
-    Command::new(program)
-        .arg(arg)
-        .output()
-        .is_ok_and(|o| o.status.success())
-}
 
 fn copy_dir(from: &Path, to: &Path) {
     std::fs::create_dir_all(to).unwrap();
@@ -72,6 +67,9 @@ fn record(repo: &Path, run: &str, traps: bool) -> app::RecordOutcome {
         traps,
         timeout_secs: None,
         http: true,
+        server_args: &[],
+        fresh: &[],
+        pace_ms: None,
         port: None,
         float_tolerance: None,
     })
@@ -91,7 +89,7 @@ fn replay(repo: &Path, build: Option<&str>) -> app::ReplayOutcome {
 
 #[test]
 fn http_record_keeps_distinct_requests_with_the_same_name() {
-    if !available("node", "--version") {
+    if !common::have("node") {
         return;
     }
     let repo = fixture("ts", "duplicate-inputs");
@@ -115,6 +113,9 @@ fn http_record_keeps_distinct_requests_with_the_same_name() {
         traps: false,
         timeout_secs: None,
         http: true,
+        server_args: &[],
+        fresh: &[],
+        pace_ms: None,
         port: None,
         float_tolerance: None,
     })
@@ -135,6 +136,70 @@ fn http_record_keeps_distinct_requests_with_the_same_name() {
     );
 }
 
+#[test]
+fn http_fresh_files_and_arguments_reach_every_start() {
+    if !common::have("node") {
+        return;
+    }
+    let repo = fixture("ts", "fresh-state");
+    std::fs::create_dir_all(repo.join("data")).unwrap();
+    std::fs::write(repo.join("data/count.txt"), "0").unwrap();
+    std::fs::write(
+        repo.join("counter.js"),
+        concat!(
+            "const http = require('http');\nconst fs = require('fs');\n",
+            "const file = process.argv[2];\n",
+            "http.createServer((req, res) => {\n",
+            "  let n = Number(fs.readFileSync(file, 'utf8'));\n",
+            "  if (req.method === 'POST') { n += 1; fs.writeFileSync(file, String(n)); }\n",
+            "  setTimeout(() => res.end(String(n)), 1);\n",
+            "}).listen(Number(process.env.PORT), '127.0.0.1');\n",
+        ),
+    )
+    .unwrap();
+    std::fs::remove_file(repo.join("README.md")).unwrap();
+    let inputs = repo.join("inputs.jsonl");
+    std::fs::write(
+        &inputs,
+        "{\"name\":\"a1\",\"method\":\"POST\",\"path\":\"/\"}\n{\"name\":\"a2\",\"path\":\"/\"}\n",
+    )
+    .unwrap();
+    let out = app::record(&RecordOptions {
+        repo: &repo,
+        run: &words("node counter.js"),
+        inputs: Some(&inputs),
+        normalize: &[],
+        name: None,
+        traps: false,
+        timeout_secs: None,
+        http: false,
+        port: None,
+        server_args: &["data/count.txt".to_string()],
+        fresh: &["data".to_string()],
+        pace_ms: Some(5),
+        float_tolerance: None,
+    })
+    .unwrap();
+    let body = std::fs::read_to_string(out.dir.join("a2.body")).unwrap();
+    let config = app::Config::load(&repo).unwrap().unwrap();
+    let replayed = replay(&repo, None);
+    let untouched = std::fs::read_to_string(repo.join("data/count.txt")).unwrap();
+    std::fs::remove_dir_all(&repo).unwrap();
+    assert!(out.noisy.is_empty(), "{:?}", out.noise);
+    assert_eq!(body, "1");
+    assert_eq!(untouched, "0");
+    let http = config.http.unwrap();
+    assert_eq!(
+        (http.args, http.fresh, http.pace_ms),
+        (
+            vec!["data/count.txt".to_string()],
+            vec!["data".to_string()],
+            Some(5)
+        )
+    );
+    assert_eq!(replayed.passed, 2, "{:?}", replayed.failures);
+}
+
 /// How to build and run one language's server, and a copy with a changed error message.
 struct Lang {
     name: &'static str,
@@ -150,7 +215,7 @@ fn no_build(_: &Path, _: &str, _: &str) {}
 
 #[test]
 fn http_rerecord_uses_the_existing_fixed_port() {
-    if !available("node", "--version") {
+    if !common::have("node") {
         return;
     }
     let repo = fixture("ts", "saved-port");
@@ -170,6 +235,9 @@ fn http_rerecord_uses_the_existing_fixed_port() {
             traps: false,
             timeout_secs: None,
             http: true,
+            server_args: &[],
+            fresh: &[],
+            pace_ms: None,
             port,
             float_tolerance: None,
         })
@@ -306,8 +374,7 @@ pub async fn handle(route: &str, params: HashMap<String, String>, req: Request) 
 
 fn check_language(lang: &Lang) {
     let (program, arg) = lang.runtime;
-    if !available(program, arg) {
-        eprintln!("skipped: {program} not found");
+    if !common::have_with(program, &[arg], "was not found") {
         return;
     }
 
@@ -349,7 +416,7 @@ fn check_language(lang: &Lang) {
     }
     std::fs::remove_dir_all(&repo).unwrap();
 
-    if !available("cargo", "--version") {
+    if !common::have("cargo") {
         return;
     }
     let repo = fixture(lang.name, "lift");

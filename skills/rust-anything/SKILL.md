@@ -28,7 +28,9 @@ Tools: the `rust-anything` CLI, or the same steps as MCP tools (`rust-anything m
 whole app `app_record`, `app_replay`, `app_front_door`, `app_wire`, `app_lift`.
 If the MCP tools are not available, use the CLI; if `rust-anything` is not installed, ask the user
 to install it (`cargo install rust-anything`) and run
-`rust-anything setup`, then restart the agent.
+`rust-anything setup`, then restart the agent. When a step fails because a runtime, the agent
+setup or the MCP server is missing or out of date, run `rust-anything doctor`: it checks each one
+and prints the command that fixes it.
 
 ## 0. Profile: find what is worth moving
 
@@ -142,6 +144,11 @@ line per case to `<crate>/known-diffs.jsonl`: `{"fn", "args", "actual", "reason"
 `args` and `actual` copied from `diff --json`. That case then passes only with exactly that result,
 and `gate` fails once it no longer differs, so remove the line then. If `gate` says the recording
 is stale, the original changed: record again before porting further.
+
+When `diff` says the port is stalled (its `trend.stalled`: three changes to `port.rs` in a row
+gained no matching case), stop editing. Show the user the remaining mismatches and ask: they may
+know the rule you are missing, or decide to keep those functions in the original for now. Each
+failed `gate` check carries a `fix`: run that first.
 
 Numeric code (physics, statistics, graphics) rarely gives bit-identical floats once ported:
 operation order, fused multiply-add and the math library differ. When the user accepts that,

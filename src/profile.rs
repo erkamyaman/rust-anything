@@ -245,7 +245,11 @@ fn goroot() -> Option<&'static str> {
     static GOROOT: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
     GOROOT
         .get_or_init(|| {
-            let out = Command::new("go").args(["env", "GOROOT"]).output().ok()?;
+            let out = crate::process::output(
+                Command::new("go").args(["env", "GOROOT"]),
+                crate::process::QUICK,
+            )
+            .ok()?;
             let root = String::from_utf8(out.stdout).ok()?.trim().to_string();
             (!root.is_empty()).then(|| format!("{root}/"))
         })
@@ -268,12 +272,14 @@ fn node(root: &Path, command: &[String], work: &Path) -> Result<(HashMap<Key, Ac
         .replace('\\', "\\\\")
         .replace('"', "\\\"");
     options.push_str(&format!(" --cpu-prof --cpu-prof-dir=\"{dir_option}\""));
-    let status = Command::new(&command[0])
-        .args(&command[1..])
-        .current_dir(root)
-        .env("NODE_OPTIONS", options.trim())
-        .status()
-        .with_context(|| format!("running {}", command[0]))?;
+    let status = crate::process::status(
+        Command::new(&command[0])
+            .args(&command[1..])
+            .current_dir(root)
+            .env("NODE_OPTIONS", options.trim()),
+        crate::process::TESTS,
+    )
+    .with_context(|| format!("running {}", command[0]))?;
     if !status.success() {
         bail!("the workload failed ({status})");
     }
@@ -423,13 +429,15 @@ fn python(root: &Path, command: &[String], work: &Path) -> Result<(HashMap<Key, 
     }
     let stats = work.join("profile.pstats");
     let start = std::time::Instant::now();
-    let status = Command::new(&command[0])
-        .args(["-m", "cProfile", "-o"])
-        .arg(&stats)
-        .args(&command[1..])
-        .current_dir(root)
-        .status()
-        .with_context(|| format!("running {}", command[0]))?;
+    let status = crate::process::status(
+        Command::new(&command[0])
+            .args(["-m", "cProfile", "-o"])
+            .arg(&stats)
+            .args(&command[1..])
+            .current_dir(root),
+        crate::process::TESTS,
+    )
+    .with_context(|| format!("running {}", command[0]))?;
     let total_ms = start.elapsed().as_secs_f64() * 1000.0;
     if !status.success() {
         bail!("the workload failed ({status})");
@@ -437,11 +445,13 @@ fn python(root: &Path, command: &[String], work: &Path) -> Result<(HashMap<Key, 
     let json = work.join("profile.json");
     let script = work.join("pstats_json.py");
     std::fs::write(&script, PSTATS_PY)?;
-    let status = Command::new(&command[0])
-        .arg(&script)
-        .arg(&stats)
-        .arg(&json)
-        .status()?;
+    let status = crate::process::status(
+        Command::new(&command[0])
+            .arg(&script)
+            .arg(&stats)
+            .arg(&json),
+        crate::process::TESTS,
+    )?;
     if !status.success() {
         bail!("reading the cProfile output failed");
     }
@@ -630,21 +640,25 @@ fn go(root: &Path, command: &[String], work: &Path) -> Result<(HashMap<Key, Acc>
         );
     }
     let out = work.join("cpu.pprof");
-    let status = Command::new(&command[0])
-        .arg("test")
-        .arg(format!("-cpuprofile={}", out.display()))
-        .args(&command[2..])
-        .current_dir(root)
-        .status()
-        .with_context(|| format!("running {}", command[0]))?;
+    let status = crate::process::status(
+        Command::new(&command[0])
+            .arg("test")
+            .arg(format!("-cpuprofile={}", out.display()))
+            .args(&command[2..])
+            .current_dir(root),
+        crate::process::TESTS,
+    )
+    .with_context(|| format!("running {}", command[0]))?;
     if !status.success() {
         bail!("the workload failed ({status})");
     }
-    let raw = Command::new("go")
-        .args(["tool", "pprof", "-raw"])
-        .arg(&out)
-        .current_dir(root)
-        .output()?;
+    let raw = crate::process::output(
+        Command::new("go")
+            .args(["tool", "pprof", "-raw"])
+            .arg(&out)
+            .current_dir(root),
+        crate::process::TESTS,
+    )?;
     if !raw.status.success() {
         bail!(
             "go tool pprof failed: {}",
@@ -694,27 +708,31 @@ fn java(root: &Path, command: &[String], work: &Path) -> Result<(HashMap<Key, Ac
         " -XX:StartFlightRecording=filename={},settings=profile -XX:FlightRecorderOptions=stackdepth=256",
         recording.display()
     ));
-    let status = Command::new(&command[0])
-        .args(&command[1..])
-        .current_dir(root)
-        .env("JAVA_TOOL_OPTIONS", options.trim())
-        .status()
-        .with_context(|| format!("running {}", command[0]))?;
+    let status = crate::process::status(
+        Command::new(&command[0])
+            .args(&command[1..])
+            .current_dir(root)
+            .env("JAVA_TOOL_OPTIONS", options.trim()),
+        crate::process::TESTS,
+    )
+    .with_context(|| format!("running {}", command[0]))?;
     if !status.success() {
         bail!("the workload failed ({status})");
     }
-    let out = Command::new("jfr")
-        .args([
-            "print",
-            "--json",
-            "--stack-depth",
-            "256",
-            "--events",
-            "jdk.ExecutionSample",
-        ])
-        .arg(&recording)
-        .output()
-        .context("running jfr (it comes with the JDK)")?;
+    let out = crate::process::output(
+        Command::new("jfr")
+            .args([
+                "print",
+                "--json",
+                "--stack-depth",
+                "256",
+                "--events",
+                "jdk.ExecutionSample",
+            ])
+            .arg(&recording),
+        crate::process::TESTS,
+    )
+    .context("running jfr (it comes with the JDK)")?;
     if !out.status.success() {
         bail!("jfr print failed: {}", String::from_utf8_lossy(&out.stderr));
     }
@@ -870,13 +888,15 @@ fn ruby(root: &Path, command: &[String], work: &Path) -> Result<(HashMap<Key, Ac
     let mut rubyopt = std::env::var("RUBYOPT").unwrap_or_default();
     rubyopt.push_str(&format!(" -r{}", tracer.display()));
     let start = std::time::Instant::now();
-    let status = Command::new(&command[0])
-        .args(&command[1..])
-        .current_dir(root)
-        .env("RUBYOPT", rubyopt.trim())
-        .env("RUST_ANYTHING_PROFILE_OUT", &out)
-        .status()
-        .with_context(|| format!("running {}", command[0]))?;
+    let status = crate::process::status(
+        Command::new(&command[0])
+            .args(&command[1..])
+            .current_dir(root)
+            .env("RUBYOPT", rubyopt.trim())
+            .env("RUST_ANYTHING_PROFILE_OUT", &out),
+        crate::process::TESTS,
+    )
+    .with_context(|| format!("running {}", command[0]))?;
     let total_ms = start.elapsed().as_secs_f64() * 1000.0;
     if !status.success() {
         bail!("the workload failed ({status})");

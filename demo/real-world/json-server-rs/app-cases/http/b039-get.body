@@ -1,0 +1,14 @@
+[
+  {
+    "id": "p1",
+    "name": "Grace",
+    "tickets": [
+      {
+        "id": "t1",
+        "statusId": "s1",
+        "personId": "p1",
+        "title": "first"
+      }
+    ]
+  }
+]

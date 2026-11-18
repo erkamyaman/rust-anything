@@ -1,0 +1,28 @@
+[
+  {
+    "id": "5",
+    "title": "numeric id",
+    "views": 1e+21
+  },
+  {
+    "title": "no id at all",
+    "views": 0,
+[..]
+  },
+  {
+    "title": "new post",
+    "views": 10,
+[..]
+  },
+  {
+[..]
+    "title": "custom id"
+  },
+  {
+    "id": "[..]"
+  },
+  {
+    "title": "charset",
+    "id": "[..]"
+  }
+]

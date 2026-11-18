@@ -1,0 +1,15 @@
+[request]
+method = "GET"
+path = "/users"
+
+[request.headers]
+Access-Control-Request-Headers = "Authorization,  X-Y"
+
+[response]
+status = 200
+
+[response.headers]
+access-control-allow-headers = "Authorization, X-Y"
+access-control-allow-methods = "GET, HEAD, PUT, PATCH, POST, DELETE"
+access-control-allow-origin = "*"
+content-type = "application/json"

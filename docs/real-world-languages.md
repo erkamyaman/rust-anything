@@ -186,8 +186,8 @@ Handled in the first port, and confirmed by the recorded cases:
 
 | | Record | Diff | Bridge | Shadow |
 | --- | --- | --- | --- | --- |
-| Go | generated driver, built as its own module with a `replace` to the original | the same driver over the cgo wrapper | JSON dispatcher + cgo package with the original API | package with the original API, runs both |
-| Ruby | generated driver loads the original files | the same driver loads the Fiddle wrapper | JSON dispatcher + Fiddle wrapper defining the same modules | file to require after the original: `prepend`s both |
-| Java | reflection driver compiled with the original sources | the same driver compiled with the JNI wrapper classes | JSON dispatcher over JNI + wrapper classes with the original static methods | `<Class>Shadow` classes |
+| Go | generated driver, built as its own module with a `replace` to the original | the same driver over the cgo wrapper | typed cgo with a binary wire + package with the original API | package with the original API, runs both |
+| Ruby | generated driver loads the original files | the same driver loads the magnus extension | magnus extension defining the same modules | file to require after the original: `prepend`s both |
+| Java | reflection driver compiled with the original sources | the same driver compiled with the JNI wrapper classes | typed JNI with a binary wire + wrapper classes with the original static methods | `<Class>Shadow` classes |
 | Python | in-process driver imports the original | the same driver imports the PyO3 package | PyO3 | module with the original API |
 | C | `cc -shared` of the original, called through ctypes, one fork per case | ctypes over the Rust `cdylib` | `extern "C"` functions with the original names and a header | shadow `.c` with `-D` renames; the crate's `shadow` feature exports only `rust_anything_` names |

@@ -1,0 +1,27 @@
+{
+  "id": "1",
+  "title": "a title",
+  "views": 100,
+  "published": true,
+  "userId": "1",
+  "author": {
+    "name": "typicode",
+    "age": 30
+  },
+  "tags": [
+    "json",
+    "rest"
+  ],
+  "comments": [
+    {
+      "id": "1",
+      "text": "a comment about post 1",
+      "postId": "1"
+    },
+    {
+      "id": "2",
+      "text": "another comment about post 1",
+      "postId": "1"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+[request]
+method = "POST"
+path = "/posts"
+body = '{"n":9007199254740993,"f":1e21,"t":0.1,"neg":-7,"z":-0,"e":1E400,"s":"\u00e9\ud83d\ude00\n\t\"q\" \u0001"}'
+
+[request.headers]
+Content-Type = "application/json"
+
+[response]
+status = 201
+
+[response.headers]
+access-control-allow-headers = "content-type"
+access-control-allow-methods = "GET, HEAD, PUT, PATCH, POST, DELETE"
+access-control-allow-origin = "*"
+content-type = "application/json"

@@ -1,0 +1,15 @@
+[request]
+method = "GET"
+path = "/test.html"
+
+[request.headers]
+Range = "bytes=5-"
+
+[response]
+status = 206
+
+[response.headers]
+accept-ranges = "bytes"
+cache-control = "no-store"
+content-range = "bytes 5-72/73"
+content-type = "text/html;charset=utf-8"

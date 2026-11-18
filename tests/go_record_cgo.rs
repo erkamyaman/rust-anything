@@ -1,9 +1,14 @@
+mod common;
+
 use std::{path::Path, process::Command};
 
 use rust_anything::{bridge, harness};
 
 #[test]
 fn record_uses_cgo_when_available_for_the_original_module() {
+    if !common::have("go") {
+        return;
+    }
     let Ok(cgo) = Command::new("go").args(["env", "CGO_ENABLED"]).output() else {
         return;
     };
@@ -38,6 +43,7 @@ fn record(root: &Path) -> anyhow::Result<()> {
         keep: Vec::new(),
         lang: None,
         batch: Vec::new(),
+        as_json: Vec::new(),
     })?;
     let recording = harness::record(&harness::RecordOptions {
         crate_dir: &out,

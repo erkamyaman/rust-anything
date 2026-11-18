@@ -1,0 +1,16 @@
+[request]
+method = "OPTIONS"
+path = "/posts"
+
+[request.headers]
+Access-Control-Request-Headers = "X-A, x-b"
+Access-Control-Request-Method = "POST"
+Origin = "http://example.com"
+
+[response]
+status = 204
+
+[response.headers]
+access-control-allow-headers = "X-A, x-b"
+access-control-allow-methods = "GET, HEAD, PUT, PATCH, POST, DELETE"
+access-control-allow-origin = "*"

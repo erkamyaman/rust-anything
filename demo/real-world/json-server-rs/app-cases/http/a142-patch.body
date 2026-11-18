@@ -1,0 +1,17 @@
+{
+  "id": "3",
+  "title": "Ünïcödé 👍🏽 thumbs",
+  "views": 51,
+  "published": true,
+  "userId": "1",
+  "author": {
+    "name": "zoë",
+    "age": null
+  },
+  "extra": {
+    "a": [
+      1,
+      "b"
+    ]
+  }
+}

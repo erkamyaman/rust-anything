@@ -1,0 +1,6 @@
+{"fn":"paginate","args":[[1,2,3,4,5],1,2]}
+{"fn":"paginate","args":[[1,2,3,4,5],2,2]}
+{"fn":"paginate","args":[[1,2,3,4,5],9,2]}
+{"fn":"paginate","args":[[1,2,3],0,2]}
+{"fn":"paginate","args":[[],1,2]}
+{"fn":"paginate","args":[[1,2,3],1,0]}

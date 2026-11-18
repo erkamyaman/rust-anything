@@ -10,7 +10,7 @@ use tree_sitter::Node;
 
 use super::syntax::{self, named_children, text};
 use crate::risks::{Risk, regex_needs_fancy};
-use crate::ts::deps::{CrateMatch, Fit};
+use crate::ts::deps::CrateMatch;
 use crate::ts::discover::{FileKind, Package, SourceFile, Workspace};
 use crate::ts::exports::{ExportedFn, Param};
 use crate::ts::scan::{FileFacts, Import};
@@ -314,62 +314,10 @@ pub fn resolve(spec: &str, index: &HashMap<&str, usize>, ws: &Workspace) -> supe
     super::Resolution::External(spec.split('.').take(2).collect::<Vec<_>>().join("."))
 }
 
-const fn m(crates: &'static str, fit: Fit, note: &'static str) -> CrateMatch {
-    CrateMatch { crates, fit, note }
-}
-
 /// Rust counterparts of common Java libraries, by import prefix or Maven coordinates.
 pub fn lookup(name: &str) -> Option<CrateMatch> {
     let key = name.split(':').next().unwrap_or(name);
-    Some(match key {
-        k if k.starts_with("com.google.guava") || k.starts_with("com.google.common") => m(
-            "std, itertools, indexmap",
-            Fit::Partial,
-            "Guava spans many crates",
-        ),
-        k if k.starts_with("org.apache.commons") => m("std, itertools", Fit::Partial, ""),
-        k if k.starts_with("com.fasterxml.jackson")
-            || k.starts_with("com.google.gson")
-            || k.starts_with("com.google.code.gson") =>
-        {
-            m("serde_json", Fit::Good, "")
-        }
-        k if k.starts_with("org.slf4j")
-            || k.starts_with("ch.qos.logback")
-            || k.starts_with("org.apache.logging") =>
-        {
-            m("tracing", Fit::Good, "")
-        }
-        k if k.starts_with("org.junit")
-            || k.starts_with("junit")
-            || k.starts_with("org.assertj") =>
-        {
-            m("std test", Fit::Good, "")
-        }
-        k if k.starts_with("org.springframework") => m(
-            "axum",
-            Fit::None,
-            "a framework is an application rewrite, not a port",
-        ),
-        k if k.starts_with("org.projectlombok") || k.starts_with("lombok") => m(
-            "derive macros",
-            Fit::Good,
-            "Lombok's generated code becomes derives",
-        ),
-        k if k.starts_with("com.squareup.okhttp3")
-            || k.starts_with("org.apache.httpcomponents") =>
-        {
-            m("reqwest", Fit::Good, "")
-        }
-        k if k.starts_with("org.yaml") => m("serde_yaml_ng", Fit::Good, ""),
-        k if k.starts_with("info.picocli") || k.starts_with("com.beust") => {
-            m("clap", Fit::Good, "")
-        }
-        k if k.starts_with("org.postgresql") => m("tokio-postgres, sqlx", Fit::Good, ""),
-        k if k.starts_with("org.xerial") => m("rusqlite", Fit::Good, ""),
-        k if k.starts_with("com.ibm.icu") => m("icu", Fit::Partial, ""),
-        _ => return None,
-    })
+    crate::crates::find("java", key)
 }
 
 // ---- exports ---------------------------------------------------------------------------------

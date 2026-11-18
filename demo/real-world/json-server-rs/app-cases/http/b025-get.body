@@ -1,0 +1,34 @@
+[
+  {
+    "id": "5",
+    "title": "numeric id",
+    "views": 1e+21,
+    "comments": []
+  },
+  {
+    "title": "no id at all",
+    "views": 0,
+[..]
+    "comments": []
+  },
+  {
+    "title": "new post",
+    "views": 10,
+[..]
+    "comments": []
+  },
+  {
+[..]
+    "title": "custom id",
+    "comments": []
+  },
+  {
+    "id": "[..]",
+    "comments": []
+  },
+  {
+    "title": "charset",
+    "id": "[..]",
+    "comments": []
+  }
+]

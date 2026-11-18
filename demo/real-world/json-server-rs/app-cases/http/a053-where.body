@@ -1,0 +1,34 @@
+[
+  {
+    "id": "1",
+    "title": "a title",
+    "views": 100,
+    "published": true,
+    "userId": "1",
+    "author": {
+      "name": "typicode",
+      "age": 30
+    },
+    "tags": [
+      "json",
+      "rest"
+    ]
+  },
+  {
+    "id": "2",
+    "title": "another title",
+    "views": 200,
+    "published": false,
+    "userId": "2",
+    "author": {
+      "name": "Ana",
+      "age": 25
+    }
+  },
+  {
+    "id": "4",
+    "title": "Zebra",
+    "views": -3,
+    "userId": null
+  }
+]

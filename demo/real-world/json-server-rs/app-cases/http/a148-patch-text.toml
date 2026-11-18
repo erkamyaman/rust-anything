@@ -1,0 +1,15 @@
+[request]
+method = "PATCH"
+path = "/posts/3"
+body = "x"
+
+[request.headers]
+Content-Type = "text/plain"
+
+[response]
+status = 500
+
+[response.headers]
+access-control-allow-headers = "content-type"
+access-control-allow-methods = "GET, HEAD, PUT, PATCH, POST, DELETE"
+access-control-allow-origin = "*"

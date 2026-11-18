@@ -1,0 +1,55 @@
+[
+  {
+    "id": "1",
+    "title": "a title",
+    "views": 100,
+    "published": true,
+    "userId": "1",
+    "author": {
+      "name": "typicode",
+      "age": 30
+    },
+    "tags": [
+      "json",
+      "rest"
+    ]
+  },
+  {
+    "id": "2",
+    "title": "another title",
+    "views": 200,
+    "published": false,
+    "userId": "2",
+    "author": {
+      "name": "Ana",
+      "age": 25
+    }
+  },
+  {
+    "title": "no id at all",
+    "views": 0,
+[..]
+  },
+  {
+    "id": "5",
+    "title": "numeric id",
+    "views": 1e+21
+  },
+  {
+    "id": "3",
+    "title": "Ünïcödé 👍🏽 thumbs",
+    "views": 50.5,
+    "published": true,
+    "userId": "1",
+    "author": {
+      "name": "zoë",
+      "age": null
+    }
+  },
+  {
+    "id": "4",
+    "title": "Zebra",
+    "views": -3,
+    "userId": null
+  }
+]

@@ -1,0 +1,12 @@
+[request]
+method = "GET"
+path = "/$schema"
+
+[response]
+status = 404
+
+[response.headers]
+access-control-allow-headers = "content-type"
+access-control-allow-methods = "GET, HEAD, PUT, PATCH, POST, DELETE"
+access-control-allow-origin = "*"
+content-type = "application/json"

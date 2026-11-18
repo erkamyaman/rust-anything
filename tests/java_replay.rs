@@ -1,3 +1,5 @@
+mod common;
+
 use std::{path::Path, process::Command};
 
 use rust_anything::{
@@ -7,12 +9,7 @@ use rust_anything::{
 
 #[test]
 fn java_replay_distinguishes_null_from_a_rejected_argument() {
-    if !["java", "javac"].into_iter().all(|tool| {
-        Command::new(tool)
-            .arg("-version")
-            .output()
-            .is_ok_and(|o| o.status.success())
-    }) {
+    if !common::have("java") || !common::have("javac") {
         return;
     }
 

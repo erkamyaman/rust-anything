@@ -1,0 +1,25 @@
+[
+  {
+    "id": "s1",
+    "label": "open",
+    "tickets": [
+      {
+        "id": "t1",
+        "statusId": "s1",
+        "personId": "p1",
+        "title": "first"
+      }
+    ]
+  },
+  {
+    "id": "s2",
+    "label": "closed",
+    "tickets": [
+      {
+        "id": "t2",
+        "statusId": "s2",
+        "title": "second"
+      }
+    ]
+  }
+]

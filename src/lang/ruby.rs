@@ -9,7 +9,7 @@ use tree_sitter::Node;
 
 use super::syntax::{self, named_children, text};
 use crate::risks::{Risk, regex_needs_fancy};
-use crate::ts::deps::{CrateMatch, Fit};
+use crate::ts::deps::CrateMatch;
 use crate::ts::discover::{FileKind, Package, SourceFile, Workspace};
 use crate::ts::exports::{ExportedFn, Param};
 use crate::ts::scan::{FileFacts, Import};
@@ -434,46 +434,9 @@ fn normalize(path: &str) -> Option<String> {
     Some(parts.join("/"))
 }
 
-const fn m(crates: &'static str, fit: Fit, note: &'static str) -> CrateMatch {
-    CrateMatch { crates, fit, note }
-}
-
 /// Rust counterparts of common gems.
 pub fn lookup(gem: &str) -> Option<CrateMatch> {
-    Some(match gem {
-        "rails" | "sinatra" | "roda" | "hanami" => m(
-            "axum",
-            Fit::None,
-            "a web framework is an application rewrite, not a port",
-        ),
-        "activesupport" => m(
-            "chrono, heck, inflector",
-            Fit::Partial,
-            "core extensions have no single counterpart",
-        ),
-        "activerecord" | "sequel" => m(
-            "sqlx, diesel",
-            Fit::Partial,
-            "an ORM's dynamic queries need redesign",
-        ),
-        "nokogiri" => m("scraper, quick-xml", Fit::Partial, ""),
-        "json" | "oj" | "multi_json" => m("serde_json", Fit::Good, ""),
-        "httparty" | "faraday" | "rest-client" | "http" => m("reqwest", Fit::Good, ""),
-        "thor" | "optparse" | "slop" => m("clap", Fit::Good, ""),
-        "rspec" | "minitest" | "test-unit" => m("std test", Fit::Good, ""),
-        "rake" => m("cargo-make, just", Fit::Partial, ""),
-        "redis" => m("redis", Fit::Good, ""),
-        "pg" => m("tokio-postgres, sqlx", Fit::Good, ""),
-        "sqlite3" => m("rusqlite", Fit::Good, ""),
-        "dry-types" | "dry-struct" => m("serde", Fit::Partial, ""),
-        "nanoid" => m("nanoid", Fit::Good, ""),
-        "tzinfo" => m("chrono-tz", Fit::Good, ""),
-        "i18n" => m("rust-i18n, fluent", Fit::Partial, ""),
-        "kramdown" | "redcarpet" | "commonmarker" => m("pulldown-cmark, comrak", Fit::Good, ""),
-        "rouge" => m("syntect", Fit::Partial, ""),
-        "zeitwerk" | "bootsnap" => m("(none)", Fit::None, "Ruby loading machinery: drop it"),
-        _ => return None,
-    })
+    crate::crates::find("ruby", gem)
 }
 
 // ---- exports ---------------------------------------------------------------------------------

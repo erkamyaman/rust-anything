@@ -45,12 +45,13 @@ pub fn capture(crate_dir: &Path, command: &[String]) -> Result<Capture> {
     cmd.args(args)
         .current_dir(&m.root)
         .stdout(std::io::stderr())
-        .env("RUST_ANYTHING_CAPTURE", &raw);
+        .env("RUST_ANYTHING_CAPTURE", &raw)
+        .env("CI", "1");
     let mut skipped = Vec::new();
     let status = match m.language {
         Lang::Ts => {
             let guard = instrument_js(&m, &mut skipped)?;
-            let status = cmd.status();
+            let status = crate::process::status(&mut cmd, crate::process::TESTS);
             drop(guard);
             status
         }
@@ -75,7 +76,7 @@ pub fn capture(crate_dir: &Path, command: &[String]) -> Result<Capture> {
             cmd.env("PYTHONPATH", path)
                 .env("RUST_ANYTHING_CAPTURE_FUNCS", serde_json::to_string(&want)?)
                 .env("PYTHONDONTWRITEBYTECODE", "1");
-            cmd.status()
+            crate::process::status(&mut cmd, crate::process::TESTS)
         }
         other => bail!(
             "--from-tests captures TS/JS and Python test suites; this unit is {}",

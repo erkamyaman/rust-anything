@@ -1,0 +1,27 @@
+{
+  "first": 1,
+  "prev": 1,
+  "next": 3,
+  "last": 3,
+  "pages": 3,
+  "items": 6,
+  "data": [
+    {
+      "id": "3",
+      "title": "Ünïcödé 👍🏽 thumbs",
+      "views": 50.5,
+      "published": true,
+      "userId": "1",
+      "author": {
+        "name": "zoë",
+        "age": null
+      }
+    },
+    {
+      "id": "4",
+      "title": "Zebra",
+      "views": -3,
+      "userId": null
+    }
+  ]
+}

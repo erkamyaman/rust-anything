@@ -221,6 +221,7 @@ pub fn checks(crate_dir: &Path, manifest: &Manifest) -> Vec<Check> {
         .map(|r| format!("{} fails at {}", r.export, r.site))
         .collect();
     let error_cases = Check {
+        fix: None,
         name: "error cases",
         passed: unreached.is_empty(),
         detail: if raised.is_empty() {
@@ -251,6 +252,7 @@ pub fn checks(crate_dir: &Path, manifest: &Manifest) -> Vec<Check> {
         .map(|p| format!("src/port.rs:{} `{}` in {}", p.line, p.what, p.function))
         .collect();
     let panics_check = Check {
+        fix: None,
         name: "panics",
         passed: bad.is_empty(),
         detail: if bad.is_empty() {

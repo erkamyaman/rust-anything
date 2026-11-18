@@ -1,0 +1,19 @@
+[package]
+name = "json-server"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "`json-server` in Rust, lifted by rust-anything from its front door"
+
+[[bin]]
+name = "json-server"
+path = "src/main.rs"
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "time"] }
+app-rs = { path = "../app-rs" }
+json-server-js = { path = "../json-server-js" }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+
+[workspace]

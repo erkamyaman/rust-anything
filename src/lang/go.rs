@@ -9,7 +9,7 @@ use tree_sitter::Node;
 
 use super::syntax::{self, named_children, text};
 use crate::risks::Risk;
-use crate::ts::deps::{CrateMatch, Fit};
+use crate::ts::deps::CrateMatch;
 use crate::ts::discover::{FileKind, Package, SourceFile, Workspace};
 use crate::ts::exports::{ExportedFn, Param};
 use crate::ts::scan::{FileFacts, Import};
@@ -273,41 +273,9 @@ pub fn resolve(spec: &str, index: &HashMap<&str, usize>, ws: &Workspace) -> supe
     super::Resolution::External(spec.to_string())
 }
 
-const fn m(crates: &'static str, fit: Fit, note: &'static str) -> CrateMatch {
-    CrateMatch { crates, fit, note }
-}
-
 /// Rust counterparts of common Go modules.
 pub fn lookup(module: &str) -> Option<CrateMatch> {
-    Some(match module {
-        "github.com/spf13/cobra" | "github.com/urfave/cli" | "github.com/urfave/cli/v2" => {
-            m("clap", Fit::Good, "")
-        }
-        "github.com/spf13/viper" => m("config, figment", Fit::Partial, ""),
-        "github.com/sirupsen/logrus" | "go.uber.org/zap" | "github.com/rs/zerolog" => {
-            m("tracing", Fit::Good, "")
-        }
-        "github.com/stretchr/testify" => m("std test, pretty_assertions", Fit::Good, ""),
-        "github.com/google/uuid" => m("uuid", Fit::Good, ""),
-        "github.com/gorilla/mux" | "github.com/gin-gonic/gin" | "github.com/labstack/echo/v4" => {
-            m("axum", Fit::Partial, "routing and middleware differ")
-        }
-        "gopkg.in/yaml.v3" | "gopkg.in/yaml.v2" | "sigs.k8s.io/yaml" => {
-            m("serde_yaml_ng", Fit::Good, "")
-        }
-        "github.com/BurntSushi/toml" | "github.com/pelletier/go-toml/v2" => {
-            m("toml", Fit::Good, "")
-        }
-        "golang.org/x/text" => m("unicode-normalization, icu", Fit::Partial, ""),
-        "golang.org/x/sync" => m("tokio, rayon", Fit::Partial, ""),
-        "github.com/jackc/pgx/v5" | "github.com/lib/pq" => m("sqlx, tokio-postgres", Fit::Good, ""),
-        "github.com/mattn/go-sqlite3" => m("rusqlite", Fit::Good, ""),
-        "github.com/prometheus/client_golang" => m("prometheus", Fit::Good, ""),
-        "google.golang.org/grpc" => m("tonic", Fit::Good, ""),
-        "google.golang.org/protobuf" | "github.com/golang/protobuf" => m("prost", Fit::Good, ""),
-        "github.com/dlclark/regexp2" => m("fancy-regex", Fit::Good, ""),
-        _ => return None,
-    })
+    crate::crates::find("go", module)
 }
 
 // ---- exports ---------------------------------------------------------------------------------

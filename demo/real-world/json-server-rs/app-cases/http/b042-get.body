@@ -1,0 +1,21 @@
+[
+  {
+    "id": "t1",
+    "statusId": "s1",
+    "personId": "p1",
+    "title": "first",
+    "status": {
+      "id": "s1",
+      "label": "open"
+    }
+  },
+  {
+    "id": "t2",
+    "statusId": "s2",
+    "title": "second",
+    "status": {
+      "id": "s2",
+      "label": "closed"
+    }
+  }
+]

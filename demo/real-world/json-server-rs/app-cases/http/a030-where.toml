@@ -1,0 +1,6 @@
+[request]
+method = "GET"
+path = "/posts?id:in=1, 3 ,x"
+
+[response]
+status = 400

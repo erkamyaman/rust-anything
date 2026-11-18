@@ -1,0 +1,91 @@
+[
+  {
+    "id": "1",
+    "title": "a title",
+    "views": 100,
+    "published": true,
+    "userId": "1",
+    "author": {
+      "name": "typicode",
+      "age": 30
+    },
+    "tags": [
+      "json",
+      "rest"
+    ],
+    "comments": [
+      {
+        "id": "1",
+        "text": "a comment about post 1",
+        "postId": "1"
+      },
+      {
+        "id": "2",
+        "text": "another comment about post 1",
+        "postId": "1"
+      }
+    ],
+    "user": {
+      "id": "1",
+      "name": "typicode"
+    }
+  },
+  {
+    "id": "2",
+    "title": "another title",
+    "views": 200,
+    "published": false,
+    "userId": "2",
+    "author": {
+      "name": "Ana",
+      "age": 25
+    },
+    "comments": [
+      {
+        "id": "3",
+        "text": "about post 2",
+        "postId": "2",
+        "likes": 7
+      }
+    ],
+    "user": {
+      "id": "2",
+      "name": "Ana"
+    }
+  },
+  {
+    "id": "3",
+    "title": "Ünïcödé 👍🏽 thumbs",
+    "views": 50.5,
+    "published": true,
+    "userId": "1",
+    "author": {
+      "name": "zoë",
+      "age": null
+    },
+    "comments": [],
+    "user": {
+      "id": "1",
+      "name": "typicode"
+    }
+  },
+  {
+    "id": "4",
+    "title": "Zebra",
+    "views": -3,
+    "userId": null,
+    "comments": []
+  },
+  {
+    "id": "5",
+    "title": "numeric id",
+    "views": 1e+21,
+    "comments": []
+  },
+  {
+    "title": "no id at all",
+    "views": 0,
+[..]
+    "comments": []
+  }
+]

@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+- A port of [json-server](https://github.com/typicode/json-server) to a pure Rust binary in
+  `demo/real-world/json-server-rs` and `docs/real-world.md`: 514/514 recorded HTTP cases match
+  with no fallback, and six units pass `gate`. Against Node 24 on an M4: first response in 8 to
+  10 ms instead of about 80, 3.5 MB of memory idle instead of 74, 2 to 4x the requests per second
+  on one connection and 5 to 13x on 50; 1.1 to 1.2x on writes and on the whole list of a 10,000-post
+  database.
+- `app record --http --fresh <path>` copies a file or folder the server writes (its database)
+  into a fresh working directory for every start, from a snapshot kept with the cases;
+  `--arg <arg>` passes the original's arguments to every build too; `--pace <ms>` waits after each
+  response for work a server does after answering. json-server needed all three: it rewrites its
+  database on every write, and its file watcher can undo a write that follows quickly.
+- `bridge --as-json T` bridges a generic the app only fills with data (`paginate<T>(items: T[])`)
+  as JSON values instead of keeping it in TS.
+- Fix: the HTTP front door's routes with parameters answered axum's own 400 when an escape was not
+  UTF-8 (`/posts/%E0`); parameters are now read from the URI and the unit gets the request.
+- Fix: `app lift` left out the crates the wired units depend on by path (shared code, other
+  units), so the staged build failed; they are staged, stripped of their bindings and synced back
+  with the units.
+- Fix: a lifted unit that keeps generated modules (`js.rs`) got a `lib.rs` that failed
+  `cargo fmt --check`: modules are now listed in the order rustfmt keeps.
+
+- A port of [Fuse.js](https://github.com/krisk/Fuse) string-list search in
+  `demo/real-world/fuse-rs` and `docs/real-world.md`: 3,414/3,414 recorded cases match, results
+  byte-identical to Fuse, 32x faster on 50,000 strings (5.3x on one core).
+- `gate`'s size check counts the files a TS unit imports from the repository, not only the unit.
+- Batch crates with string items but other results no longer get an unused helper (clippy failed).
 - TypeScript analysis and recording keep inherited path aliases when a later tsconfig base
   omits `compilerOptions.paths`.
 

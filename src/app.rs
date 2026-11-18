@@ -1208,6 +1208,15 @@ pub struct RecordOptions<'a> {
     /// The port a server always listens on (implies `http`); unset, it gets a free one through
     /// `PORT` and `{port}`.
     pub port: Option<u16>,
+    /// Servers: arguments every start gets after its command, the original's and every build's
+    /// (implies `http`); kept from the last recording when empty.
+    pub server_args: &'a [String],
+    /// Servers: repository files or folders copied into a fresh working directory before every
+    /// start (implies `http`); kept from the last recording when empty.
+    pub fresh: &'a [String],
+    /// Servers: milliseconds to wait after each response, for work the server does after
+    /// answering (a file watcher, a write-behind); kept from the last recording when `None`.
+    pub pace_ms: Option<u64>,
     /// Numbers in the output match within this tolerance; kept from the last recording when
     /// `None`, removed with 0.
     pub float_tolerance: Option<f64>,
@@ -1465,11 +1474,7 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
             .timeout_secs
             .or(existing.as_ref().map(|c| c.timeout_secs))
             .unwrap_or_else(default_timeout),
-        http: opts
-            .port
-            .map(|port| crate::http::HttpConfig { port: Some(port) })
-            .or_else(|| existing.as_ref().and_then(|c| c.http.clone()))
-            .or_else(|| opts.http.then_some(crate::http::HttpConfig { port: None })),
+        http: crate::http::merge_config(existing.as_ref().and_then(|c| c.http.clone()), opts),
         float_tolerance: match opts.float_tolerance {
             Some(t) => (crate::tolerance::check(t)? > 0.0).then_some(t),
             None => existing.as_ref().and_then(|c| c.float_tolerance),
@@ -2171,6 +2176,9 @@ mod tests {
             traps: false,
             timeout_secs: None,
             http: false,
+            server_args: &[],
+            fresh: &[],
+            pace_ms: None,
             port: None,
             float_tolerance: None,
         })
@@ -2350,6 +2358,9 @@ mod tests {
             traps: false,
             timeout_secs: None,
             http: false,
+            server_args: &[],
+            fresh: &[],
+            pace_ms: None,
             port: None,
             float_tolerance: None,
         })

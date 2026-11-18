@@ -1,0 +1,17 @@
+{
+  "id": "3",
+  "text": "about post 2",
+  "postId": "2",
+  "likes": 7,
+  "post": {
+    "id": "2",
+    "title": "another title",
+    "views": 200,
+    "published": false,
+    "userId": "2",
+    "author": {
+      "name": "Ana",
+      "age": 25
+    }
+  }
+}
