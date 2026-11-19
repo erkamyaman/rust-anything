@@ -585,13 +585,14 @@ fn run() -> Result<ExitCode> {
                 node_args: &node_args,
                 float_tolerance,
             })?;
+            let stale = rust_anything::bridge::Manifest::load(&crate_dir)
+                .ok()
+                .and_then(|m| rust_anything::recording::stale(&crate_dir, &m));
             if json {
                 say!("{}", serde_json::to_string_pretty(&d)?);
             } else {
-                if let Ok(m) = rust_anything::bridge::Manifest::load(&crate_dir)
-                    && let Some(why) = rust_anything::recording::stale(&crate_dir, &m)
-                {
-                    say!("Warning: {why}");
+                if let Some(why) = &stale {
+                    say!("Stale recording: {why}");
                 }
                 if d.accepted > 0 {
                     say!(
@@ -643,7 +644,7 @@ fn run() -> Result<ExitCode> {
                     );
                 }
             }
-            if d.failed > 0 {
+            if d.failed > 0 || stale.is_some() {
                 return Ok(ExitCode::FAILURE);
             }
         }

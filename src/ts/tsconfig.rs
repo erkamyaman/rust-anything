@@ -21,7 +21,9 @@ impl PathAliases {
                 format!("{current}/tsconfig.json")
             };
             if root.join(&candidate).is_file() {
-                return load(root, &candidate, 0).unwrap_or_default();
+                return load(root, &candidate, 0)
+                    .map(Config::into_aliases)
+                    .unwrap_or_default();
             }
             if current.is_empty() {
                 return Self::default();
@@ -55,53 +57,87 @@ impl PathAliases {
     }
 }
 
-/// Finds the effective paths map, following relative `extends`.
-fn load(root: &Path, rel: &str, depth: usize) -> Option<PathAliases> {
+#[derive(Default)]
+struct Config {
+    base_url: Option<String>,
+    paths: Option<Paths>,
+}
+
+struct Paths {
+    dir: String,
+    entries: Vec<(String, Vec<String>)>,
+}
+
+impl Config {
+    fn overlay(&mut self, later: Self) {
+        self.base_url = later.base_url.or(self.base_url.take());
+        self.paths = later.paths.or(self.paths.take());
+    }
+
+    fn into_aliases(self) -> PathAliases {
+        let Some(Paths { dir, mut entries }) = self.paths else {
+            return PathAliases::default();
+        };
+        let base = self.base_url.unwrap_or(dir);
+        for (_, targets) in &mut entries {
+            for target in targets {
+                *target = join(&base, target);
+            }
+        }
+        PathAliases { entries }
+    }
+}
+
+fn load(root: &Path, rel: &str, depth: usize) -> Option<Config> {
     if depth > 8 {
         return None;
     }
     let text = std::fs::read_to_string(root.join(rel)).ok()?;
     let json: Value = json5::from_str(&text).ok()?;
     let dir = rel.rsplit_once('/').map_or("", |(d, _)| d);
-    let options = &json["compilerOptions"];
-    let Some(paths) = options["paths"].as_object() else {
-        let extends: Vec<&str> = match &json["extends"] {
-            Value::String(s) => vec![s.as_str()],
-            Value::Array(items) => items.iter().filter_map(Value::as_str).collect(),
-            _ => Vec::new(),
-        };
-        return extends
-            .into_iter()
-            .rev()
-            .filter(|parent| parent.starts_with('.'))
-            .find_map(|parent| {
-                let mut target = join(dir, parent);
-                if !target.ends_with(".json") {
-                    target.push_str(".json");
-                }
-                load(root, &target, depth + 1)
-            });
+    let extends: Vec<&str> = match &json["extends"] {
+        Value::String(s) => vec![s.as_str()],
+        Value::Array(items) => items.iter().filter_map(Value::as_str).collect(),
+        _ => Vec::new(),
     };
-    // Targets are relative to `baseUrl` when set, else to the config's own folder.
-    let base = options["baseUrl"]
-        .as_str()
-        .map_or_else(|| dir.to_string(), |b| join(dir, b));
-    let entries = paths
-        .iter()
-        .map(|(pattern, targets)| {
-            let targets = targets
-                .as_array()
-                .map(|t| {
-                    t.iter()
-                        .filter_map(Value::as_str)
-                        .map(|t| join(&base, t))
-                        .collect()
-                })
-                .unwrap_or_default();
-            (pattern.clone(), targets)
-        })
-        .collect();
-    Some(PathAliases { entries })
+    let mut config = Config::default();
+    for parent in extends.into_iter().filter(|parent| parent.starts_with('.')) {
+        let mut target = join(dir, parent);
+        if !target.ends_with(".json") {
+            target.push_str(".json");
+        }
+        if let Some(parent) = load(root, &target, depth + 1) {
+            config.overlay(parent);
+        }
+    }
+    let options = &json["compilerOptions"];
+    let paths = options["paths"].as_object().map(|paths| {
+        let entries = paths
+            .iter()
+            .map(|(pattern, targets)| {
+                let targets = targets
+                    .as_array()
+                    .map(|items| {
+                        items
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .map(str::to_owned)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                (pattern.clone(), targets)
+            })
+            .collect();
+        Paths {
+            dir: dir.to_string(),
+            entries,
+        }
+    });
+    config.overlay(Config {
+        base_url: options["baseUrl"].as_str().map(|base| join(dir, base)),
+        paths,
+    });
+    Some(config)
 }
 
 /// `dir/rel`, with `.` and `..` collapsed; root-relative.

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- `bench` and `record` pass `--experimental-transform-types` only when Node accepts it: Node 26
+  removed the option and refused to start (#99).
+- `profile` keeps a Python workload script given as a relative path (`python3 bench.py`); its
+  functions were dropped and the table came out empty (#101).
+- `diff` exits non-zero when the recording is stale, as `gate` already refuses it, and the
+  warning says "Stale recording" (#102).
+- `analyze` says what a wasm-bindgen bridge needs installed, and that `--kind napi` runs with
+  what Node already has (#102).
+- TypeScript analysis and recording resolve path aliases against the inherited `baseUrl`,
+  including when the two options come from separate tsconfig files.
 - `setup` also registers OpenCode: the MCP server in `~/.config/opencode/opencode.json`
   (`mcp.servers`, the whole argv in `command`) and the workflow skill in
   `~/.config/opencode/skills/`, and `doctor` reads that entry back.

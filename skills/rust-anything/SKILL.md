@@ -182,7 +182,7 @@ fmt, clippy with warnings as errors, cargo tests, `unsafe` only with SAFETY comm
 reached by a recorded failing case (add one with `record --inputs` when gate names it), no
 `unwrap`, `expect` or `panic!` in a function whose original returns an error (return `Err`; for a
 state the original also treats as impossible, a `// INFALLIBLE: <why>` comment), the port at most
-3x the original's lines (over that, use the crates `analyze` lists and fold repeated code), the
+3x the original's lines plus 50 for imports and signatures (over that, use the crates `analyze` lists and fold repeated code), the
 module builds, every export present, every recorded case matches. A Rust panic never matches a
 recorded error: return `Err` where the original throws.
 
