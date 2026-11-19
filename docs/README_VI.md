@@ -20,20 +20,20 @@
   <img src="https://img.shields.io/badge/languages-6%20%2B%202%20preview-E2862A" alt="6 ngôn ngữ chính và 2 ngôn ngữ preview">
   <a href="#works-with"><img src="https://img.shields.io/badge/works%20with-4%20agents-E2862A" alt="Hỗ trợ 4 agent"></a>
   <a href="https://github.com/erkamyaman/rust-anything/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/erkamyaman/rust-anything/ci.yml?branch=main&label=tests" alt="Các bài kiểm tra"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-E2862A" alt="giấy phép MIT"></a>
+  <a href="../LICENSE"><img src="https://img.shields.io/badge/license-MIT-E2862A" alt="giấy phép MIT"></a>
   <a href="https://github.com/erkamyaman/rust-anything"><img src="https://img.shields.io/github/stars/erkamyaman/rust-anything?style=social" alt="Lượt sao trên GitHub"></a>
 </p>
 
 <p align="center">
   <a href="#quick-start">Bắt đầu nhanh</a> ·
   <a href="#languages">Ngôn ngữ</a> ·
-  <a href="docs/how-it-works.md#how-it-works">Cách hoạt động</a> ·
-  <a href="docs/how-it-works.md#the-loop">Quy trình</a> ·
-  <a href="docs/whole-apps.md#port-a-whole-app">Chuyển cả ứng dụng</a> ·
-  <a href="docs/how-it-works.md#hot-paths-keep-the-data-in-rust">Hot path</a> ·
-  <a href="docs/install.md#install">Cài đặt</a> ·
-  <a href="docs/how-it-works.md#what-it-cant-catch">Giới hạn</a> ·
-  <a href="docs/faq.md#faq">FAQ</a>
+  <a href="how-it-works.md#how-it-works">Cách hoạt động</a> ·
+  <a href="how-it-works.md#the-loop">Quy trình</a> ·
+  <a href="whole-apps.md#port-a-whole-app">Chuyển cả ứng dụng</a> ·
+  <a href="how-it-works.md#hot-paths-keep-the-data-in-rust">Hot path</a> ·
+  <a href="install.md#install">Cài đặt</a> ·
+  <a href="how-it-works.md#what-it-cant-catch">Giới hạn</a> ·
+  <a href="faq.md#faq">FAQ</a>
 </p>
 
 <p align="center">nhanh hơn tới 20 lần · chạy lại 38.251 ca đã ghi · không sai khác · chỉ với một lệnh</p>
@@ -163,7 +163,7 @@ rust-anything không tự dịch code sang Rust. Bạn hoặc coding agent (Clau
 | PHP (preview) | thư mục chứa function và method `public static` | sắp tới: PHP FFI dựa trên C ABI | có thể chạy với cả ứng dụng ngay hôm nay: `app record`, `app replay` và front door cho CLI lẫn server (`php -S`) |
 | C# (preview) | thư mục chứa các method `public static` | sắp tới: P/Invoke dựa trên C ABI | có thể chạy với cả ứng dụng ngay hôm nay: `app record`, `app replay` và front door cho CLI lẫn server ASP.NET (`dotnet <app>.dll`) |
 
-Mọi ngôn ngữ trừ C đều hỗ trợ batch class (`--batch`): dữ liệu chỉ qua cầu nối một lần rồi nằm trong Rust, mỗi lần gọi sẽ xử lý cả lô trên mọi core.
+TypeScript/JavaScript, Python, Go, Ruby và Java hỗ trợ batch class (`--batch`); PHP và C# chưa được hỗ trợ. Dữ liệu chỉ qua cầu nối một lần rồi nằm trong Rust, mỗi lần gọi sẽ xử lý cả lô trên mọi core.
 
 Công cụ nhận diện ngôn ngữ qua repo dựa trên các file như `go.mod`, `pom.xml`, `.csproj`, `.sln`, `pyproject.toml`, `Gemfile`, `composer.json`, `package.json` hoặc phần mở rộng xuất hiện nhiều nhất. Muốn chỉ định ngôn ngữ, dùng `--lang`. Kiểu dữ liệu được đọc từ source: type của TypeScript, type hint của Python, chữ ký hàm của C, Go, Java và C#, YARD tag của Ruby, type và phpdoc của PHP. Tham số không khai báo kiểu nhưng được dùng như số sẽ được suy luận là kiểu số.
 
@@ -173,12 +173,12 @@ C# cũng đang ở trạng thái preview. `analyze` đọc project `.csproj` và
 
 <h2 id="learn-more">Đọc thêm</h2>
 
-- [Cách hoạt động](docs/how-it-works.md): quy trình, cách `bridge` và `analyze` đưa ra quyết định, hot path và những gì công cụ không kiểm tra được
-- [Chuyển cả ứng dụng](docs/whole-apps.md): chuyển server, CLI và thư viện từ front door đến `app lift`
-- [Ví dụ và tình huống thực tế](docs/examples.md): x18n và code thực tế bằng sáu ngôn ngữ
-- [Các bản port thực tế](docs/real-world.md): json-server, Fuse.js, vercel/ms và benchmark
-- [Cài đặt, cập nhật và phát triển](docs/install.md): các cách cài, hướng dẫn cho Windows và cách build từ source
-- [Câu hỏi thường gặp](docs/faq.md) · [Trạng thái dự án](docs/STATUS.md) · [Công cụ MCP](docs/tools.md)
+- [Cách hoạt động](how-it-works.md): quy trình, cách `bridge` và `analyze` đưa ra quyết định, hot path và những gì công cụ không kiểm tra được
+- [Chuyển cả ứng dụng](whole-apps.md): chuyển server, CLI và thư viện từ front door đến `app lift`
+- [Ví dụ và tình huống thực tế](examples.md): x18n và code thực tế bằng sáu ngôn ngữ
+- [Các bản port thực tế](real-world.md): json-server, Fuse.js, vercel/ms và benchmark
+- [Cài đặt, cập nhật và phát triển](install.md): các cách cài, hướng dẫn cho Windows và cách build từ source
+- [Câu hỏi thường gặp](faq.md) · [Trạng thái dự án](STATUS.md) · [Công cụ MCP](tools.md)
 
 ## Nhà tài trợ
 
@@ -211,8 +211,8 @@ C# cũng đang ở trạng thái preview. `analyze` đọc project `.csproj` và
 
 ## Đóng góp
 
-Hoan nghênh issue và pull request. [CONTRIBUTING.md](./CONTRIBUTING.md) hướng dẫn cài đặt môi trường, vị trí đặt test và cách thêm ngôn ngữ. Các lựa chọn thiết kế cùng lý do được ghi trong [DECISIONS.md](./DECISIONS.md). Bạn cũng có thể chia sẻ những lần port ứng dụng thực tế. Nếu phát hiện vấn đề bảo mật, hãy báo riêng theo hướng dẫn trong [SECURITY.md](./SECURITY.md), đồng thời đọc [quy tắc ứng xử](./CODE_OF_CONDUCT.md).
+Hoan nghênh issue và pull request. [CONTRIBUTING.md](../CONTRIBUTING.md) hướng dẫn cài đặt môi trường, vị trí đặt test và cách thêm ngôn ngữ. Các lựa chọn thiết kế cùng lý do được ghi trong [DECISIONS.md](../DECISIONS.md). Bạn cũng có thể chia sẻ những lần port ứng dụng thực tế. Nếu phát hiện vấn đề bảo mật, hãy báo riêng theo hướng dẫn trong [SECURITY.md](../SECURITY.md), đồng thời đọc [quy tắc ứng xử](../CODE_OF_CONDUCT.md).
 
 ## Giấy phép
 
-[MIT](./LICENSE) © [Erkam Yaman](https://github.com/erkamyaman). Các bản port và code được tạo trong repo thuộc về bạn.
+[MIT](../LICENSE) © [Erkam Yaman](https://github.com/erkamyaman). Các bản port và code được tạo trong repo thuộc về bạn.
