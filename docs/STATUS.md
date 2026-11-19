@@ -28,6 +28,7 @@ Details of every run: [real-world.md](real-world.md) (TS/JS) and
 | --- | --- | --- |
 | `analyze` | Verified | every language above, x18n's 142 units |
 | `bridge`, `record`, `diff`, `gate`, `build` | Verified | the runs above; `bridge --as-json` on json-server's `paginate` |
+| Types for untyped JS in `bridge` (sibling `.d.ts`/`.d.mts`/`.d.cts`, then JSDoc) | Tested | `tests/untyped_js_types.rs` |
 | `bench` | Verified | the runs above; numbers in [real-world.md](real-world.md) |
 | `record --from-tests` | Verified (TS/JS), Tested (Python) | vercel/ms's Jest suite |
 | Coverage of the original in `record` and `gate` | Verified (TS/JS) | Fuse.js: cases run 81% of the lines it imports; other languages do not measure it yet |

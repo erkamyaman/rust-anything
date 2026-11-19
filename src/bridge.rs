@@ -1102,7 +1102,9 @@ pub fn bridge(opts: &Options) -> Result<Outcome> {
                 }
             }
         }
-        for mut f in exported_functions(file, &text) {
+        let mut functions = exported_functions(file, &text);
+        crate::ts::jsdoc::apply_declarations(&root, file, &mut functions);
+        for mut f in functions {
             for p in &mut f.params {
                 p.ts_type = resolve_aliases(&p.ts_type, &types);
             }

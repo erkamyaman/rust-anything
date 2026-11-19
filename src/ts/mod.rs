@@ -3,6 +3,7 @@
 pub mod deps;
 pub mod discover;
 pub mod exports;
+pub mod jsdoc;
 pub mod scan;
 pub mod shape;
 pub mod tsconfig;

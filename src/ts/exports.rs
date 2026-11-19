@@ -8,6 +8,8 @@ use oxc_parser::Parser;
 use oxc_span::{GetSpan, SourceType};
 use serde::{Deserialize, Serialize};
 
+use super::jsdoc::{self, JsDoc, ParamTag};
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Param {
     pub name: String,
@@ -207,6 +209,14 @@ pub fn exported_classes(path: &str, source: &str) -> Vec<ExportedClass> {
 
 /// Top-level `export function f()` and `export const f = () => ...` declarations.
 pub fn exported_functions(path: &str, source: &str) -> Vec<ExportedFn> {
+    functions(path, source, false)
+}
+
+pub fn declared_functions(path: &str, source: &str) -> Vec<ExportedFn> {
+    functions(path, source, true)
+}
+
+fn functions(path: &str, source: &str, declarations: bool) -> Vec<ExportedFn> {
     let source_type = SourceType::from_path(path).unwrap_or_else(|_| SourceType::ts());
     let allocator = Allocator::default();
     let ret = Parser::new(&allocator, source, source_type).parse();
@@ -217,38 +227,62 @@ pub fn exported_functions(path: &str, source: &str) -> Vec<ExportedFn> {
     let line = |offset: u32| {
         u32::try_from(source[..offset as usize].matches('\n').count() + 1).unwrap_or(u32::MAX)
     };
-    let params = |params: &FormalParameters| -> Vec<Param> {
+    let params = |params: &FormalParameters, doc: &JsDoc| -> Vec<Param> {
         let mut out: Vec<Param> = params
             .items
             .iter()
             .enumerate()
-            .map(|(i, p)| Param {
-                name: binding_name(&p.pattern).unwrap_or_else(|| format!("arg{i}")),
-                ts_type: match (&p.type_annotation, p.initializer.as_deref()) {
-                    (Some(a), _) => annotation(Some(a)),
-                    // `namespaced = true`: the type comes from the default value.
-                    (None, Some(Expression::BooleanLiteral(_))) => "boolean".into(),
-                    (None, Some(Expression::NumericLiteral(_))) => "number".into(),
-                    (None, Some(Expression::StringLiteral(_) | Expression::TemplateLiteral(_))) => {
-                        "string".into()
-                    }
-                    (None, _) => "unknown".into(),
-                },
-                optional: p.optional || p.initializer.is_some(),
-                rest: false,
-                ..Default::default()
+            .map(|(i, p)| {
+                let name = binding_name(&p.pattern).unwrap_or_else(|| format!("arg{i}"));
+                let tag = doc.param(&name);
+                let documented = tag.and_then(|t| t.ts_type.clone());
+                Param {
+                    ts_type: match (&p.type_annotation, documented, p.initializer.as_deref()) {
+                        (Some(a), _, _) => annotation(Some(a)),
+                        (None, Some(t), _) => t,
+                        // `namespaced = true`: the type comes from the default value.
+                        (None, None, Some(Expression::BooleanLiteral(_))) => "boolean".into(),
+                        (None, None, Some(Expression::NumericLiteral(_))) => "number".into(),
+                        (
+                            None,
+                            None,
+                            Some(Expression::StringLiteral(_) | Expression::TemplateLiteral(_)),
+                        ) => "string".into(),
+                        (None, None, _) => "unknown".into(),
+                    },
+                    optional: p.optional
+                        || p.initializer.is_some()
+                        || (p.type_annotation.is_none() && tag.is_some_and(|t| t.optional)),
+                    rest: false,
+                    name,
+                    ..Default::default()
+                }
             })
             .collect();
         if let Some(rest) = &params.rest {
+            let name = binding_name(&rest.rest.argument).unwrap_or_else(|| "rest".into());
+            let ts_type = match (&rest.type_annotation, doc.param(&name)) {
+                (
+                    None,
+                    Some(ParamTag {
+                        ts_type: Some(t), ..
+                    }),
+                ) => t.clone(),
+                (ann, _) => annotation(ann.as_deref()),
+            };
             out.push(Param {
-                name: binding_name(&rest.rest.argument).unwrap_or_else(|| "rest".into()),
-                ts_type: annotation(rest.type_annotation.as_deref()),
+                name,
+                ts_type,
                 optional: true,
                 rest: true,
                 ..Default::default()
             });
         }
         out
+    };
+    let returns_of = |ann: Option<&TSTypeAnnotation>, doc: &JsDoc| match (ann, &doc.returns) {
+        (None, Some(t)) => t.clone(),
+        (ann, _) => annotation(ann),
     };
 
     let mut out = Vec::new();
@@ -257,16 +291,17 @@ pub fn exported_functions(path: &str, source: &str) -> Vec<ExportedFn> {
             Statement::ExportDeclaration(export) => Some(&export.declaration),
             _ => None,
         };
+        let doc = jsdoc::leading(source, statement.span().start as usize).unwrap_or_default();
         match declaration {
             // Overload signatures have no body: the implementation signature follows them.
-            Some(Declaration::FunctionDeclaration(f)) if f.body.is_some() => {
+            Some(Declaration::FunctionDeclaration(f)) if f.body.is_some() != declarations => {
                 if let Some(id) = &f.id {
                     out.push(ExportedFn {
                         name: id.name.as_str().to_string(),
                         file: path.to_string(),
                         line: line(f.span.start),
-                        params: params(&f.params),
-                        returns: annotation(f.return_type.as_deref()),
+                        params: params(&f.params, &doc),
+                        returns: returns_of(f.return_type.as_deref(), &doc),
                         is_async: f.r#async,
                         is_generator: f.generator,
                         type_params: type_params_of(f.type_parameters.as_deref(), &text),
@@ -275,7 +310,7 @@ pub fn exported_functions(path: &str, source: &str) -> Vec<ExportedFn> {
                     });
                 }
             }
-            Some(Declaration::VariableDeclaration(vars)) => {
+            Some(Declaration::VariableDeclaration(vars)) if !declarations => {
                 for declarator in &vars.declarations {
                     let Some(name) = binding_name(&declarator.id) else {
                         continue;
@@ -307,8 +342,8 @@ pub fn exported_functions(path: &str, source: &str) -> Vec<ExportedFn> {
                         name,
                         file: path.to_string(),
                         line: line(span.start),
-                        params: params(fn_params),
-                        returns: annotation(returns),
+                        params: params(fn_params, &doc),
+                        returns: returns_of(returns, &doc),
                         is_async,
                         is_generator,
                         type_params,
@@ -426,6 +461,31 @@ mod tests {
             ("boolean", true)
         );
         assert_eq!(found[2].returns, "unknown");
+    }
+
+    #[test]
+    fn reads_jsdoc_types_of_untyped_parameters() {
+        let found = exported_functions(
+            "m.js",
+            "/**\n * @param {string} source\n * @param {?number} [limit]\n * @returns {string[]}\n */\n\
+             export function parse(source, limit = 0) { return [] }\n\
+             /** @param {...string} parts */\n\
+             export const join = (...parts) => parts.join('')\n\
+             /** @param {function(string): number} f */\n\
+             export function apply(f, n = 1) {}\n",
+        );
+        let types = |i: usize| -> Vec<(&str, bool)> {
+            found[i]
+                .params
+                .iter()
+                .map(|p| (p.ts_type.as_str(), p.optional))
+                .collect()
+        };
+        assert_eq!(types(0), [("string", false), ("(number) | null", true)]);
+        assert_eq!(found[0].returns, "string[]");
+        assert_eq!(types(1), [("(string)[]", true)]);
+        assert_eq!(found[1].returns, "unknown");
+        assert_eq!(types(2), [("unknown", false), ("number", true)]);
     }
 
     #[test]
