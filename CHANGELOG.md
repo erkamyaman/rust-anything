@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `setup` also registers OpenCode: the MCP server in `~/.config/opencode/opencode.json`
+  (`mcp.servers`, the whole argv in `command`) and the workflow skill in
+  `~/.config/opencode/skills/`, and `doctor` reads that entry back.
 - A port of [json-server](https://github.com/typicode/json-server) to a pure Rust binary in
   `demo/real-world/json-server-rs` and `docs/real-world.md`: 514/514 recorded HTTP cases match
   with no fallback, and six units pass `gate`. Against Node 24 on an M4: first response in 8 to

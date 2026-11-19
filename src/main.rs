@@ -207,9 +207,9 @@ enum Cmd {
     },
     /// Serve every step as MCP tools over stdio.
     Mcp,
-    /// Register rust-anything with your coding agents (Claude Code, Codex, Cursor, Gemini CLI):
-    /// the MCP server and, where the agent reads skills, the workflow skill. Keeps your other
-    /// settings; run it again any time.
+    /// Register rust-anything with your coding agents (Claude Code, Codex, Cursor, Gemini CLI,
+    /// OpenCode): the MCP server and, where the agent reads skills, the workflow skill. Keeps your
+    /// other settings; run it again any time.
     Setup {
         /// Agents to set up (repeatable); every agent found by default.
         #[arg(long = "agent", value_enum)]

@@ -129,6 +129,8 @@ pub struct Entry {
     pub command: Option<String>,
     pub args: Vec<String>,
     pub url: bool,
+    /// OpenCode keeps a configured server out of the way with `disabled`; never set elsewhere.
+    pub disabled: bool,
 }
 
 /// Ours and current when it runs `<exe> mcp`; outdated when it runs `mcp` on another binary.
@@ -141,6 +143,9 @@ pub fn entry_state(entry: Option<&Entry>, exe: &Path) -> Install {
     };
     if entry.url || entry.args != ["mcp"] {
         return Install::Foreign;
+    }
+    if entry.disabled {
+        return Install::Outdated;
     }
     let path = Path::new(command);
     if path == exe || path.canonical().is_ok_and(|p| p == exe) {
@@ -559,6 +564,7 @@ fn slug(agent: Agent) -> &'static str {
         Agent::Codex => "codex",
         Agent::Cursor => "cursor",
         Agent::Gemini => "gemini",
+        Agent::OpenCode => "opencode",
     }
 }
 
@@ -584,7 +590,7 @@ fn agents(exe: &Path) -> Vec<Check> {
             name: "agents".into(),
             status: Status::Missing,
             required: false,
-            detail: "no coding agent found (Claude Code, Codex, Cursor, Gemini CLI); the CLI works without one".into(),
+            detail: "no coding agent found (Claude Code, Codex, Cursor, Gemini CLI, OpenCode); the CLI works without one".into(),
             fix: Some(format!("{} setup --agent claude", quoted(exe))),
         }];
     }
@@ -598,6 +604,9 @@ fn agents(exe: &Path) -> Vec<Check> {
                 let state = entry_state(entry.as_ref(), exe);
                 let detail = match (state, &entry) {
                     (Install::Missing, _) => format!("no `{NAME}` server in {}", config.display()),
+                    (_, Some(Entry { disabled: true, .. })) => {
+                        format!("`{NAME}` in {} is disabled", config.display())
+                    }
                     (
                         _,
                         Some(Entry {
@@ -702,6 +711,31 @@ fn read_entry(agent: Agent, path: &Path) -> Result<Option<Entry>, String> {
                 })
                 .unwrap_or_default(),
             url: server.get("url").is_some(),
+            disabled: false,
+        }));
+    }
+    if agent == Agent::OpenCode {
+        let doc: Value = serde_json::from_str(&text)
+            .map_err(|_| format!("{} is not valid JSON", path.display()))?;
+        // Current OpenCode keeps servers under `mcp.servers`; older files list them in `mcp`.
+        let mcp = &doc["mcp"];
+        let servers = if mcp.get("servers").is_some() {
+            &mcp["servers"]
+        } else {
+            mcp
+        };
+        let Some(server) = servers.get(NAME) else {
+            return Ok(None);
+        };
+        // OpenCode's local server takes the whole argv in `command`.
+        let mut argv = server["command"]
+            .as_array()
+            .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)));
+        return Ok(Some(Entry {
+            command: argv.as_mut().and_then(|a| a.next()),
+            args: argv.into_iter().flatten().collect(),
+            url: server.get("url").is_some(),
+            disabled: server["disabled"].as_bool() == Some(true),
         }));
     }
     let doc: Value =
@@ -720,6 +754,7 @@ fn read_entry(agent: Agent, path: &Path) -> Result<Option<Entry>, String> {
             })
             .unwrap_or_default(),
         url: server.get("url").is_some(),
+        disabled: false,
     }))
 }
 
@@ -816,6 +851,7 @@ mod tests {
             command: Some(command.into()),
             args: args.iter().map(|a| a.to_string()).collect(),
             url,
+            disabled: false,
         };
         assert_eq!(entry_state(None, exe), Install::Missing);
         assert_eq!(
@@ -838,6 +874,49 @@ mod tests {
             Install::Foreign
         );
         assert_eq!(entry_state(Some(&Entry::default()), exe), Install::Foreign);
+        // A server OpenCode keeps disabled is not current.
+        let mut disabled = entry("/opt/bin/rust-anything", &["mcp"], false);
+        disabled.disabled = true;
+        assert_eq!(entry_state(Some(&disabled), exe), Install::Outdated);
+    }
+
+    #[test]
+    fn opencode_entries_come_from_mcp_servers() {
+        let home = std::env::temp_dir().join(format!(
+            "rust-anything-doctor-opencode-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&home);
+        std::fs::create_dir_all(home.join(".config/opencode")).unwrap();
+        let config = home.join(".config/opencode/opencode.json");
+        std::fs::write(
+            &config,
+            r#"{"mcp":{"servers":{"rust-anything":{"type":"local","command":["/opt/bin/rust-anything","mcp"]}}}}"#,
+        )
+        .unwrap();
+        let exe = Path::new("/opt/bin/rust-anything");
+        let entry = read_entry(Agent::OpenCode, &config).unwrap();
+        assert_eq!(entry_state(entry.as_ref(), exe), Install::Current);
+        assert_eq!(
+            entry_state(entry.as_ref(), Path::new("/elsewhere/rust-anything")),
+            Install::Outdated
+        );
+        std::fs::write(
+            &config,
+            r#"{"mcp":{"servers":{"rust-anything":{"type":"local","command":["/opt/bin/rust-anything","mcp"],"disabled":true}}}}"#,
+        )
+        .unwrap();
+        let entry = read_entry(Agent::OpenCode, &config).unwrap();
+        assert_eq!(entry_state(entry.as_ref(), exe), Install::Outdated);
+        // Older files list servers in `mcp` itself.
+        std::fs::write(
+            &config,
+            r#"{"mcp":{"rust-anything":{"type":"local","command":["/opt/bin/rust-anything","mcp"]}}}"#,
+        )
+        .unwrap();
+        let entry = read_entry(Agent::OpenCode, &config).unwrap();
+        assert_eq!(entry_state(entry.as_ref(), exe), Install::Current);
+        std::fs::remove_dir_all(&home).unwrap();
     }
 
     #[test]

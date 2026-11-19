@@ -39,6 +39,7 @@ Details of every run: [real-world.md](real-world.md) (TS/JS) and
 | Front door (`front-door`), `wire` | Verified (TS server) | json-server: reads wired first (22.6% fallback), then every route (0%); servers in eight languages in `tests/http.rs` |
 | `lift` | Verified (TS server), Tested (CLIs) | json-server: pure Rust binary, 514/514; CLIs in all eight languages in `tests/app.rs` |
 | MCP server (`mcp`) | Tested | protocol test in `src/mcp.rs` |
+| `setup` | Tested | registers the MCP server (and the skill, where the agent reads skills) with Claude Code, Codex, Cursor, Gemini CLI and OpenCode; per-agent tests in `src/setup.rs`, read back in `src/doctor.rs` and `tests/doctor.rs`. The OpenCode entry was also confirmed by OpenCode 2.3.2 itself (`mcp.servers`, `command` as an array) |
 
 ## Where the tests run
 

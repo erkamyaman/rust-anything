@@ -46,6 +46,23 @@ one project by hand instead (`.mcp.json`):
 { "mcpServers": { "rust-anything": { "command": "rust-anything", "args": ["mcp"] } } }
 ```
 
+OpenCode takes a local server under `mcp.servers` and the whole argv in one `command` array, in
+`~/.config/opencode/opencode.json` (an older file that lists servers directly under `mcp` keeps
+that shape):
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "rust-anything": { "type": "local", "command": ["rust-anything", "mcp"] }
+    }
+  }
+}
+```
+
+Its skill goes in `~/.config/opencode/skills/rust-anything/` (`SKILL.md` and `whole-app.md` from
+[`skills/rust-anything/`](../skills/rust-anything)).
+
 Every tool, its parameters and what it may touch: [docs/tools.md](tools.md). The server also
 offers two prompts, `port_unit` and `port_whole_app`, built from the skill.
 
