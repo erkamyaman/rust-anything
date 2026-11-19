@@ -212,7 +212,9 @@ fn relative(root: &Path, file: &str) -> Option<String> {
         file
     };
     if !path.starts_with('/') && !path.contains(":\\") {
-        return None; // node:internal/..., <frozen ...>, ~
+        let rel = path.trim_start_matches("./");
+        return (!rel.starts_with(['<', '~']) && !rel.contains(':') && root.join(rel).is_file())
+            .then(|| rel.replace('\\', "/")); // node:internal/..., <frozen ...>, ~
     }
     // Installed libraries and runtimes: npm, Python, Ruby gems and stdlib, Go modules and GOROOT.
     if path.split(['/', '\\']).any(|p| {
@@ -1275,6 +1277,19 @@ mod tests {
             Some("/tmp/bench.ts")
         );
         assert!(in_repo("src/fuzzy.ts") && !in_repo("/tmp/bench.ts"));
+    }
+
+    #[test]
+    fn a_relative_script_path_under_the_repository_is_kept() {
+        let root = std::env::temp_dir().join(format!("ra-profile-rel-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("bench.py"), "").unwrap();
+        assert_eq!(relative(&root, "bench.py").as_deref(), Some("bench.py"));
+        assert_eq!(relative(&root, "./bench.py").as_deref(), Some("bench.py"));
+        assert_eq!(relative(&root, "missing.py"), None);
+        assert_eq!(relative(&root, "<frozen runpy>"), None);
+        assert_eq!(relative(&root, "~"), None);
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     fn node(id: u64, name: &str, url: &str, line: i64, hits: u64, children: &[u64]) -> Value {

@@ -18,7 +18,7 @@
   <a href="https://crates.io/crates/rust-anything"><img src="https://img.shields.io/crates/v/rust-anything?color=E2862A&label=crates.io" alt="crates.io version"></a>
   <a href="https://www.npmjs.com/package/rust-anything"><img src="https://img.shields.io/npm/v/rust-anything?color=E2862A&label=npm" alt="npm version"></a>
   <img src="https://img.shields.io/badge/languages-6%20%2B%202%20preview-E2862A" alt="6 languages, plus 2 in preview">
-  <a href="#works-with"><img src="https://img.shields.io/badge/works%20with-4%20agents-E2862A" alt="Works with 4 agents"></a>
+  <a href="#works-with"><img src="https://img.shields.io/badge/works%20with-5%20agents-E2862A" alt="Works with 5 agents"></a>
   <a href="https://github.com/erkamyaman/rust-anything/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/erkamyaman/rust-anything/ci.yml?branch=main&label=tests" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-E2862A" alt="MIT license"></a>
   <a href="https://github.com/erkamyaman/rust-anything"><img src="https://img.shields.io/github/stars/erkamyaman/rust-anything?style=social" alt="GitHub stars"></a>
@@ -97,7 +97,7 @@ rust-anything finds the loop worth moving, and moves it.
 
 ## Quick start
 
-Paste this into Claude Code, Codex, Cursor or Gemini CLI and let your agent install it:
+Paste this into Claude Code, Codex, Cursor, Gemini CLI or OpenCode and let your agent install it:
 
 ```text
 Install rust-anything: run `cargo install rust-anything`, then `rust-anything setup`.
@@ -108,7 +108,7 @@ Or yourself:
 
 ```sh
 cargo install rust-anything   # from crates.io
-rust-anything setup           # registers it with Claude Code, Codex, Cursor and Gemini CLI
+rust-anything setup           # registers it with Claude Code, Codex, Cursor, Gemini CLI and OpenCode
 ```
 
 No Rust toolchain yet? Prebuilt binaries for macOS, Linux and Windows are attached to each
@@ -139,9 +139,24 @@ Then ask your agent, for example:
 | Codex | MCP server in `~/.codex/config.toml`, skill in `~/.codex/skills/` |
 | Cursor | MCP server in `~/.cursor/mcp.json` |
 | Gemini CLI | MCP server in `~/.gemini/settings.json` |
+| OpenCode | MCP server in `~/.config/opencode/opencode.json` (`mcp.servers`), skill in `~/.config/opencode/skills/` |
 | Any other MCP client | add `rust-anything mcp` as a stdio server by hand (see [Install](docs/install.md#install)) |
 
 Before changing a file that exists, `setup` saves a copy beside it (`<file>.rust-anything.bak`).
+
+To wire OpenCode up by hand, put the server in `~/.config/opencode/opencode.json` (`command` is
+the whole argv) and copy [`skills/rust-anything/`](./skills/rust-anything) to
+`~/.config/opencode/skills/rust-anything/`:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "rust-anything": { "type": "local", "command": ["rust-anything", "mcp"] }
+    }
+  }
+}
+```
 
 Or run the steps yourself:
 
@@ -161,7 +176,7 @@ rust-anything bench rust/fuzzy-rs                      # faster? the verdict say
 rust-anything gate rust/fuzzy-rs                       # done means this passes
 ```
 
-rust-anything does not translate code: your coding agent (Claude Code, Codex, Cursor, ...) or you write
+rust-anything does not translate code: your coding agent (Claude Code, Codex, Cursor, OpenCode, ...) or you write
 the Rust. rust-anything supplies what an agent cannot guess reliably: where the time goes, what to port
 first and in which order, a bridge so the rest of the code calls the Rust with its API unchanged,
 the exact behavior the port must match, a safe way to ship it, and a gate that says when a port is

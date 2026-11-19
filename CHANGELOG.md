@@ -2,13 +2,23 @@
 
 ## Unreleased
 
+- `bench` and `record` pass `--experimental-transform-types` only when Node accepts it: Node 26
+  removed the option and refused to start (#99).
+- `profile` keeps a Python workload script given as a relative path (`python3 bench.py`); its
+  functions were dropped and the table came out empty (#101).
+- `diff` exits non-zero when the recording is stale, as `gate` already refuses it, and the
+  warning says "Stale recording" (#102).
+- `analyze` says what a wasm-bindgen bridge needs installed, and that `--kind napi` runs with
+  what Node already has (#102).
 - `bridge` reads types for plain JavaScript: from a sibling `.d.ts`/`.d.mts`/`.d.cts`, then
   JSDoc `@param {T} name` (with `[name]`, defaults and `opts.field` shapes) and `@returns {T}`.
   Before, only parameters with a literal default were typed and the rest became `unknown`, so
   `record` generated mostly wrong-typed inputs (#100).
 - TypeScript analysis and recording resolve path aliases against the inherited `baseUrl`,
   including when the two options come from separate tsconfig files.
-
+- `setup` also registers OpenCode: the MCP server in `~/.config/opencode/opencode.json`
+  (`mcp.servers`, the whole argv in `command`) and the workflow skill in
+  `~/.config/opencode/skills/`, and `doctor` reads that entry back.
 - A port of [json-server](https://github.com/typicode/json-server) to a pure Rust binary in
   `demo/real-world/json-server-rs` and `docs/real-world.md`: 514/514 recorded HTTP cases match
   with no fallback, and six units pass `gate`. Against Node 24 on an M4: first response in 8 to

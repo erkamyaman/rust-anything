@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
 /// The server and skill name in every agent.
 pub const NAME: &str = "rust-anything";
@@ -35,10 +35,19 @@ pub enum Agent {
     Cursor,
     /// Gemini CLI: `~/.gemini/settings.json`.
     Gemini,
+    /// OpenCode: `~/.config/opencode/opencode.json`, skill in `~/.config/opencode/skills`.
+    #[value(name = "opencode")]
+    OpenCode,
 }
 
 impl Agent {
-    pub const ALL: [Agent; 4] = [Agent::Claude, Agent::Codex, Agent::Cursor, Agent::Gemini];
+    pub const ALL: [Agent; 5] = [
+        Agent::Claude,
+        Agent::Codex,
+        Agent::Cursor,
+        Agent::Gemini,
+        Agent::OpenCode,
+    ];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -46,6 +55,7 @@ impl Agent {
             Agent::Codex => "Codex",
             Agent::Cursor => "Cursor",
             Agent::Gemini => "Gemini CLI",
+            Agent::OpenCode => "OpenCode",
         }
     }
 
@@ -56,6 +66,7 @@ impl Agent {
             Agent::Codex => (".codex", "codex"),
             Agent::Cursor => (".cursor", "cursor"),
             Agent::Gemini => (".gemini", "gemini"),
+            Agent::OpenCode => (".config/opencode", "opencode"),
         }
     }
 
@@ -66,6 +77,7 @@ impl Agent {
             Agent::Codex => ".codex/config.toml",
             Agent::Cursor => ".cursor/mcp.json",
             Agent::Gemini => ".gemini/settings.json",
+            Agent::OpenCode => ".config/opencode/opencode.json",
         })
     }
 
@@ -74,6 +86,7 @@ impl Agent {
         match self {
             Agent::Claude => Some(home.join(".claude/skills").join(NAME)),
             Agent::Codex => Some(home.join(".codex/skills").join(NAME)),
+            Agent::OpenCode => Some(home.join(".config/opencode/skills").join(NAME)),
             Agent::Cursor | Agent::Gemini => None,
         }
     }
@@ -145,8 +158,8 @@ pub fn setup(opts: &Options) -> Result<Report> {
     };
     if agents.is_empty() {
         bail!(
-            "no coding agent found (looked for ~/.claude, ~/.codex, ~/.cursor, ~/.gemini and their commands); \
-             name one with --agent claude|codex|cursor|gemini"
+            "no coding agent found (looked for ~/.claude, ~/.codex, ~/.cursor, ~/.gemini, ~/.config/opencode and their commands); \
+             name one with --agent claude|codex|cursor|gemini|opencode"
         );
     }
     let command = opts.command.to_string_lossy().into_owned();
@@ -155,6 +168,7 @@ pub fn setup(opts: &Options) -> Result<Report> {
         let config = agent.config(opts.home);
         changes.push(match agent {
             Agent::Codex => codex_server(agent, &config, &command, opts)?,
+            Agent::OpenCode => opencode_server(agent, &config, &command, opts)?,
             _ => json_server(agent, &config, &command, opts, agent == Agent::Claude)?,
         });
         if let Some(dir) = agent.skill_dir(opts.home) {
@@ -246,6 +260,101 @@ fn json_server(
         if stdio_type {
             entry.entry("env").or_insert_with(|| json!({}));
         }
+        entry.shift_remove("url");
+        let entry = Value::Object(entry);
+        if existing == Some(&entry) {
+            "unchanged"
+        } else {
+            let action = if existing.is_some() {
+                "updated"
+            } else {
+                "added"
+            };
+            servers.insert(NAME.into(), entry);
+            action
+        }
+    };
+    let mut saved = None;
+    if !opts.dry_run && matches!(action, "added" | "updated" | "removed") {
+        saved = backup(path)?;
+        write(path, &(serde_json::to_string_pretty(&doc)? + "\n"))?;
+    }
+    Ok(Change {
+        agent,
+        file: path.to_path_buf(),
+        action,
+        backup: saved,
+    })
+}
+
+/// The map of servers in OpenCode's `mcp` object. Current OpenCode keeps them under
+/// `mcp.servers`; a `mcp` object that already lists servers by name (the shape older files
+/// use) is kept as it is, so the two shapes never end up mixed in one file.
+fn opencode_servers<'a>(
+    mcp: &'a mut Map<String, Value>,
+    path: &Path,
+) -> Result<&'a mut Map<String, Value>> {
+    if mcp.is_empty() || matches!(mcp.get("servers"), Some(Value::Object(_))) {
+        let servers = mcp.entry("servers").or_insert_with(|| json!({}));
+        return servers.as_object_mut().with_context(|| {
+            format!(
+                "`mcp.servers` in {} is not an object; add the server by hand",
+                path.display()
+            )
+        });
+    }
+    Ok(mcp)
+}
+
+/// `mcp.servers.rust-anything` in OpenCode's `opencode.json`: a local server whose `command`
+/// is the whole argv, so the executable and `mcp` go in one array.
+fn opencode_server(agent: Agent, path: &Path, command: &str, opts: &Options) -> Result<Change> {
+    let text = match std::fs::read_to_string(path) {
+        Ok(t) => Some(t),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(e).with_context(|| format!("reading {}", path.display())),
+    };
+    let mut doc: Value = match text.as_deref().map(str::trim) {
+        None | Some("") => json!({}),
+        Some(t) => serde_json::from_str(t).with_context(|| {
+            format!(
+                "{} is not valid JSON; fix it or add the server by hand",
+                path.display()
+            )
+        })?,
+    };
+    let Some(root) = doc.as_object_mut() else {
+        bail!(
+            "{} is not a JSON object; add the server by hand",
+            path.display()
+        );
+    };
+    let mcp = root.entry("mcp").or_insert_with(|| json!({}));
+    let Some(mcp) = mcp.as_object_mut() else {
+        bail!(
+            "`mcp` in {} is not an object; add the server by hand",
+            path.display()
+        );
+    };
+    let servers = opencode_servers(mcp, path)?;
+    let action = if opts.remove {
+        if servers.shift_remove(NAME).is_some() {
+            "removed"
+        } else {
+            "absent"
+        }
+    } else {
+        let existing = servers.get(NAME);
+        let mut entry = existing
+            .and_then(Value::as_object)
+            .cloned()
+            .unwrap_or_default();
+        entry.insert("type".into(), json!("local"));
+        entry.insert("command".into(), json!([command, "mcp"]));
+        // OpenCode keeps a server out of the way with `disabled`, and older files wrote the
+        // opposite `enabled`: setting one up means neither key.
+        entry.shift_remove("disabled");
+        entry.shift_remove("enabled");
         entry.shift_remove("url");
         let entry = Value::Object(entry);
         if existing == Some(&entry) {
@@ -568,6 +677,97 @@ mod tests {
             Some(120)
         );
         assert!(again.changes.iter().all(|c| c.action == "unchanged"));
+    }
+
+    #[test]
+    fn opencode_gets_a_local_server_and_the_skill() {
+        let home = temp_home("opencode");
+        let config = home.join(".config/opencode/opencode.json");
+        std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+        // Other settings, another server and key order that must all survive.
+        std::fs::write(
+            &config,
+            r#"{"$schema":"https://opencode.ai/config.json","mcp":{"servers":{"other":{"type":"local","command":["x"]}}},"model":"a/b"}"#,
+        )
+        .unwrap();
+
+        let mut options = opts(&home, vec![Agent::OpenCode]);
+        setup(&options).unwrap();
+        let doc: Value = serde_json::from_str(&std::fs::read_to_string(&config).unwrap()).unwrap();
+        let entry = &doc["mcp"]["servers"][NAME];
+        assert_eq!(entry["type"], "local");
+        assert_eq!(entry["command"], json!(["/opt/bin/rust-anything", "mcp"]));
+        assert!(entry.get("disabled").is_none(), "{entry}");
+        assert_eq!(doc["mcp"]["servers"]["other"]["command"], json!(["x"]));
+        assert_eq!(doc["model"], "a/b");
+        let keys: Vec<&String> = doc.as_object().unwrap().keys().collect();
+        assert_eq!(keys, ["$schema", "mcp", "model"], "key order kept");
+        assert_eq!(
+            std::fs::read_to_string(home.join(".config/opencode/skills/rust-anything/SKILL.md"))
+                .unwrap(),
+            SKILL
+        );
+
+        // Running again changes nothing.
+        let again = setup(&options).unwrap();
+        assert!(
+            again.changes.iter().all(|c| c.action == "unchanged"),
+            "{:?}",
+            again.changes
+        );
+
+        // A disabled server is turned back on.
+        let mut doc: Value =
+            serde_json::from_str(&std::fs::read_to_string(&config).unwrap()).unwrap();
+        doc["mcp"]["servers"][NAME]["disabled"] = json!(true);
+        std::fs::write(&config, serde_json::to_string(&doc).unwrap()).unwrap();
+        let r = setup(&options).unwrap();
+        assert_eq!(r.changes[0].action, "updated");
+        let doc: Value = serde_json::from_str(&std::fs::read_to_string(&config).unwrap()).unwrap();
+        assert!(doc["mcp"]["servers"][NAME].get("disabled").is_none());
+
+        // A moved binary updates the entry.
+        options.command = PathBuf::from("/usr/local/bin/rust-anything");
+        let r = setup(&options).unwrap();
+        assert_eq!(r.changes[0].action, "updated");
+
+        // Remove takes out only ours.
+        options.remove = true;
+        setup(&options).unwrap();
+        let doc: Value = serde_json::from_str(&std::fs::read_to_string(&config).unwrap()).unwrap();
+        assert!(doc["mcp"]["servers"].get(NAME).is_none());
+        assert_eq!(doc["mcp"]["servers"]["other"]["command"], json!(["x"]));
+        assert!(!home.join(".config/opencode/skills/rust-anything").exists());
+
+        // A file that lists servers in `mcp` by name (the older shape) keeps that shape.
+        let flat = temp_home("opencode-flat");
+        let flat_config = flat.join(".config/opencode/opencode.json");
+        std::fs::create_dir_all(flat_config.parent().unwrap()).unwrap();
+        std::fs::write(
+            &flat_config,
+            r#"{"mcp":{"other":{"type":"local","command":["x"]},"rust-anything":{"type":"local","command":["/old/rust-anything","mcp"],"enabled":true}}}"#,
+        )
+        .unwrap();
+        setup(&opts(&flat, vec![Agent::OpenCode])).unwrap();
+        let doc: Value =
+            serde_json::from_str(&std::fs::read_to_string(&flat_config).unwrap()).unwrap();
+        let entry = &doc["mcp"][NAME];
+        assert_eq!(entry["command"], json!(["/opt/bin/rust-anything", "mcp"]));
+        assert!(entry.get("enabled").is_none(), "{entry}");
+        assert!(entry.get("disabled").is_none(), "{entry}");
+        assert!(
+            doc["mcp"].get("servers").is_none(),
+            "shapes never mix: {doc}"
+        );
+        assert_eq!(doc["mcp"]["other"]["command"], json!(["x"]));
+        std::fs::remove_dir_all(&flat).unwrap();
+
+        // A file that does not parse is left alone with an error.
+        std::fs::write(&config, "{ not json").unwrap();
+        let err = setup(&opts(&home, vec![Agent::OpenCode])).unwrap_err();
+        assert!(format!("{err:#}").contains("not valid JSON"), "{err:#}");
+        assert_eq!(std::fs::read_to_string(&config).unwrap(), "{ not json");
+        std::fs::remove_dir_all(&home).unwrap();
     }
 
     #[test]

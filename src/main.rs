@@ -207,9 +207,9 @@ enum Cmd {
     },
     /// Serve every step as MCP tools over stdio.
     Mcp,
-    /// Register rust-anything with your coding agents (Claude Code, Codex, Cursor, Gemini CLI):
-    /// the MCP server and, where the agent reads skills, the workflow skill. Keeps your other
-    /// settings; run it again any time.
+    /// Register rust-anything with your coding agents (Claude Code, Codex, Cursor, Gemini CLI,
+    /// OpenCode): the MCP server and, where the agent reads skills, the workflow skill. Keeps your
+    /// other settings; run it again any time.
     Setup {
         /// Agents to set up (repeatable); every agent found by default.
         #[arg(long = "agent", value_enum)]
@@ -585,13 +585,14 @@ fn run() -> Result<ExitCode> {
                 node_args: &node_args,
                 float_tolerance,
             })?;
+            let stale = rust_anything::bridge::Manifest::load(&crate_dir)
+                .ok()
+                .and_then(|m| rust_anything::recording::stale(&crate_dir, &m));
             if json {
                 say!("{}", serde_json::to_string_pretty(&d)?);
             } else {
-                if let Ok(m) = rust_anything::bridge::Manifest::load(&crate_dir)
-                    && let Some(why) = rust_anything::recording::stale(&crate_dir, &m)
-                {
-                    say!("Warning: {why}");
+                if let Some(why) = &stale {
+                    say!("Stale recording: {why}");
                 }
                 if d.accepted > 0 {
                     say!(
@@ -643,7 +644,7 @@ fn run() -> Result<ExitCode> {
                     );
                 }
             }
-            if d.failed > 0 {
+            if d.failed > 0 || stale.is_some() {
                 return Ok(ExitCode::FAILURE);
             }
         }

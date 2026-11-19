@@ -336,7 +336,7 @@ fn record_node(opts: &RecordOptions, manifest: &Manifest, cases: &[Value]) -> Re
             let mut cmd = Command::new("node");
             if transform {
                 // Enums and parameter properties need Node to transform TS, not only strip types.
-                cmd.arg("--experimental-transform-types")
+                cmd.args(transform_flag())
                     .arg("--no-warnings=ExperimentalWarning");
             }
             cmd.args(&node_args)
@@ -359,6 +359,18 @@ fn record_node(opts: &RecordOptions, manifest: &Manifest, cases: &[Value]) -> Re
         record(true)?;
     }
     Ok(out)
+}
+
+fn transform_flag() -> Option<&'static str> {
+    static SUPPORTED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    let supported = *SUPPORTED.get_or_init(|| {
+        let mut cmd = Command::new("node");
+        cmd.args(["--experimental-transform-types", "--no-warnings", "-e", "0"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        crate::process::status(&mut cmd, crate::process::QUICK).is_ok_and(|s| s.success())
+    });
+    supported.then_some("--experimental-transform-types")
 }
 
 /// Copies a freshly built library into place by renaming, so a process that has the old one
@@ -663,7 +675,7 @@ pub fn bench(opts: &BenchOptions) -> Result<Vec<BenchRow>> {
     let native = opts.crate_dir.join("index.cjs").canonical()?;
     let register = work.canonical()?.join("register.mjs");
     let mut cmd = Command::new("node");
-    cmd.arg("--experimental-transform-types")
+    cmd.args(transform_flag())
         .arg("--no-warnings")
         .arg(format!("--import={}", file_url(&register)))
         .args(opts.node_args)

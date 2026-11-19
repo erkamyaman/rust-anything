@@ -731,7 +731,12 @@ fn score(u: usize, ctx: &Ctx) -> UnitReport {
         Bridge::WasmBindgen
     };
     if bridge == Bridge::WasmBindgen {
-        notes.push("Portable code: wasm-bindgen keeps it running in browsers and Node.".into());
+        notes.push(
+            "Portable code: wasm-bindgen keeps it running in browsers and Node. It needs the \
+             wasm32-unknown-unknown target and wasm-bindgen; `bridge --kind napi` runs with what \
+             Node already has."
+                .into(),
+        );
     }
 
     let mut files: Vec<String> = unit
