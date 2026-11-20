@@ -1341,13 +1341,21 @@ const enc = (v, stack = []) => {
   if (v instanceof Error) return { $error: v.message }
   return Object.fromEntries(Object.keys(v).map(k => [k, enc(v[k], next)]))
 }
+// Code units in chunks: one `String.fromCharCode` call per argument blows the stack on a long
+// string, and a recorded lone surrogate can be as long as the original's own strings.
+const fromUnits = (units) => {
+  let out = ''
+  for (let i = 0; i < units.length; i += 8192)
+    out += String.fromCharCode.apply(null, units.slice(i, i + 8192))
+  return out
+}
 const dec = (v) => {
   if (Array.isArray(v)) return v.map(dec)
   if (v === null || typeof v !== 'object') return v
   if (v.$undefined) return undefined
   if ('$num' in v) return Number(v.$num)
   if ('$bigint' in v) return BigInt(v.$bigint)
-  if ('$utf16' in v) return String.fromCharCode(...v.$utf16)
+  if ('$utf16' in v) return fromUnits(v.$utf16)
   if ('$map' in v) return new Map(v.$map.map(([k, x]) => [dec(k), dec(x)]))
   if ('$set' in v) return new Set(v.$set.map(dec))
   if ('$date' in v) return new Date(v.$date)

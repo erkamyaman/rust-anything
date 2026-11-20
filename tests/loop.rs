@@ -1022,3 +1022,41 @@ fn diff_compares_own_proto_named_properties_in_arguments_and_results() {
     assert_eq!(matching.passed, 1);
     assert_eq!(changed.failed, 1);
 }
+
+#[test]
+fn diff_decodes_long_strings_recorded_as_code_units() {
+    if !node_available() {
+        return;
+    }
+    // A lone surrogate is recorded as `$utf16`, and such a string is as long as any other: one
+    // `String.fromCharCode` call per code unit overflows the argument stack well under this size.
+    let mut units: Vec<u16> = std::iter::repeat_n([0xD83D, 0xDE00], 100_000)
+        .flatten()
+        .collect();
+    units.push(0xD83D);
+    let encoded = serde_json::json!({ "$utf16": units });
+    let dir = bridged("long-code-units");
+    std::fs::write(
+        dir.join(harness::CASES),
+        format!(
+            "{}\n",
+            serde_json::json!({ "fn": "echo", "args": [&encoded], "ok": &encoded })
+        ),
+    )
+    .unwrap();
+    let module = dir.join("index.cjs");
+    let opts = DiffOptions {
+        crate_dir: &dir,
+        module: None,
+        ignore_key_order: false,
+        float_tolerance: None,
+        node_args: &[],
+    };
+    std::fs::write(&module, "exports.echo = x => x").unwrap();
+    let matching = harness::diff(&opts).unwrap();
+    std::fs::write(&module, "exports.echo = x => x.slice(0, -1)").unwrap();
+    let truncated = harness::diff(&opts).unwrap();
+    std::fs::remove_dir_all(dir).unwrap();
+    assert_eq!(matching.passed, 1, "{:?}", matching.mismatches);
+    assert_eq!(truncated.failed, 1);
+}

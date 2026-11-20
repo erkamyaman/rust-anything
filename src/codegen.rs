@@ -982,7 +982,7 @@ const single = (v, key) => Object.keys(v).length === 1 && key in v
 const revive = v => Array.isArray(v) ? v.map(revive)
   : v !== null && typeof v === 'object'
     ? (single(v, '$undefined') ? undefined
-      : single(v, '$utf16') ? String.fromCharCode(...v.$utf16)
+      : single(v, '$utf16') ? fromUnits(v.$utf16)
       : single(v, '$num') ? Number(v.$num)
       : single(v, '$bigint') ? BigInt(v.$bigint)
       : single(v, '$date') ? new Date(v.$date)
