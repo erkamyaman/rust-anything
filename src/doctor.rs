@@ -220,6 +220,10 @@ struct Runtime {
     fix: [&'static str; 3],
 }
 
+/// The C++ Build Tools, which Rust links with on Windows. Without `--add`, winget installs them
+/// with no workload: no compiler, linker or Windows SDK.
+const BUILD_TOOLS: &str = "winget install Microsoft.VisualStudio.2022.BuildTools --override \"--wait --passive --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended\"";
+
 const RUNTIMES: &[Runtime] = &[
     Runtime {
         name: "cargo",
@@ -269,7 +273,7 @@ const RUNTIMES: &[Runtime] = &[
         java: false,
         fix: [
             "xcode-select --install",
-            "winget install Microsoft.VisualStudio.2022.BuildTools",
+            BUILD_TOOLS,
             "sudo apt install build-essential",
         ],
     },
@@ -379,13 +383,42 @@ const RUNTIMES: &[Runtime] = &[
     },
 ];
 
-fn platform_fix(fix: &[&'static str; 3]) -> &'static str {
-    if cfg!(target_os = "macos") {
-        fix[0]
+/// Where a fix runs: [`Runtime::fix`] has one command for each, in this order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Platform {
+    MacOs,
+    Windows,
+    Other,
+}
+
+impl Platform {
+    const HERE: Platform = if cfg!(target_os = "macos") {
+        Platform::MacOs
     } else if cfg!(windows) {
-        fix[1]
+        Platform::Windows
     } else {
-        fix[2]
+        Platform::Other
+    };
+
+    fn pick(self, fix: &[&'static str; 3]) -> &'static str {
+        fix[self as usize]
+    }
+}
+
+/// The command that installs or updates `r` on `platform`; `None` when it is fine.
+fn runtime_fix(r: &Runtime, status: Status, platform: Platform) -> Option<String> {
+    match (status, r.name) {
+        (Status::Ok, _) => None,
+        (Status::Outdated, "cargo") => Some("rustup update stable".to_string()),
+        // rustup's script needs a Unix shell. winget runs `rustup-init -y`, which skips the Build
+        // Tools with a warning, so they come first.
+        (Status::Missing, "cargo") if platform == Platform::Windows => {
+            Some(format!("{BUILD_TOOLS}; winget install Rustlang.Rustup"))
+        }
+        (Status::Missing, "cargo") => {
+            Some("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh".to_string())
+        }
+        _ => Some(platform.pick(&r.fix).to_string()),
     }
 }
 
@@ -435,20 +468,12 @@ fn runtime(r: &Runtime) -> Check {
             detail.push_str(" (this is macOS's system Ruby)");
         }
     }
-    let fix = match (status, r.name) {
-        (Status::Ok, _) => None,
-        (Status::Outdated, "cargo") => Some("rustup update stable".to_string()),
-        (Status::Missing, "cargo") => {
-            Some("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh".to_string())
-        }
-        _ => Some(platform_fix(&r.fix).to_string()),
-    };
     Check {
         name: r.name.to_string(),
         status,
         required: r.required,
         detail,
-        fix,
+        fix: runtime_fix(r, status, Platform::HERE),
     }
 }
 
@@ -1048,5 +1073,46 @@ mod tests {
             checks: vec![check(Status::Outdated, true)],
         };
         assert!(!required.ok());
+    }
+
+    fn runtime_named(name: &str) -> &'static Runtime {
+        RUNTIMES.iter().find(|r| r.name == name).unwrap()
+    }
+
+    #[test]
+    fn fixes_follow_the_platform() {
+        let cc = runtime_named("cc");
+        let fix = |platform| runtime_fix(cc, Status::Missing, platform);
+        assert_eq!(
+            fix(Platform::MacOs).as_deref(),
+            Some("xcode-select --install")
+        );
+        assert_eq!(fix(Platform::Windows).as_deref(), Some(BUILD_TOOLS));
+        assert_eq!(
+            fix(Platform::Other).as_deref(),
+            Some("sudo apt install build-essential")
+        );
+        assert_eq!(runtime_fix(cc, Status::Ok, Platform::Windows), None);
+    }
+
+    #[test]
+    fn windows_fixes_need_no_unix_shell() {
+        for r in RUNTIMES {
+            for status in [Status::Missing, Status::Outdated] {
+                let fix = runtime_fix(r, status, Platform::Windows).unwrap();
+                assert!(!fix.contains("| sh"), "{}: {fix}", r.name);
+            }
+        }
+    }
+
+    #[test]
+    fn windows_build_tools_fixes_add_the_cpp_workload() {
+        for name in ["cargo", "cc"] {
+            let fix = runtime_fix(runtime_named(name), Status::Missing, Platform::Windows).unwrap();
+            assert!(
+                fix.contains("--add Microsoft.VisualStudio.Workload.VCTools"),
+                "{name}: {fix}"
+            );
+        }
     }
 }
