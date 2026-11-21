@@ -456,7 +456,7 @@ those printers (embedded GraphQL needs only the template glue now).
 Beyond the recorded cases, the new parsers were fuzzed against Prettier: 13,991 YAML
 files, 6,000 GraphQL files, 20,000 Markdown files and 11,997 CSS, SCSS and Less files made by deleting, inserting and re-indenting
 pieces of the fixtures. Rust formatted 9,973 of the YAML files, 2,131 of the GraphQL files (every
-GraphQL file Prettier accepted) 19,150 of the Markdown files and 8,153 of the 8,223 style files Prettier accepted, each
+GraphQL file Prettier accepted), 19,150 of the Markdown files and 8,153 of the 8,223 style files Prettier accepted, each
 byte-identical to Prettier, and accepted no file that Prettier rejects. The first Markdown run
 found one: `![][x` with no closing bracket, where Prettier puts `null` in its doc and throws; the
 port now refuses it too. The style runs found two: `@function f($a, $args\n...)`, where Prettier's
