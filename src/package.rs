@@ -318,14 +318,20 @@ fn safe_relative(path: &str) -> bool {
 }
 
 fn validate_npm_name(name: &str) -> Result<()> {
-    let bare = name
-        .strip_prefix('@')
-        .and_then(|n| n.split_once('/'))
-        .map_or(name, |(_, n)| n);
-    let ok = !bare.is_empty()
+    // A scoped name is exactly `@scope/name`, and npm applies the `.`/`_` rule to each segment:
+    // `@x18n/.hidden`, `@x18n/_private`, `@x18n/fuzzy/extra`, `@x18n` and `@/fuzzy` are all
+    // refused at publish time, so they are refused here instead of in the generated package.
+    let (scope, bare) = match name.strip_prefix('@') {
+        Some(rest) => match rest.split_once('/') {
+            Some((scope, pkg)) if !pkg.contains('/') => (Some(scope), pkg),
+            _ => (None, ""),
+        },
+        None => (None, name),
+    };
+    let segment = |s: &str| !s.is_empty() && !s.starts_with(['.', '_']);
+    let ok = segment(bare)
+        && scope.is_none_or(segment)
         && name.len() <= 214
-        && !name.starts_with('.')
-        && !name.starts_with('_')
         && name.chars().all(|c| {
             c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '-' | '.' | '_' | '@' | '/')
         });
@@ -1070,6 +1076,12 @@ mod tests {
         assert!(validate_npm_name("@x18n/fuzzy").is_ok());
         assert!(validate_npm_name("Fuzzy").is_err());
         assert!(validate_npm_name("@x18n/").is_err());
+        // npm applies the `.`/`_` rule to each segment, and a scope is `@scope/name` exactly.
+        assert!(validate_npm_name("@x18n/.hidden").is_err());
+        assert!(validate_npm_name("@x18n/_private").is_err());
+        assert!(validate_npm_name("@x18n/fuzzy/extra").is_err());
+        assert!(validate_npm_name("@x18n").is_err());
+        assert!(validate_npm_name("@/fuzzy").is_err());
     }
 
     #[test]
