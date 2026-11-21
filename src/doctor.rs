@@ -221,8 +221,17 @@ struct Runtime {
 }
 
 /// The C++ Build Tools, which Rust links with on Windows. Without `--add`, winget installs them
-/// with no workload: no compiler, linker or Windows SDK.
-const BUILD_TOOLS: &str = "winget install Microsoft.VisualStudio.2022.BuildTools --override \"--wait --passive --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended\"";
+/// with no workload: no compiler, linker or Windows SDK. The workload's recommended tools build for
+/// x64 and x86, so a build for Windows on ARM (npm has no binary for it) adds the ARM64 tools.
+const BUILD_TOOLS: &str = if cfg!(all(windows, target_arch = "aarch64")) {
+    BUILD_TOOLS_ARM64
+} else {
+    BUILD_TOOLS_X64
+};
+const BUILD_TOOLS_X64: &str = "winget install Microsoft.VisualStudio.2022.BuildTools --override \"--wait --passive --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended\"";
+const BUILD_TOOLS_ARM64: &str = "winget install Microsoft.VisualStudio.2022.BuildTools --override \"--wait --passive --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --add Microsoft.VisualStudio.Component.VC.Tools.ARM64\"";
+/// winget adds nothing to Build Tools that are already installed: an upgrade cannot add a workload.
+const BUILD_TOOLS_INSTALLED: &str = "(Build Tools already installed: add \"Desktop development with C++\" in Visual Studio Installer)";
 
 const RUNTIMES: &[Runtime] = &[
     Runtime {
@@ -405,21 +414,28 @@ impl Platform {
     }
 }
 
-/// The command that installs or updates `r` on `platform`; `None` when it is fine.
+/// The commands that install or update `r` on `platform`, one per line, to run in order; `None`
+/// when it is fine.
 fn runtime_fix(r: &Runtime, status: Status, platform: Platform) -> Option<String> {
-    match (status, r.name) {
-        (Status::Ok, _) => None,
-        (Status::Outdated, "cargo") => Some("rustup update stable".to_string()),
+    let fix = match (status, r.name) {
+        (Status::Ok, _) => return None,
+        (Status::Outdated, "cargo") => "rustup update stable".to_string(),
         // rustup's script needs a Unix shell. winget runs `rustup-init -y`, which skips the Build
-        // Tools with a warning, so they come first.
+        // Tools with a warning, so they come first, on a line of their own: `cmd` does not split
+        // commands at `;`.
         (Status::Missing, "cargo") if platform == Platform::Windows => {
-            Some(format!("{BUILD_TOOLS}; winget install Rustlang.Rustup"))
+            format!("{BUILD_TOOLS}\nwinget install Rustlang.Rustup")
         }
         (Status::Missing, "cargo") => {
-            Some("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh".to_string())
+            "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh".to_string()
         }
-        _ => Some(platform.pick(&r.fix).to_string()),
-    }
+        _ => platform.pick(&r.fix).to_string(),
+    };
+    Some(if fix.starts_with(BUILD_TOOLS) {
+        format!("{fix}\n{BUILD_TOOLS_INSTALLED}")
+    } else {
+        fix
+    })
 }
 
 /// The program's banner (stdout, else stderr), or `None` when it did not run.
@@ -888,7 +904,11 @@ pub fn text(r: &Report) -> String {
             c.detail
         ));
         if let Some(fix) = &c.fix {
-            out.push_str(&format!("{:<9} {:<width$}  fix: {fix}\n", "", ""));
+            // Further lines of a fix line up under the first.
+            for (i, line) in fix.lines().enumerate() {
+                let label = if i == 0 { "fix:" } else { "" };
+                out.push_str(&format!("{:<9} {:<width$}  {label:<4} {line}\n", "", ""));
+            }
         }
     }
     out.push_str(if r.ok() {
@@ -1087,7 +1107,10 @@ mod tests {
             fix(Platform::MacOs).as_deref(),
             Some("xcode-select --install")
         );
-        assert_eq!(fix(Platform::Windows).as_deref(), Some(BUILD_TOOLS));
+        assert_eq!(
+            fix(Platform::Windows),
+            Some(format!("{BUILD_TOOLS}\n{BUILD_TOOLS_INSTALLED}"))
+        );
         assert_eq!(
             fix(Platform::Other).as_deref(),
             Some("sudo apt install build-essential")
@@ -1114,5 +1137,50 @@ mod tests {
                 "{name}: {fix}"
             );
         }
+    }
+
+    #[test]
+    fn windows_cargo_fix_has_one_command_per_line() {
+        let fix = runtime_fix(runtime_named("cargo"), Status::Missing, Platform::Windows).unwrap();
+        assert_eq!(
+            fix.lines().collect::<Vec<_>>(),
+            [
+                BUILD_TOOLS,
+                "winget install Rustlang.Rustup",
+                BUILD_TOOLS_INSTALLED
+            ]
+        );
+    }
+
+    #[test]
+    fn windows_on_arm_adds_the_arm64_tools() {
+        let workload = "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended";
+        assert!(BUILD_TOOLS_X64.contains(workload));
+        assert!(!BUILD_TOOLS_X64.contains("ARM64"));
+        assert!(BUILD_TOOLS_ARM64.contains(workload));
+        assert!(
+            BUILD_TOOLS_ARM64.ends_with(" --add Microsoft.VisualStudio.Component.VC.Tools.ARM64\"")
+        );
+        assert_eq!(
+            BUILD_TOOLS == BUILD_TOOLS_ARM64,
+            cfg!(all(windows, target_arch = "aarch64"))
+        );
+    }
+
+    #[test]
+    fn fixes_of_several_lines_line_up() {
+        let report = Report {
+            checks: vec![Check {
+                name: "cargo".into(),
+                status: Status::Missing,
+                required: true,
+                detail: "not found".into(),
+                fix: Some("first\nsecond".into()),
+            }],
+        };
+        let out = text(&report);
+        let lines: Vec<_> = out.lines().collect();
+        assert!(lines[1].trim_start().starts_with("fix: first"), "{out}");
+        assert_eq!(lines[1].find("first"), lines[2].find("second"), "{out}");
     }
 }
