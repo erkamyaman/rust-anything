@@ -47,20 +47,26 @@ fn driver(crate_dir: &Path) -> Result<PathBuf> {
     Ok(path)
 }
 
-/// The folder the wrapper package lives in, and the package name.
-/// The unit's source files, joined for the driver: their packages stay importable during `diff`.
-fn source_files(manifest: &Manifest) -> Result<std::ffi::OsString> {
+/// The unit's source files, written as a JSON list for the driver (a file, not an argument: any path
+/// survives, and a large unit cannot outgrow the command line): their packages stay importable during
+/// `diff`.
+fn source_files(crate_dir: &Path, manifest: &Manifest) -> Result<PathBuf> {
     let files: std::collections::BTreeSet<&str> = manifest
         .exports
         .iter()
         .map(|f| f.file.as_str())
         .chain(manifest.classes.iter().map(|c| c.file.as_str()))
         .collect();
-    Ok(std::env::join_paths(
-        files.into_iter().map(|f| manifest.root.join(f)),
-    )?)
+    let paths: Vec<String> = files
+        .into_iter()
+        .map(|f| manifest.root.join(f).to_string_lossy().into_owned())
+        .collect();
+    let path = crate_dir.join(WORK_DIR).join("diff-sources.json");
+    std::fs::write(&path, serde_json::to_string(&paths)?)?;
+    Ok(path)
 }
 
+/// The folder the wrapper package lives in, and the package name.
 pub fn package(crate_dir: &Path, manifest: &Manifest) -> (PathBuf, String) {
     (crate_dir.join("python"), manifest.lib_name())
 }
@@ -151,7 +157,7 @@ pub fn diff(crate_dir: &Path, manifest: &Manifest, ignore_key_order: bool) -> Re
         .arg(dir)
         .arg(name)
         .arg(if ignore_key_order { "sort" } else { "keep" })
-        .arg(source_files(manifest)?)
+        .arg(source_files(crate_dir, manifest)?)
         .env("PYTHONHASHSEED", "0")
         // Recording must not leave `__pycache__` folders in the source tree.
         .env("PYTHONDONTWRITEBYTECODE", "1");
@@ -506,11 +512,12 @@ def same(expected, actual, sort):
     return canon(expected.get("ok"), sort) == canon(actual.get("ok"), sort)
 
 
-def diff(cases_path, out_path, package_dir, name, key_order, sources=""):
+def diff(cases_path, out_path, package_dir, name, key_order, sources_path=None):
     mod = native(package_dir, name)
     # The original's packages stay importable, as they are in the app: a port raises the
     # original's own exception classes by importing them (`Err("pkg.errors.Bad: ...")`).
-    for source in filter(None, sources.split(os.pathsep)):
+    sources = json.load(open(sources_path, encoding="utf-8")) if sources_path else []
+    for source in sources:
         directory = import_root(source)[0]
         if directory not in sys.path:
             sys.path.append(directory)
