@@ -1932,6 +1932,7 @@ fn csharp_static_methods_bridge_record_and_diff() {
 fn python_float_subclass_records_as_its_float_value() {
     // NumPy 2's `repr(np.float64(0.0))` is "np.float64(0.0)"; a float subclass with that kind of
     // repr must record as the float it is, or a port returning a plain float can never match.
+    // Its `__float__` is overridden too: the value recorded is the one stored, not what it returns.
     let Some(_) = common::python() else {
         return;
     };
@@ -1945,7 +1946,8 @@ fn python_float_subclass_records_as_its_float_value() {
     .unwrap();
     std::fs::write(
         root.join("src/floatkit/__init__.py"),
-        "class _F64(float):\n    def __repr__(self):\n        return f\"_F64({float.__repr__(self)})\"\n\n\n\
+        "class _F64(float):\n    def __repr__(self):\n        return f\"_F64({float.__repr__(self)})\"\n\n\
+         \x20   def __float__(self):\n        return 2.0\n\n\n\
          def centre(x: float) -> float:\n    return _F64(x - x)\n",
     )
     .unwrap();

@@ -218,9 +218,10 @@ def enc(v, stack=()):
             return {"$num": "Infinity" if v > 0 else "-Infinity"}
         if v == 0 and math.copysign(1, v) < 0:
             return {"$num": "-0"}
-        # 1.0 and 1 are different Python values: keep floats distinguishable. Through float():
-        # a subclass (numpy.float64 under NumPy 2) has its own repr, "np.float64(0.0)".
-        return {"$float": repr(float(v))} if v.is_integer() else v
+        # 1.0 and 1 are different Python values: keep floats distinguishable. Through float.__repr__:
+        # a subclass (numpy.float64 under NumPy 2) has its own repr, "np.float64(0.0)", and float()
+        # would call its __float__.
+        return {"$float": float.__repr__(v)} if v.is_integer() else v
     if any(v is s for s in stack):
         return {"$cycle": True}
     stack = stack + (v,)
