@@ -108,8 +108,10 @@ a signature in `port.rs`, run `rust-anything refresh <crate>`.
 - Read each risk the plan lists for the unit, at its `file:line`, before writing code.
 - String offsets: JS and Java index UTF-16 code units, Rust UTF-8 bytes: use `src/utf16.rs`.
 - Errors: return `Err("TypeName: message")`; it becomes that exception in Python, Ruby and Java,
-  and the `error` text in Go. Inside `port.rs`, a small error enum is clearer; turn it into that
-  string only in the exported function.
+  and the `error` text in Go. In Python a built-in exception goes by its name; the original's own
+  class by its dotted path, `Err("mypkg.errors.ParseError: message")`, which the bindings import.
+  Inside `port.rs`, a small error enum is clearer; turn it into that string only in the exported
+  function.
 - Letters and digits: Rust's `char::is_alphanumeric` takes more than Java's
   `Character.isLetterOrDigit` (letters and decimal digits, per UTF-16 unit, so nothing beyond
   U+FFFF) or Python's `str.isalpha` (letters only). Match the original's rule by general category.

@@ -832,3 +832,130 @@ print(ShoutBatch(items).run() == [shout(t) for t in items])
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+#[test]
+fn python_errors_raise_the_originals_own_classes() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let root = project(
+        "pyo3-errors",
+        &[
+            (
+                "pyproject.toml",
+                "[project]\nname = \"guard\"\nversion = \"0.1.0\"\n",
+            ),
+            (
+                "guard/errors.py",
+                "class GuardError(Exception):\n    \"\"\"The package's own error.\"\"\"\n",
+            ),
+            (
+                "guard/__init__.py",
+                "from guard.errors import GuardError\n\n\n\
+                 def check(text: str) -> str:\n    if not text:\n        raise GuardError(\"blank\")\n    return text\n\n\n\
+                 def need(text: str) -> str:\n    if not text:\n        raise FileNotFoundError(\"nothing to open\")\n    return text\n",
+            ),
+        ],
+    );
+    let dir = root.join("port");
+    bridge::bridge(&bridge::Options {
+        root: &root,
+        unit: "guard/",
+        kind: Some(Kind::Pyo3),
+        out: Some(dir.clone()),
+        name: None,
+        force: false,
+        keep: Vec::new(),
+        lang: None,
+        batch: Vec::new(),
+        as_json: Vec::new(),
+        allocator: Default::default(),
+    })
+    .unwrap();
+    let inputs = dir.join("inputs.jsonl");
+    std::fs::write(
+        &inputs,
+        "{\"fn\": \"check\", \"args\": [\"\"]}\n{\"fn\": \"check\", \"args\": [\"ok\"]}\n\
+         {\"fn\": \"need\", \"args\": [\"\"]}\n",
+    )
+    .unwrap();
+    harness::record(&RecordOptions {
+        crate_dir: &dir,
+        count: 30,
+        inputs: Some(&inputs),
+        module: None,
+        resolve_from: None,
+        node_args: &[],
+    })
+    .unwrap();
+    let port = std::fs::read_to_string(dir.join("src/port.rs")).unwrap();
+    let port = port
+        .replacen(
+            "unimplemented!(\"port `check` from guard/__init__.py\")",
+            "if text.is_empty() {\n        return Err(\"guard.errors.GuardError: blank\".into());\n    }\n    Ok(text)",
+            1,
+        )
+        .replacen(
+            "unimplemented!(\"port `need` from guard/__init__.py\")",
+            "if text.is_empty() {\n        return Err(\"FileNotFoundError: nothing to open\".into());\n    }\n    \
+             match text.as_str() {\n        \
+             \"not-a-class\" => Err(\"os.path: a module\".into()),\n        \
+             \"not-an-error\" => Err(\"builtins.int: a class, not an exception\".into()),\n        \
+             \"no-module\" => Err(\"no_such_module.Error: gone\".into()),\n        \
+             \"sentence\" => Err(\"Could not open it: no such file\".into()),\n        \
+             _ => Ok(text),\n    }",
+            1,
+        );
+    assert!(port.contains("guard.errors.GuardError"), "{port}");
+    std::fs::write(dir.join("src/port.rs"), &port).unwrap();
+    harness::build(&dir).unwrap();
+    let outcome = harness::diff(&DiffOptions {
+        crate_dir: &dir,
+        module: None,
+        ignore_key_order: false,
+        node_args: &[],
+        float_tolerance: None,
+    })
+    .unwrap();
+    assert_eq!(
+        (outcome.failed, outcome.passed),
+        (0, outcome.total),
+        "{:#?}",
+        outcome.mismatches
+    );
+    // Names that are not an exception class keep today's ValueError with the whole message.
+    let script = r#"
+import sys
+sys.path[:0] = [sys.argv[1] + "/python", sys.argv[2]]
+from guard_rs import check, need
+from guard.errors import GuardError
+out = []
+for f, arg in [(check, ""), (need, ""), (need, "not-a-class"), (need, "not-an-error"),
+               (need, "no-module"), (need, "sentence")]:
+    try:
+        f(arg)
+    except Exception as e:
+        out.append(f"{type(e).__module__}.{type(e).__name__}: {e}")
+print("\n".join(out))
+"#;
+    let output = Command::new(python)
+        .args(["-c", script])
+        .arg(&dir)
+        .arg(&root)
+        .output()
+        .unwrap();
+    std::fs::remove_dir_all(&root).unwrap();
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout)
+            .replace("\r\n", "\n")
+            .trim(),
+        "guard.errors.GuardError: blank\n\
+         builtins.FileNotFoundError: nothing to open\n\
+         builtins.ValueError: os.path: a module\n\
+         builtins.ValueError: builtins.int: a class, not an exception\n\
+         builtins.ValueError: no_such_module.Error: gone\n\
+         builtins.ValueError: Could not open it: no such file",
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
