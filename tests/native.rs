@@ -847,7 +847,8 @@ fn python_errors_raise_the_originals_own_classes() {
             ),
             (
                 "guard/errors.py",
-                "class GuardError(Exception):\n    \"\"\"The package's own error.\"\"\"\n",
+                "class GuardError(Exception):\n    \"\"\"The package's own error.\"\"\"\n\n\n\
+                 class q\u{301}Error(Exception):\n    \"\"\"A name Python allows: a combining mark after q.\"\"\"\n",
             ),
             (
                 "guard/__init__.py",
@@ -903,6 +904,7 @@ fn python_errors_raise_the_originals_own_classes() {
              \"not-an-error\" => Err(\"builtins.int: a class, not an exception\".into()),\n        \
              \"no-module\" => Err(\"no_such_module.Error: gone\".into()),\n        \
              \"sentence\" => Err(\"Could not open it: no such file\".into()),\n        \
+             \"combining\" => Err(\"guard.errors.q\u{301}Error: marked\".into()),\n        \
              \"needs-more\" => Err(\"json.decoder.JSONDecodeError: takes a document and a position\".into()),\n        \
              _ => Ok(text),\n    }",
             1,
@@ -932,11 +934,13 @@ from guard_rs import check, need
 from guard.errors import GuardError
 out = []
 for f, arg in [(check, ""), (need, ""), (need, "not-a-class"), (need, "not-an-error"),
-               (need, "no-module"), (need, "sentence"), (need, "needs-more")]:
+               (need, "no-module"), (need, "sentence"), (need, "needs-more"),
+               (need, "combining")]:
     try:
         f(arg)
     except Exception as e:
-        out.append(f"{type(e).__module__}.{type(e).__name__}: {e}")
+        name = type(e).__name__.encode("ascii", "backslashreplace").decode()
+        out.append(f"{type(e).__module__}.{name}: {e}")
 print("\n".join(out))
 "#;
     let output = Command::new(python)
@@ -956,7 +960,8 @@ print("\n".join(out))
          builtins.ValueError: builtins.int: a class, not an exception\n\
          builtins.ValueError: no_such_module.Error: gone\n\
          builtins.ValueError: Could not open it: no such file\n\
-         builtins.ValueError: json.decoder.JSONDecodeError: takes a document and a position",
+         builtins.ValueError: json.decoder.JSONDecodeError: takes a document and a position\n\
+         guard.errors.q\\u0301Error: marked",
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );

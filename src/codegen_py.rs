@@ -233,15 +233,18 @@ fn error(message: String) -> PyErr {
     /// `package.module.Class`, called with the text. None when it names no `Exception` subclass or the
     /// class cannot be made from the text alone (its constructor takes more arguments).
     fn named_error(kind: &str, text: &str) -> Option<PyErr> {
-        let identifier = |part: &str| {
-            part.starts_with(|c: char| c.is_alphabetic() || c == '_')
-                && part.chars().all(|c| c.is_alphanumeric() || c == '_')
-        };
-        if !kind.split('.').all(identifier) {
-            return None;
-        }
-        let (module, name) = kind.rsplit_once('.').unwrap_or(("builtins", kind));
         Python::attach(|py| {
+            // Each dotted part must be a Python identifier, by Python's own rules (`str.isidentifier`).
+            let identifier = |part: &str| {
+                pyo3::types::PyString::new(py, part)
+                    .call_method0("isidentifier")
+                    .and_then(|ok| ok.extract::<bool>())
+                    .unwrap_or(false)
+            };
+            if !kind.split('.').all(identifier) {
+                return None;
+            }
+            let (module, name) = kind.rsplit_once('.').unwrap_or(("builtins", kind));
             let class = py.import(module).ok()?.getattr(name).ok()?;
             let class = class.cast_into::<pyo3::types::PyType>().ok()?;
             if !class.is_subclass_of::<pyo3::exceptions::PyException>().ok()? {
