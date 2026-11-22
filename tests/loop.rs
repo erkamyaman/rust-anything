@@ -1927,3 +1927,74 @@ fn csharp_static_methods_bridge_record_and_diff() {
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn python_float_subclass_records_as_its_float_value() {
+    // NumPy 2's `repr(np.float64(0.0))` is "np.float64(0.0)"; a float subclass with that kind of
+    // repr must record as the float it is, or a port returning a plain float can never match.
+    let Some(_) = common::python() else {
+        return;
+    };
+    let root = std::env::temp_dir().join(format!("rust-anything-pyfloat-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("src/floatkit")).unwrap();
+    std::fs::write(
+        root.join("pyproject.toml"),
+        "[project]\nname = \"floatkit\"\nversion = \"0.1.0\"\n",
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("src/floatkit/__init__.py"),
+        "class _F64(float):\n    def __repr__(self):\n        return f\"_F64({float.__repr__(self)})\"\n\n\n\
+         def centre(x: float) -> float:\n    return _F64(x - x)\n",
+    )
+    .unwrap();
+    let dir = root.join("crate");
+    bridge::bridge(&bridge::Options {
+        root: &root,
+        unit: "src/floatkit/",
+        kind: None,
+        out: Some(dir.clone()),
+        name: None,
+        force: false,
+        keep: Vec::new(),
+        lang: None,
+        batch: Vec::new(),
+        as_json: Vec::new(),
+        allocator: Default::default(),
+    })
+    .unwrap();
+    harness::record(&RecordOptions {
+        crate_dir: &dir,
+        count: 20,
+        inputs: None,
+        module: None,
+        resolve_from: None,
+        node_args: &[],
+    })
+    .unwrap();
+    let cases = std::fs::read_to_string(dir.join("cases.jsonl")).unwrap();
+    assert!(cases.contains(r#"{"$float": "0.0"}"#), "{cases}");
+    assert!(!cases.contains("_F64"), "{cases}");
+    // A pure-Python stand-in for the built package that returns plain floats.
+    let manifest = Manifest::load(&dir).unwrap();
+    let package = dir
+        .join("python")
+        .join(manifest.crate_name.replace('-', "_"));
+    std::fs::create_dir_all(&package).unwrap();
+    std::fs::write(
+        package.join("__init__.py"),
+        "def centre(x):\n    return float(x - x)\n",
+    )
+    .unwrap();
+    let diff = harness::diff(&DiffOptions {
+        crate_dir: &dir,
+        module: None,
+        ignore_key_order: false,
+        float_tolerance: None,
+        node_args: &[],
+    })
+    .unwrap();
+    assert_eq!(diff.failed, 0, "{:?}", diff.mismatches);
+    let _ = std::fs::remove_dir_all(&root);
+}

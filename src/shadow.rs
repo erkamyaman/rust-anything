@@ -500,7 +500,7 @@ def enc(v, stack=()):
             return {"$num": "Infinity" if v > 0 else "-Infinity"}
         if v == 0 and math.copysign(1, v) < 0:
             return {"$num": "-0"}
-        return {"$float": repr(v)} if v.is_integer() else v
+        return {"$float": repr(float(v))} if v.is_integer() else v
     if any(v is s for s in stack):
         return {"$cycle": True}
     stack = stack + (v,)
