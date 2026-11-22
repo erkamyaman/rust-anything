@@ -903,6 +903,7 @@ fn python_errors_raise_the_originals_own_classes() {
              \"not-an-error\" => Err(\"builtins.int: a class, not an exception\".into()),\n        \
              \"no-module\" => Err(\"no_such_module.Error: gone\".into()),\n        \
              \"sentence\" => Err(\"Could not open it: no such file\".into()),\n        \
+             \"needs-more\" => Err(\"json.decoder.JSONDecodeError: takes a document and a position\".into()),\n        \
              _ => Ok(text),\n    }",
             1,
         );
@@ -931,7 +932,7 @@ from guard_rs import check, need
 from guard.errors import GuardError
 out = []
 for f, arg in [(check, ""), (need, ""), (need, "not-a-class"), (need, "not-an-error"),
-               (need, "no-module"), (need, "sentence")]:
+               (need, "no-module"), (need, "sentence"), (need, "needs-more")]:
     try:
         f(arg)
     except Exception as e:
@@ -954,7 +955,8 @@ print("\n".join(out))
          builtins.ValueError: os.path: a module\n\
          builtins.ValueError: builtins.int: a class, not an exception\n\
          builtins.ValueError: no_such_module.Error: gone\n\
-         builtins.ValueError: Could not open it: no such file",
+         builtins.ValueError: Could not open it: no such file\n\
+         builtins.ValueError: json.decoder.JSONDecodeError: takes a document and a position",
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );

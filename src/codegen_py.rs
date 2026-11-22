@@ -227,29 +227,33 @@ fn py_out(f: &PortFn) -> &'static str {
 /// Anything else, or a name that is not an `Exception` subclass, is a `ValueError` with the whole
 /// message. Panics become `PanicException`.
 const PY_ERROR: &str = r#"
-/// `Err("Kind: text")` for a `Kind` the match below does not know: a built-in exception's name or
-/// `package.module.Class`. None when it names no `Exception` subclass.
-fn named_error(kind: &str, text: &str) -> Option<PyErr> {
-    let identifier = |part: &str| {
-        part.starts_with(|c: char| c.is_alphabetic() || c == '_')
-            && part.chars().all(|c| c.is_alphanumeric() || c == '_')
-    };
-    if !kind.split('.').all(identifier) {
-        return None;
-    }
-    let (module, name) = kind.rsplit_once('.').unwrap_or(("builtins", kind));
-    Python::attach(|py| {
-        let class = py.import(module).ok()?.getattr(name).ok()?;
-        let class = class.cast_into::<pyo3::types::PyType>().ok()?;
-        if !class.is_subclass_of::<pyo3::exceptions::PyException>().ok()? {
-            return None;
-        }
-        Some(PyErr::from_type(class, text.to_string()))
-    })
-}
-
 fn error(message: String) -> PyErr {
     use pyo3::exceptions as e;
+    /// `Err("Kind: text")` for a `Kind` the match below does not know: a built-in exception's name or
+    /// `package.module.Class`, called with the text. None when it names no `Exception` subclass or the
+    /// class cannot be made from the text alone (its constructor takes more arguments).
+    fn named_error(kind: &str, text: &str) -> Option<PyErr> {
+        let identifier = |part: &str| {
+            part.starts_with(|c: char| c.is_alphabetic() || c == '_')
+                && part.chars().all(|c| c.is_alphanumeric() || c == '_')
+        };
+        if !kind.split('.').all(identifier) {
+            return None;
+        }
+        let (module, name) = kind.rsplit_once('.').unwrap_or(("builtins", kind));
+        Python::attach(|py| {
+            let class = py.import(module).ok()?.getattr(name).ok()?;
+            let class = class.cast_into::<pyo3::types::PyType>().ok()?;
+            if !class.is_subclass_of::<pyo3::exceptions::PyException>().ok()? {
+                return None;
+            }
+            let value = class.call1((text,)).ok()?;
+            if !value.is_instance(&class).ok()? {
+                return None;
+            }
+            Some(PyErr::from_value(value))
+        })
+    }
     let (kind, text) = message.split_once(": ").unwrap_or(("", message.as_str()));
     let text = text.to_string();
     match kind {
