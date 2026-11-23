@@ -101,4 +101,21 @@ installs each one:
 A missing optional runtime skips its tests instead of failing them; `RUST_ANYTHING_REQUIRE` makes
 them fail. See [Install](install.md#install).
 
+**A command was stopped for running too long. Which limit is it?** Two environment variables set
+the limits, in seconds (a number above zero; anything else is ignored and the default applies):
+
+- `RUST_ANYTHING_COMMAND_TIMEOUT` limits each command rust-anything runs for you: your test
+  runner, your build and the quick helper commands. The defaults are 30 minutes for tests and
+  builds and 60 seconds for the quick ones. When a command passes the limit it is stopped and the
+  error names this variable. A test runner in watch mode never ends, so run it once (for example
+  `vitest run`) rather than raising the limit.
+- `RUST_ANYTHING_CASE_TIMEOUT` limits one recorded case while the original runs, 10 seconds by
+  default. An input that makes the original loop or allocate for ever is stopped and left out of
+  the recording, and the others carry on; the output lists the inputs it left out.
+
+```sh
+RUST_ANYTHING_COMMAND_TIMEOUT=3600 rust-anything gate        # allow a slow test suite an hour
+RUST_ANYTHING_CASE_TIMEOUT=60 rust-anything record           # allow slower cases 60 s each
+```
+
 **Something broke.** Open an issue with the command, its output and your platform.
