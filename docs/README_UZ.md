@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · Oʻzbekcha · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · Oʻzbekcha · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a></sub></p>
 <p align="center"><sub>Bu tarjima hamjamiyat tomonidan yuritiladi va <a href="../README.md">inglizcha README</a>dan ortda qolishi mumkin.</sub></p>
 
 <p align="center"><b>Ilovangizni Rust'da qayta yozing va u hamon xuddi shunday ishlashini isbotlang.</b><br>
@@ -17,7 +17,7 @@ U kodni o'zi tarjima qilmaydi: Rust'ni kodlash agentingiz (yoki siz) yozadi, rus
   <a href="https://crates.io/crates/rust-anything"><img src="https://img.shields.io/crates/v/rust-anything?color=E2862A&label=crates.io" alt="crates.io version"></a>
   <a href="https://www.npmjs.com/package/rust-anything"><img src="https://img.shields.io/npm/v/rust-anything?color=E2862A&label=npm" alt="npm version"></a>
   <br>
-  <a href="https://coderabbit.link/erkamyaman"><img src="https://img.shields.io/coderabbit/prs/github/erkamyaman/rust-anything?labelColor=171717&color=FF570A&label=Reviewed+by+CodeRabbit" alt="Pull requests reviewed by CodeRabbit"></a>
+  <a href="https://coderabbit.link/er-kam"><img src="https://img.shields.io/coderabbit/prs/github/erkamyaman/rust-anything?labelColor=171717&color=FF570A&label=Reviewed+by+CodeRabbit" alt="Pull requests reviewed by CodeRabbit"></a>
   <a href="https://github.com/rust-unofficial/awesome-rust#development-tools"><img src="https://awesome.re/mentioned-badge.svg" alt="Mentioned in Awesome Rust"></a>
   <a href="https://github.com/AIshihzong/awesome-reverse-engineer-anything"><img src="https://img.shields.io/badge/Featured%20in-Awesome%20REA-f0b429" alt="Featured in Awesome REA"></a>
   <a href="https://github.com/erkamyaman/rust-anything"><img src="https://img.shields.io/github/stars/erkamyaman/rust-anything?style=social" alt="GitHub stars"></a>
@@ -29,7 +29,7 @@ U kodni o'zi tarjima qilmaydi: Rust'ni kodlash agentingiz (yoki siz) yozadi, rus
 
 <p align="center"><b><a href="#tezkor-boshlash">Tezkor boshlash</a></b> · <a href="https://github.com/erkamyaman/rust-anything/releases">Releases</a> · <a href="#tezkor-boshlash">Claude Code plugin</a> · <a href="https://registry.modelcontextprotocol.io/v0.1/servers?search=rust-anything">MCP Registry</a> · <a href="real-world.md">Haqiqiy portlar</a> · <a href="faq.md#faq">Ko'p so'raladigan savollar</a><br>
 <sub><a href="#tillar">Tillar</a> · <a href="how-it-works.md#how-it-works">Qanday ishlaydi</a> · <a href="whole-apps.md#port-a-whole-app">Butun ilovalar</a> · <a href="../LICENSE">MIT</a></sub><br>
-Turkiyada 🇹🇷 <a href="https://github.com/erkamyaman">erKam Yaman</a> tomonidan yaratilgan · <a href="../LICENSE">MIT</a> · <a href="https://github.com/sponsors/erkamyaman">❤️ Homiy bo'ling</a> · Homiy: <a href="https://coderabbit.link/erkamyaman"><img src="assets/brands/coderabbit.png" width="22" height="22" align="absmiddle" alt=""> <b>CodeRabbit</b></a></p>
+Turkiyada 🇹🇷 <a href="https://github.com/erkamyaman">erKam Yaman</a> tomonidan yaratilgan · <a href="../LICENSE">MIT</a> · <a href="https://github.com/sponsors/erkamyaman">❤️ Homiy bo'ling</a> · Homiy: <a href="https://coderabbit.link/er-kam"><img src="assets/brands/coderabbit.png" width="22" height="22" align="absmiddle" alt=""> <b>CodeRabbit</b></a></p>
 
 <p align="center">2.0'da yangi: <a href="real-world.md#prettier">Prettier Rust'ga port qilindi</a>. 19x tezroq · 17,224 ta yozib olingan ishga tushirishdan 15,861 tasi to'liq Rust'da · hammasi baytma-bayt bir xil</p>
 
@@ -271,7 +271,7 @@ ortiga qo'yish mumkin; birliklarni P/Invoke orqali port qilish navbatda.
 </p>
 
 <p align="center">
-  <a href="https://coderabbit.link/erkamyaman">
+  <a href="https://coderabbit.link/er-kam">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="assets/sponsors/company-dark.svg">
       <img src="assets/sponsors/company-light.svg" width="800" alt="Kompaniya homiysi: CodeRabbit">

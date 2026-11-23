@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · 简体中文 · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · 简体中文 · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a></sub></p>
 <p align="center"><sub>本译文由社区维护，可能落后于<a href="../README.md">英文 README</a>。</sub></p>
 
 <p align="center"><b>用 Rust 重写你的应用，并证明它的行为依然完全一致。</b><br>
@@ -17,7 +17,7 @@
   <a href="https://crates.io/crates/rust-anything"><img src="https://img.shields.io/crates/v/rust-anything?color=E2862A&label=crates.io" alt="crates.io version"></a>
   <a href="https://www.npmjs.com/package/rust-anything"><img src="https://img.shields.io/npm/v/rust-anything?color=E2862A&label=npm" alt="npm version"></a>
   <br>
-  <a href="https://coderabbit.link/erkamyaman"><img src="https://img.shields.io/coderabbit/prs/github/erkamyaman/rust-anything?labelColor=171717&color=FF570A&label=Reviewed+by+CodeRabbit" alt="Pull requests reviewed by CodeRabbit"></a>
+  <a href="https://coderabbit.link/er-kam"><img src="https://img.shields.io/coderabbit/prs/github/erkamyaman/rust-anything?labelColor=171717&color=FF570A&label=Reviewed+by+CodeRabbit" alt="Pull requests reviewed by CodeRabbit"></a>
   <a href="https://github.com/rust-unofficial/awesome-rust#development-tools"><img src="https://awesome.re/mentioned-badge.svg" alt="Mentioned in Awesome Rust"></a>
   <a href="https://github.com/AIshihzong/awesome-reverse-engineer-anything"><img src="https://img.shields.io/badge/Featured%20in-Awesome%20REA-f0b429" alt="Featured in Awesome REA"></a>
   <a href="https://github.com/erkamyaman/rust-anything"><img src="https://img.shields.io/github/stars/erkamyaman/rust-anything?style=social" alt="GitHub stars"></a>
@@ -29,7 +29,7 @@
 
 <p align="center"><b><a href="#快速开始">快速开始</a></b> · <a href="https://github.com/erkamyaman/rust-anything/releases">Releases</a> · <a href="#快速开始">Claude Code plugin</a> · <a href="https://registry.modelcontextprotocol.io/v0.1/servers?search=rust-anything">MCP Registry</a> · <a href="real-world.md">真实项目迁移</a> · <a href="faq.md#faq">常见问题</a><br>
 <sub><a href="#支持语言">支持语言</a> · <a href="how-it-works.md#how-it-works">工作原理</a> · <a href="whole-apps.md#port-a-whole-app">整应用迁移</a> · <a href="../LICENSE">MIT</a></sub><br>
-由 <a href="https://github.com/erkamyaman">erKam Yaman</a> 在土耳其 🇹🇷 打造 · <a href="../LICENSE">MIT</a> · <a href="https://github.com/sponsors/erkamyaman">❤️ 赞助我</a> · 赞助商：<a href="https://coderabbit.link/erkamyaman"><img src="assets/brands/coderabbit.png" width="22" height="22" align="absmiddle" alt=""> <b>CodeRabbit</b></a></p>
+由 <a href="https://github.com/erkamyaman">erKam Yaman</a> 在土耳其 🇹🇷 打造 · <a href="../LICENSE">MIT</a> · <a href="https://github.com/sponsors/erkamyaman">❤️ 赞助我</a> · 赞助商：<a href="https://coderabbit.link/er-kam"><img src="assets/brands/coderabbit.png" width="22" height="22" align="absmiddle" alt=""> <b>CodeRabbit</b></a></p>
 
 <p align="center">2.0 新功能：<a href="real-world.md#prettier">Prettier 已移植到 Rust</a>。提速 19 倍 · 17,224 次录制运行中 15,861 次完全由 Rust 执行 · 全部逐字节一致</p>
 
@@ -218,7 +218,7 @@ C# 的支持方式相同：`analyze` 会读取 `.csproj` 工程及其 NuGet 包�
 </p>
 
 <p align="center">
-  <a href="https://coderabbit.link/erkamyaman">
+  <a href="https://coderabbit.link/er-kam">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="assets/sponsors/company-dark.svg">
       <img src="assets/sponsors/company-light.svg" width="800" alt="企业赞助商：CodeRabbit">

@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · Tiếng Việt · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · Tiếng Việt · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a></sub></p>
 <p align="center"><sub>Bản dịch này do cộng đồng duy trì và có thể chậm hơn <a href="../README.md">README tiếng Anh</a>.</sub></p>
 
 <p align="center"><b>Viết lại ứng dụng bằng Rust, và chứng minh nó vẫn hoạt động y như cũ.</b><br>
@@ -17,7 +17,7 @@ Công cụ không tự dịch code: agent lập trình của bạn (hoặc chín
   <a href="https://crates.io/crates/rust-anything"><img src="https://img.shields.io/crates/v/rust-anything?color=E2862A&label=crates.io" alt="crates.io version"></a>
   <a href="https://www.npmjs.com/package/rust-anything"><img src="https://img.shields.io/npm/v/rust-anything?color=E2862A&label=npm" alt="npm version"></a>
   <br>
-  <a href="https://coderabbit.link/erkamyaman"><img src="https://img.shields.io/coderabbit/prs/github/erkamyaman/rust-anything?labelColor=171717&color=FF570A&label=Reviewed+by+CodeRabbit" alt="Pull requests reviewed by CodeRabbit"></a>
+  <a href="https://coderabbit.link/er-kam"><img src="https://img.shields.io/coderabbit/prs/github/erkamyaman/rust-anything?labelColor=171717&color=FF570A&label=Reviewed+by+CodeRabbit" alt="Pull requests reviewed by CodeRabbit"></a>
   <a href="https://github.com/rust-unofficial/awesome-rust#development-tools"><img src="https://awesome.re/mentioned-badge.svg" alt="Mentioned in Awesome Rust"></a>
   <a href="https://github.com/AIshihzong/awesome-reverse-engineer-anything"><img src="https://img.shields.io/badge/Featured%20in-Awesome%20REA-f0b429" alt="Featured in Awesome REA"></a>
   <a href="https://github.com/erkamyaman/rust-anything"><img src="https://img.shields.io/github/stars/erkamyaman/rust-anything?style=social" alt="GitHub stars"></a>
@@ -29,7 +29,7 @@ Công cụ không tự dịch code: agent lập trình của bạn (hoặc chín
 
 <p align="center"><b><a href="#quick-start">Bắt đầu nhanh</a></b> · <a href="https://github.com/erkamyaman/rust-anything/releases">Releases</a> · <a href="#quick-start">Claude Code plugin</a> · <a href="https://registry.modelcontextprotocol.io/v0.1/servers?search=rust-anything">MCP Registry</a> · <a href="real-world.md">Các bản port thực tế</a> · <a href="faq.md#faq">FAQ</a><br>
 <sub><a href="#languages">Ngôn ngữ</a> · <a href="how-it-works.md#how-it-works">Cách hoạt động</a> · <a href="whole-apps.md#port-a-whole-app">Chuyển cả ứng dụng</a> · <a href="../LICENSE">MIT</a></sub><br>
-Làm tại Thổ Nhĩ Kỳ 🇹🇷 bởi <a href="https://github.com/erkamyaman">erKam Yaman</a> · <a href="../LICENSE">MIT</a> · <a href="https://github.com/sponsors/erkamyaman">❤️ Tài trợ cho tôi</a> · Được tài trợ bởi <a href="https://coderabbit.link/erkamyaman"><img src="assets/brands/coderabbit.png" width="22" height="22" align="absmiddle" alt=""> <b>CodeRabbit</b></a></p>
+Làm tại Thổ Nhĩ Kỳ 🇹🇷 bởi <a href="https://github.com/erkamyaman">erKam Yaman</a> · <a href="../LICENSE">MIT</a> · <a href="https://github.com/sponsors/erkamyaman">❤️ Tài trợ cho tôi</a> · Được tài trợ bởi <a href="https://coderabbit.link/er-kam"><img src="assets/brands/coderabbit.png" width="22" height="22" align="absmiddle" alt=""> <b>CodeRabbit</b></a></p>
 
 <p align="center">Mới trong 2.0: <a href="real-world.md#prettier">Prettier đã được port sang Rust</a>. Nhanh hơn 19x · 15,861 trên 17,224 lần chạy đã ghi chạy hoàn toàn bằng Rust · tất cả giống từng byte</p>
 
@@ -220,7 +220,7 @@ C# cũng hoạt động theo cách tương tự. `analyze` đọc project `.cspr
 </p>
 
 <p align="center">
-  <a href="https://coderabbit.link/erkamyaman">
+  <a href="https://coderabbit.link/er-kam">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="assets/sponsors/company-dark.svg">
       <img src="assets/sponsors/company-light.svg" width="800" alt="Nhà tài trợ doanh nghiệp: CodeRabbit">

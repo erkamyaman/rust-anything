@@ -55,9 +55,12 @@ pub fn original_only(cmd: &mut Command, manifest: &Manifest) {
 }
 
 pub fn enable(crate_dir: &Path) -> Result<Switched> {
-    let crate_dir = crate_dir
-        .canonical()
-        .with_context(|| format!("resolving {}", crate_dir.display()))?;
+    let crate_dir = crate_dir.canonical().with_context(|| {
+        format!(
+            "resolving {} (run `rust-anything bridge` first)",
+            crate_dir.display()
+        )
+    })?;
     let manifest = Manifest::load(&crate_dir)?;
     supported(&manifest)?;
     let switch = crate::front_door::kill_switch(&manifest.crate_name);
@@ -130,9 +133,12 @@ pub fn enable(crate_dir: &Path) -> Result<Switched> {
 }
 
 pub fn disable(crate_dir: &Path) -> Result<Switched> {
-    let crate_dir = crate_dir
-        .canonical()
-        .with_context(|| format!("resolving {}", crate_dir.display()))?;
+    let crate_dir = crate_dir.canonical().with_context(|| {
+        format!(
+            "resolving {} (run `rust-anything bridge` first)",
+            crate_dir.display()
+        )
+    })?;
     let manifest = Manifest::load(&crate_dir)?;
     let mut out = Switched {
         crate_name: manifest.crate_name.clone(),

@@ -190,6 +190,7 @@ pub fn run() -> Report {
         let wasm = s.spawn(wasm_target);
         let ndk = s.spawn(android_ndk);
         let android_targets = s.spawn(android_targets);
+        let adb = s.spawn(android_adb);
         let mcp = s.spawn(|| mcp_self_test(&exe));
         let mut checks: Vec<Check> = probes
             .into_iter()
@@ -202,6 +203,7 @@ pub fn run() -> Report {
                 .join()
                 .expect("the Android targets probe panicked"),
         );
+        checks.push(adb.join().expect("the adb probe panicked"));
         checks.push(mcp.join().expect("the MCP self-test panicked"));
         checks
     });
@@ -615,6 +617,34 @@ fn android_ndk() -> Check {
         detail,
         fix: (status != Status::Ok).then(|| {
             "sdkmanager \"ndk;28.0.13004108\"  (or set ANDROID_NDK_HOME to an installed NDK)"
+                .to_string()
+        }),
+    }
+}
+
+/// `adb`, which `record`/`diff --profile android` use to reach a device.
+fn android_adb() -> Check {
+    let probe = probe("adb", &["version"]);
+    let (status, detail) = match probe.as_deref() {
+        Some(banner) => (
+            Status::Ok,
+            banner.lines().next().unwrap_or(banner).to_string(),
+        ),
+        None => (
+            Status::Missing,
+            "`adb` not found or did not run; recording and diffing on a device needs it".into(),
+        ),
+    };
+    Check {
+        name: "Android adb".into(),
+        status,
+        required: false,
+        detail,
+        fix: (status != Status::Ok).then(|| {
+            // The package alone is not enough: its folder has to be on PATH, or the next probe
+            // still cannot find `adb`.
+            "sdkmanager \"platform-tools\"  (or install Android Studio's SDK tools), then put its \
+             platform-tools folder on PATH"
                 .to_string()
         }),
     }
@@ -1282,6 +1312,25 @@ mod tests {
     }
 
     #[test]
+    fn adb_is_a_row_of_its_own_and_never_required() {
+        // `record`/`diff --profile android` run `adb devices`, so a machine without it should hear
+        // about it — but a device is optional, like the NDK and the Rust targets next to it.
+        let check = android_adb();
+        assert_eq!(check.name, "Android adb");
+        assert!(!check.required);
+        if check.status != Status::Ok {
+            assert!(
+                check
+                    .fix
+                    .as_deref()
+                    .is_some_and(|f| f.contains("platform-tools")),
+                "a missing adb names the package that installs it: {:?}",
+                check.fix
+            );
+        }
+    }
+
+    #[test]
     fn php_requires_the_ffi_extension_and_stays_optional() {
         let php = runtime_named("php");
         let banner = Some("PHP 8.3.4 (cli) (built: Mar 12 2024)");
@@ -1332,5 +1381,49 @@ mod tests {
         let old = runtime_check(php, Some("PHP 7.4.33 (cli)"), None, Platform::Other);
         assert_eq!(old.status, Status::Outdated);
         assert!(old.detail.contains("needs 8.0+"));
+    }
+    #[test]
+    fn install_md_names_the_runtime_minimums_doctor_checks() {
+        // docs/install.md lists the runtimes `record`, `diff` and `bench` run the original in; it
+        // must not promise an older version than `doctor` accepts, or leave a checked one out.
+        let doc = include_str!("../docs/install.md")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        let named = [
+            ("node", "Node"),
+            ("python3", "Python"),
+            ("go", "Go"),
+            ("ruby", "Ruby"),
+            ("javac", "JDK"),
+            ("php", "PHP"),
+            ("pwsh", "PowerShell"),
+        ];
+        for r in RUNTIMES.iter().filter(|r| r.minimum.is_some()) {
+            assert!(
+                matches!(r.name, "cargo" | "java") || named.iter().any(|(n, _)| *n == r.name),
+                "add {} to this list and to docs/install.md",
+                r.name
+            );
+        }
+        for (name, label) in named {
+            let Version(major, minor, _) = minimum(name).unwrap();
+            let version = if minor == 0 {
+                major.to_string()
+            } else {
+                format!("{major}.{minor}")
+            };
+            let text = format!("{label} {version}+");
+            assert!(
+                doc.contains(&text),
+                "docs/install.md should say `{text}`, as doctor does"
+            );
+        }
+        for runtime in ["`kotlinc`", ".NET SDK"] {
+            assert!(
+                doc.contains(runtime),
+                "docs/install.md should name {runtime}"
+            );
+        }
     }
 }

@@ -513,9 +513,12 @@ fn percent_decode(text: &str) -> String {
     while i < bytes.len() {
         if bytes[i] == b'%'
             && let Some(hex) = text.get(i + 1..i + 3)
-            && let Ok(b) = u8::from_str_radix(hex, 16)
+            // Two hex digits only: `from_str_radix` also takes a leading `+`, which would turn
+            // `%+1` into an escape for byte 1.
+            && hex.len() == 2
+            && hex.bytes().all(|b| b.is_ascii_hexdigit())
         {
-            out.push(b);
+            out.push(u8::from_str_radix(hex, 16).unwrap_or(0));
             i += 3;
             continue;
         }
@@ -1374,5 +1377,11 @@ mod tests {
                 .any(|r| r.body.as_deref() == Some(app::JSON_TRAPS[0]))
         );
         assert_eq!(percent_decode("a%20b%zz"), "a b%zz");
+        // `from_str_radix` accepts a sign, so `%+1` and `%-1` used to decode as an escape.
+        assert_eq!(percent_decode("%+1"), "%+1");
+        assert_eq!(percent_decode("%-1"), "%-1");
+        assert_eq!(percent_decode("%2b"), "+");
+        assert_eq!(percent_decode("%2B"), "+");
+        assert_eq!(percent_decode("%4"), "%4");
     }
 }

@@ -184,3 +184,26 @@ fn a_broken_manifest_with_an_unresolved_root_is_reported() {
     assert!(md.contains("rust/util-rs"), "{md}");
     let _ = std::fs::remove_dir_all(&repo);
 }
+
+#[test]
+fn map_refuses_a_file_instead_of_printing_an_empty_map() {
+    let file = std::env::temp_dir().join(format!("ra-map-file-{}.toml", std::process::id()));
+    std::fs::write(&file, "[package]\nname = \"x\"\n").unwrap();
+    let err = port_map::map(&file, &[]).unwrap_err().to_string();
+    // `map` canonicalizes first, and on macOS `temp_dir()` can be a symlinked path (`/var` →
+    // `/private/var`), so compare against what the message can carry.
+    let shown = std::fs::canonicalize(&file).unwrap_or_else(|_| file.clone());
+    assert!(
+        err.contains(&shown.display().to_string()) && err.contains("is a file"),
+        "the error names the path and what is wrong: {err}"
+    );
+    // `--crates` entries too: a file there is the same mistake one argument over.
+    let root = std::env::temp_dir().join(format!("ra-map-crates-{}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    let err = port_map::map(&root, std::slice::from_ref(&file))
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("`--crates` takes folders"), "{err}");
+    let _ = std::fs::remove_dir_all(&root);
+    let _ = std::fs::remove_file(&file);
+}

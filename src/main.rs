@@ -24,7 +24,7 @@ use rust_anything::{analyze, app, bridge, front_door, gate, harness, lift, mcp, 
 #[command(
     name = "rust-anything",
     version,
-    about = "Rewrite TypeScript/JavaScript, Python, C, Go, Ruby, Java, Kotlin, PHP or C# apps in Rust, one verified piece at a time",
+    about = "Rewrite TypeScript/JavaScript, Python, C, Go, Ruby, Java, Kotlin, PHP, C# or PowerShell apps in Rust, one verified piece at a time",
     after_help = "Loop per unit: analyze -> bridge -> record -> port src/port.rs -> build -> diff -> shadow -> gate\nOnly the slow part: go --agent claude -- <workload>, then enable/disable and report"
 )]
 struct Cli {
@@ -568,7 +568,8 @@ enum AppCmd {
         /// the original when omitted.
         #[arg(long)]
         build: Option<String>,
-        /// Seconds before a run is killed.
+        /// Seconds before a run is killed (default: the one saved by `app record`, 30 seconds
+        /// unless it was changed).
         #[arg(long)]
         timeout: Option<u64>,
         /// Servers: the port the build always listens on; otherwise it gets a free one through
@@ -688,6 +689,13 @@ fn run() -> Result<ExitCode> {
             lang,
             whole_app,
         } => {
+            // Said here, not under "analyzing X", so the path is named once (#267).
+            if !root
+                .try_exists()
+                .with_context(|| format!("reading {}", root.display()))?
+            {
+                anyhow::bail!("no folder {}", root.display());
+            }
             let lang = lang.unwrap_or_else(|| rust_anything::lang::Lang::detect(&root));
             let mut report = analyze::analyze_lang(&root, lang)
                 .with_context(|| format!("analyzing {}", root.display()))?;
@@ -927,6 +935,16 @@ fn run() -> Result<ExitCode> {
             json,
             node_args,
         } => {
+            // The same missing-folder hint the other commands give before they
+            // read the manifest. Otherwise a missing crate reaches the harness
+            // and reports "run record first", which cannot work yet.
+            let manifest_path = crate_dir.join(rust_anything::bridge::MANIFEST);
+            if !manifest_path.exists() {
+                anyhow::bail!(
+                    "reading {} (run `rust-anything bridge` first)",
+                    manifest_path.display()
+                );
+            }
             let opts = harness::DiffOptions {
                 crate_dir: &crate_dir,
                 module: module.as_deref(),

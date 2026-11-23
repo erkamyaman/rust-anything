@@ -550,9 +550,21 @@ pub fn go(opts: &Options) -> Result<Outcome> {
 
 fn times(x: f64) -> String {
     if x >= 1.0 {
-        format!("{x:.1}x faster")
+        // Same rule on the faster side: `1.04x` is not `1.0x`, which reads as no change at all.
+        if x < 1.05 {
+            format!("{x:.2}x faster")
+        } else {
+            format!("{x:.1}x faster")
+        }
     } else {
-        format!("{:.1}x slower", 1.0 / x.max(1e-9))
+        let slower = 1.0 / x.max(1e-9);
+        // A port a few percent behind reads as "1.0x slower" at one decimal, which says it is not
+        // slower at all: below 1.05 the difference gets a second decimal, as `bench` prints it.
+        if slower < 1.05 {
+            format!("{slower:.2}x slower")
+        } else {
+            format!("{slower:.1}x slower")
+        }
     }
 }
 
@@ -867,6 +879,14 @@ mod tests {
             "{plain}"
         );
         assert_eq!(times(31.42), "31.4x faster");
+        // Near parity, on both sides: `1.0x` would read as "no change".
+        assert_eq!(times(1.04), "1.04x faster");
+        assert_eq!(times(1.2), "1.2x faster");
+        // A few percent behind is not "1.0x slower": below 1.05 the second decimal is kept.
+        assert_eq!(times(0.97), "1.03x slower");
+        assert_eq!(times(0.96), "1.04x slower");
+        assert_eq!(times(0.9), "1.1x slower");
+        assert_eq!(times(0.5), "2.0x slower");
     }
 
     #[test]

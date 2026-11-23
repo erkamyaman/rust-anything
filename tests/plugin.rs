@@ -19,6 +19,16 @@ fn the_plugin_ships_the_same_skill_and_mcp_server() {
 }
 
 #[test]
+fn the_skill_description_names_every_language_the_crate_does() {
+    let skill = read("skills/rust-anything/SKILL.md");
+    let languages = env!("CARGO_PKG_DESCRIPTION").rsplit_once(". ").unwrap().1;
+    assert!(
+        skill.contains(languages),
+        "the skill description is missing {languages}"
+    );
+}
+
+#[test]
 fn the_plugin_version_is_the_crate_version() {
     for dir in ["plugin", "directory"] {
         let plugin: serde_json::Value =

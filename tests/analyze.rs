@@ -1021,3 +1021,68 @@ fn powershell_modules_get_their_bridge_notes_and_import_order() {
     assert!(names.contains(&"Pester"), "{names:?}");
     let _ = std::fs::remove_dir_all(&root);
 }
+
+#[test]
+fn analyze_refuses_a_folder_that_does_not_exist_in_every_language() {
+    use rust_anything::lang::Lang;
+    let missing = Path::new("/no/such/rust-anything-analyze-folder");
+    for lang in [
+        Lang::Ts,
+        Lang::Python,
+        Lang::C,
+        Lang::Go,
+        Lang::Ruby,
+        Lang::Java,
+        Lang::Kotlin,
+        Lang::Php,
+        Lang::Csharp,
+    ] {
+        let err = rust_anything::analyze::analyze_lang(missing, lang)
+            .expect_err("a missing folder is not an empty project");
+        assert_eq!(
+            err.to_string(),
+            format!("no folder {}", missing.display()),
+            "{lang:?}"
+        );
+    }
+}
+
+#[test]
+fn analyze_cli_names_a_missing_folder_once_and_fails() {
+    let path = "/no/such/rust-anything-analyze-folder";
+    for args in [
+        vec!["analyze", "--lang", "python", path],
+        vec!["analyze", path],
+    ] {
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_rust-anything"))
+            .args(&args)
+            .output()
+            .unwrap();
+        assert!(!out.status.success(), "{args:?}");
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(err.trim(), format!("error: no folder {path}"), "{args:?}");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn analyze_reports_an_unreadable_parent_instead_of_a_missing_folder() {
+    use std::os::unix::fs::PermissionsExt;
+    let parent = std::env::temp_dir().join(format!("ra-analyze-locked-{}", std::process::id()));
+    let root = parent.join("project");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let probe = std::fs::metadata(&root);
+    let result = rust_anything::analyze::analyze_lang(&root, rust_anything::lang::Lang::Python);
+    std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let _ = std::fs::remove_dir_all(&parent);
+    if probe.is_ok() {
+        return; // Running as root: the parent cannot hide the folder.
+    }
+    let err = result.expect_err("an unreadable parent is an error");
+    assert_ne!(
+        err.to_string(),
+        format!("no folder {}", root.display()),
+        "permission denied is not a missing folder"
+    );
+}

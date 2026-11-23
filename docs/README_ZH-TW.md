@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · 繁體中文 · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · 繁體中文 · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a></sub></p>
 <p align="center"><sub>本譯文由社群維護，可能落後於<a href="../README.md">英文 README</a>。</sub></p>
 
 <p align="center"><b>用 Rust 重寫你的應用程式，並證明它的行為依然完全相同。</b><br>
@@ -17,7 +17,7 @@
   <a href="https://crates.io/crates/rust-anything"><img src="https://img.shields.io/crates/v/rust-anything?color=E2862A&label=crates.io" alt="crates.io version"></a>
   <a href="https://www.npmjs.com/package/rust-anything"><img src="https://img.shields.io/npm/v/rust-anything?color=E2862A&label=npm" alt="npm version"></a>
   <br>
-  <a href="https://coderabbit.link/erkamyaman"><img src="https://img.shields.io/coderabbit/prs/github/erkamyaman/rust-anything?labelColor=171717&color=FF570A&label=Reviewed+by+CodeRabbit" alt="Pull requests reviewed by CodeRabbit"></a>
+  <a href="https://coderabbit.link/er-kam"><img src="https://img.shields.io/coderabbit/prs/github/erkamyaman/rust-anything?labelColor=171717&color=FF570A&label=Reviewed+by+CodeRabbit" alt="Pull requests reviewed by CodeRabbit"></a>
   <a href="https://github.com/rust-unofficial/awesome-rust#development-tools"><img src="https://awesome.re/mentioned-badge.svg" alt="Mentioned in Awesome Rust"></a>
   <a href="https://github.com/AIshihzong/awesome-reverse-engineer-anything"><img src="https://img.shields.io/badge/Featured%20in-Awesome%20REA-f0b429" alt="Featured in Awesome REA"></a>
   <a href="https://github.com/erkamyaman/rust-anything"><img src="https://img.shields.io/github/stars/erkamyaman/rust-anything?style=social" alt="GitHub stars"></a>
@@ -29,7 +29,7 @@
 
 <p align="center"><b><a href="#快速開始">快速開始</a></b> · <a href="https://github.com/erkamyaman/rust-anything/releases">Releases</a> · <a href="#快速開始">Claude Code plugin</a> · <a href="https://registry.modelcontextprotocol.io/v0.1/servers?search=rust-anything">MCP Registry</a> · <a href="real-world.md">真實移植案例</a> · <a href="faq.md#faq">常見問題</a><br>
 <sub><a href="#支援語言">支援語言</a> · <a href="how-it-works.md#how-it-works">運作原理</a> · <a href="whole-apps.md#port-a-whole-app">整個應用程式</a> · <a href="../LICENSE">MIT</a></sub><br>
-由 <a href="https://github.com/erkamyaman">erKam Yaman</a> 在土耳其 🇹🇷 打造 · <a href="../LICENSE">MIT</a> · <a href="https://github.com/sponsors/erkamyaman">❤️ 贊助我</a> · 贊助商：<a href="https://coderabbit.link/erkamyaman"><img src="assets/brands/coderabbit.png" width="22" height="22" align="absmiddle" alt=""> <b>CodeRabbit</b></a></p>
+由 <a href="https://github.com/erkamyaman">erKam Yaman</a> 在土耳其 🇹🇷 打造 · <a href="../LICENSE">MIT</a> · <a href="https://github.com/sponsors/erkamyaman">❤️ 贊助我</a> · 贊助商：<a href="https://coderabbit.link/er-kam"><img src="assets/brands/coderabbit.png" width="22" height="22" align="absmiddle" alt=""> <b>CodeRabbit</b></a></p>
 
 <p align="center">2.0 新功能：<a href="real-world.md#prettier">Prettier 已移植到 Rust</a>。提速 19 倍 · 17,224 次錄製執行中 15,861 次完全由 Rust 執行 · 全部逐位元組一致</p>
 
@@ -39,7 +39,7 @@
   <sub>在取自 ms、Fuse.js 與 json-server 的 59 個真實檔案上，Prettier 對上它的 Rust 移植版（Apple M4）。輸出逐位元組相同。<a href="real-world.md#prettier">測量方式</a>。</sub>
 </p>
 
-<p align="center"><sub>PHP 與 C#：目前支援錄製、重播和 front door；單元移植即將推出。</sub></p>
+<p align="center"><sub>PHP 與 C#：支援錄製、重播與前門代理，單元移植也可透過 FFI 與 P/Invoke 進行。</sub></p>
 
 <table>
   <tr>
@@ -217,10 +217,10 @@ rust-anything 並不直接翻譯程式碼：Rust 程式碼是由你的程式開�
 | Go | 套件（package） | 型別化 cgo 呼叫與自動產生的二進位傳輸協定，封裝於維持原 API 的套件內 | 自動產生的 Go 驅動程式，作為獨立模組建置執行 |
 | Ruby | 包含模組函式的檔案或資料夾 | 掛載於原模組名稱下的 magnus 擴充套件 | 自動產生的 Ruby 驅動程式 |
 | Java | 包含 `public static` 方法的套件 | 型別化 JNI 與自動產生的二進位傳輸協定，置於維持原方法的包裝類別中 | 自動產生的反射（reflection）驅動程式 |
-| PHP | 包含函式與 `public static` 方法的資料夾 | 下一步推出：透過 C ABI 運作的 PHP FFI | 目前支援整套應用程式：`app record`、`app replay` 與前門代理，適用於 CLI 與伺服器（`php -S`） |
-| C# | 包含 `public static` 方法的資料夾 | 下一步推出：透過 C ABI 運作的 P/Invoke | 目前支援整套應用程式：`app record`、`app replay` 與前門代理，適用於 CLI 與 ASP.NET 伺服器（`dotnet <app>.dll`） |
+| PHP | 頂層函式的檔案或資料夾（`public static` 方法留在 PHP） | 透過 `ext-ffi` 的 JSON 分派層，產生一個以原始參數重新宣告這些函式的檔案 | 產生 PHP 驅動程式；整套應用程式可用 `app record`、`app replay` 與前門代理，適用於 CLI 與伺服器（`php -S`） |
+| C# | 包含 `public static` 方法的檔案或資料夾 | 透過 P/Invoke 的 JSON 分派層，產生 `<namespace>.Rust` 類別並保留原始方法 | 產生反射驅動程式，與專案原始碼一起以 `dotnet build` 編譯；整套應用程式可用 `app record`、`app replay` 與前門代理，適用於 CLI 與 ASP.NET 伺服器（`dotnet <app>.dll`） |
 
-除了 C 語言外，每種語言皆可產生批次處理類別（`--batch`）：所有資料只需跨邊界傳入一次並留在
+除了 C、PHP 與 C# 之外，每種語言皆可產生批次處理類別（`--batch`）：所有資料只需跨邊界傳入一次並留在
 Rust 中，每次呼叫便會在所有 CPU 核心上平行運算全部項目。
 
 系統會根據儲存庫內容自動偵測語言（依序檢查 `go.mod`、`pom.xml`、`.csproj` 或 `.sln`、
@@ -231,13 +231,21 @@ Rust 中，每次呼叫便會在所有 CPU 核心上平行運算全部項目。
 
 對於 PHP，`analyze` 可為 PHP 應用程式規劃遷移（支援 Composer 套件與 PSR-4 自動載入，偵測
 寬鬆比較與整數溢位轉浮點數等風險，並將 Composer 套件對應至 crate），
-且支援對 PHP CLI 或伺服器進行錄製、重播與套用 Rust 前門代理。透過 PHP FFI 將各個
-單元移植到 Rust 是下一步規劃（[issue #2](https://github.com/erkamyaman/rust-anything/issues/2)）。
+且支援對 PHP CLI 或伺服器進行錄製、重播與套用 Rust 前門代理。單元的頂層函式（參數可為純量、
+字串、清單與關聯陣列）會透過 PHP 的 FFI 擴充功能橋接（需要啟用 `ext-ffi` 的 `php`，CLI 預設
+開啟）：`diff` 通過後，改為載入產生的 `php/<crate>.php`（不要移動它，包裝檔案會以 `__DIR__`
+相對路徑載入原生程式庫）。每次呼叫以 JSON 跨越邊界，約 1 µs，因此 `bench` 會顯示小型函式比 PHP 慢；PHP 目前還沒有 `shadow`
+（[issue #200](https://github.com/erkamyaman/rust-anything/issues/200)）。
 
 C# 的運作方式相同：`analyze` 會讀取 `.csproj` 專案與其 NuGet 套件
 （對應至 crate）、將 `using` 指示詞解析至對應資料夾，並標記 C# 的特殊差異
 （`decimal`、`dynamic`、LINQ 的延遲查詢、`Task`、`lock`、反射）。目前可對 C# CLI 或 ASP.NET
-伺服器進行錄製、重播與套用 Rust 前門代理；透過 P/Invoke 移植個別單元則為下一步支援項目。
+伺服器進行錄製、重播與套用 Rust 前門代理。單元的公開靜態方法（參數可為純量、字串、陣列、
+清單、字典，以及 record 或一般類別）會透過 P/Invoke 橋接（錄製與比對需要 `PATH` 中的
+`dotnet`）：`diff` 通過後，呼叫 `<namespace>.Rust` **命名空間**中產生的類別（例如
+`Acme.Text.Slug.Slugify` 會變成 `Acme.Text.Rust.Slug.Slugify`），或以 `using` 加上別名。每次
+呼叫以 JSON 跨越邊界，約 1-3 µs，因此 `bench` 會顯示小型方法比 .NET 慢；C# 目前還沒有
+`shadow`（[issue #200](https://github.com/erkamyaman/rust-anything/issues/200)）。
 
 ## 深入了解
 
@@ -256,7 +264,7 @@ C# 的運作方式相同：`analyze` 會讀取 `.csproj` 專案與其 NuGet 套�
 </p>
 
 <p align="center">
-  <a href="https://coderabbit.link/erkamyaman">
+  <a href="https://coderabbit.link/er-kam">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="assets/sponsors/company-dark.svg">
       <img src="assets/sponsors/company-light.svg" width="800" alt="企業贊助商：CodeRabbit">

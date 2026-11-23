@@ -200,3 +200,27 @@ fn docs_tools_md_matches_the_tool_list() {
         "docs/tools.md is out of date: run `UPDATE_TOOLS_DOC=1 cargo test --test tools`"
     );
 }
+
+#[test]
+fn replay_timeout_says_its_default_is_the_one_record_saved() {
+    // Replay falls back to the timeout `app record` saved, not to a fixed 30 seconds.
+    let out = Command::new(CLI)
+        .args(["app", "replay", "--help"])
+        .output()
+        .unwrap();
+    let help = String::from_utf8(out.stdout).unwrap();
+    let help = help.split_whitespace().collect::<Vec<_>>().join(" ");
+    let flag = help
+        .split("--timeout <TIMEOUT> ")
+        .nth(1)
+        .and_then(|rest| rest.split(" -").next())
+        .expect(&help);
+    assert!(flag.contains("saved by `app record`"), "{flag}");
+
+    let tools = tools();
+    let replay = tools.iter().find(|t| t["name"] == "app_replay").unwrap();
+    let mcp = replay["inputSchema"]["properties"]["timeout"]["description"]
+        .as_str()
+        .unwrap();
+    assert!(mcp.contains("saved by `app record`"), "{mcp}");
+}

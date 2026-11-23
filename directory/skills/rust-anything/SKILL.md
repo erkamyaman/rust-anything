@@ -1,6 +1,6 @@
 ---
 name: rust-anything
-description: Port TypeScript/JavaScript, Python, C, Go, Ruby or Java to Rust with the rust-anything CLI or MCP tools, from one hot function up to a whole app rewritten as a pure Rust app - profile, plan, bridge one unit at a time, record the original's behavior, port, diff, bench, shadow and gate; batch hot loops so they run in Rust on all cores. Use when asked to rewrite, port or migrate code or an app to Rust, to plan such a migration, or to make slow code faster with Rust.
+description: Port TypeScript/JavaScript, Python, C, Go, Ruby, Java, Kotlin, PHP, C# and PowerShell to Rust with the rust-anything CLI or MCP tools, from one hot function up to a whole app rewritten as a pure Rust app - profile, plan, bridge one unit at a time, record the original's behavior, port, diff, bench, shadow and gate; batch hot loops so they run in Rust on all cores. Use when asked to rewrite, port or migrate code or an app to Rust, to plan such a migration, or to make slow code faster with Rust.
 ---
 
 # Migration to Rust with rust-anything

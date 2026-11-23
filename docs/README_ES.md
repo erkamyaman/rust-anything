@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · Español · <a href="README_IT.md">Italiano</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · Español · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a></sub></p>
 <p align="center"><sub>Esta traducción la mantiene la comunidad y puede quedarse atrás respecto al <a href="../README.md">README en inglés</a>.</sub></p>
 
 <p align="center"><b>Reescribe tu aplicación en Rust y demuestra que sigue comportándose igual.</b><br>
@@ -18,7 +18,7 @@ y cada pieza se comprueba contra ese registro antes de pasar a la siguiente. No 
   <a href="https://crates.io/crates/rust-anything"><img src="https://img.shields.io/crates/v/rust-anything?color=E2862A&label=crates.io" alt="crates.io version"></a>
   <a href="https://www.npmjs.com/package/rust-anything"><img src="https://img.shields.io/npm/v/rust-anything?color=E2862A&label=npm" alt="npm version"></a>
   <br>
-  <a href="https://coderabbit.link/erkamyaman"><img src="https://img.shields.io/coderabbit/prs/github/erkamyaman/rust-anything?labelColor=171717&color=FF570A&label=Reviewed+by+CodeRabbit" alt="Pull requests reviewed by CodeRabbit"></a>
+  <a href="https://coderabbit.link/er-kam"><img src="https://img.shields.io/coderabbit/prs/github/erkamyaman/rust-anything?labelColor=171717&color=FF570A&label=Reviewed+by+CodeRabbit" alt="Pull requests reviewed by CodeRabbit"></a>
   <a href="https://github.com/rust-unofficial/awesome-rust#development-tools"><img src="https://awesome.re/mentioned-badge.svg" alt="Mentioned in Awesome Rust"></a>
   <a href="https://github.com/AIshihzong/awesome-reverse-engineer-anything"><img src="https://img.shields.io/badge/Featured%20in-Awesome%20REA-f0b429" alt="Featured in Awesome REA"></a>
   <a href="https://github.com/erkamyaman/rust-anything"><img src="https://img.shields.io/github/stars/erkamyaman/rust-anything?style=social" alt="GitHub stars"></a>
@@ -30,7 +30,7 @@ y cada pieza se comprueba contra ese registro antes de pasar a la siguiente. No 
 
 <p align="center"><b><a href="#inicio-rápido">Instalar</a></b> · <a href="https://github.com/erkamyaman/rust-anything/releases">Versiones</a> · <a href="#inicio-rápido">Plugin para Claude Code</a> · <a href="https://registry.modelcontextprotocol.io/v0.1/servers?search=rust-anything">Registro MCP</a> · <a href="real-world.md">Portes reales</a> · <a href="faq.md#faq">Preguntas frecuentes</a><br>
 <sub><a href="#lenguajes">Lenguajes</a> · <a href="how-it-works.md#how-it-works">Cómo funciona</a> · <a href="whole-apps.md#port-a-whole-app">Aplicaciones completas</a> · <a href="#patrocinadores">Patrocinadores</a> · <a href="../LICENSE">MIT</a></sub><br>
-Hecho en Türkiye 🇹🇷 por <a href="https://github.com/erkamyaman">erKam Yaman</a> · <a href="https://github.com/sponsors/erkamyaman">❤️ Patrocíname</a> · Con el patrocinio de <a href="https://coderabbit.link/erkamyaman"><img src="assets/brands/coderabbit.png" width="22" height="22" align="absmiddle" alt=""> <b>CodeRabbit</b></a></p>
+Hecho en Türkiye 🇹🇷 por <a href="https://github.com/erkamyaman">erKam Yaman</a> · <a href="https://github.com/sponsors/erkamyaman">❤️ Patrocíname</a> · Con el patrocinio de <a href="https://coderabbit.link/er-kam"><img src="assets/brands/coderabbit.png" width="22" height="22" align="absmiddle" alt=""> <b>CodeRabbit</b></a></p>
 
 <p align="center">Nuevo en 2.0: <a href="real-world.md#prettier">Prettier, portado a Rust</a>. 19 veces más rápido · 15.861 de 17.224 ejecuciones registradas enteramente en Rust · cada ejecución idéntica byte a byte</p>
 

@@ -20,9 +20,12 @@ pub struct ShadowOutcome {
 }
 
 pub fn shadow(crate_dir: &Path, out: Option<&Path>) -> Result<ShadowOutcome> {
-    let crate_dir = crate_dir
-        .canonical()
-        .with_context(|| format!("resolving {}", crate_dir.display()))?;
+    let crate_dir = crate_dir.canonical().with_context(|| {
+        format!(
+            "resolving {} (run `rust-anything bridge` first)",
+            crate_dir.display()
+        )
+    })?;
     let manifest = Manifest::load(&crate_dir)?;
     if manifest.language == crate::lang::Lang::Python {
         return shadow_python(&crate_dir, &manifest, out);

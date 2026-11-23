@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use serde::Serialize;
 
 use crate::lang::Lang;
@@ -242,6 +242,12 @@ fn compiled_hint() -> &'static str {
 }
 
 pub fn analyze_lang(root: &Path, lang: Lang) -> Result<Report> {
+    if !root
+        .try_exists()
+        .with_context(|| format!("reading {}", root.display()))?
+    {
+        bail!("no folder {}", root.display());
+    }
     if root.is_file() {
         let ext = root
             .extension()
