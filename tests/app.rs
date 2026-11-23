@@ -995,3 +995,73 @@ fn lift_strips_bridge_bindings_in_every_language() {
     }
     std::fs::remove_dir_all(&base).unwrap();
 }
+
+fn one_off(name: &str, files: &[(&str, &str)]) -> PathBuf {
+    let repo = std::env::temp_dir().join(format!(
+        "rust-anything-app-test-{name}-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(&repo).unwrap();
+    for (path, text) in files {
+        std::fs::write(repo.join(path), text).unwrap();
+    }
+    repo
+}
+
+#[test]
+fn app_record_prints_one_case_in_the_singular() {
+    if !common::have("node") {
+        return;
+    }
+    let repo = one_off(
+        "one-case",
+        &[
+            ("up.mjs", "console.log(process.argv[2].toUpperCase())\n"),
+            ("inputs.jsonl", "{\"args\": [\"hi\"]}\n"),
+        ],
+    );
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-anything"))
+        .args(["app", "record", "."])
+        .args([
+            "--no-traps",
+            "--inputs",
+            "inputs.jsonl",
+            "--",
+            "node",
+            "up.mjs",
+        ])
+        .current_dir(&repo)
+        .output()
+        .unwrap();
+    std::fs::remove_dir_all(&repo).unwrap();
+    assert!(out.status.success(), "{out:?}");
+    let printed = String::from_utf8_lossy(&out.stdout);
+    assert!(printed.starts_with("Recorded 1 case in "), "{printed}");
+}
+
+#[test]
+fn a_library_front_door_prints_one_export_in_the_singular() {
+    let repo = one_off(
+        "one-export",
+        &[
+            (
+                "package.json",
+                "{\"name\": \"one\", \"type\": \"module\"}\n",
+            ),
+            ("one.ts", "export function one(): number {\n  return 1\n}\n"),
+        ],
+    );
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-anything"))
+        .args(["app", "front-door", ".", "--library", "--no-check"])
+        .current_dir(&repo)
+        .output()
+        .unwrap();
+    std::fs::remove_dir_all(&repo).unwrap();
+    assert!(out.status.success(), "{out:?}");
+    let printed = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        printed.contains("public API: one.ts (1 export)\n"),
+        "{printed}"
+    );
+}

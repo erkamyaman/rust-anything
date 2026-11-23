@@ -406,3 +406,40 @@ fn record_reports_lines_of_the_original_no_case_reached() {
     );
     assert!(printed.contains("sign.ts: 3-4"), "{printed}");
 }
+
+#[test]
+fn record_prints_one_case_in_the_singular() {
+    if !common::have("node") {
+        return;
+    }
+    let root = project(
+        "one-case",
+        &[
+            (
+                "package.json",
+                "{\"name\": \"one\", \"type\": \"module\"}\n",
+            ),
+            ("one.ts", "export function one(): number {\n  return 1\n}\n"),
+        ],
+    );
+    let cli = env!("CARGO_BIN_EXE_rust-anything");
+    let crate_dir = root.join("port");
+    let run = |args: &[&std::ffi::OsStr]| {
+        let out = Command::new(cli).args(args).output().unwrap();
+        assert!(out.status.success(), "{out:?}");
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+    run(&[
+        "bridge".as_ref(),
+        root.as_os_str(),
+        "one.ts".as_ref(),
+        "--out".as_ref(),
+        crate_dir.as_os_str(),
+    ]);
+    let printed = run(&["record".as_ref(), crate_dir.as_os_str()]);
+    std::fs::remove_dir_all(&root).unwrap();
+    assert!(
+        printed.starts_with("Recorded 1 case (0 threw)"),
+        "{printed}"
+    );
+}
