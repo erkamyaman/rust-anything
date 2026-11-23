@@ -1333,4 +1333,48 @@ mod tests {
         assert_eq!(old.status, Status::Outdated);
         assert!(old.detail.contains("needs 8.0+"));
     }
+    #[test]
+    fn install_md_names_the_runtime_minimums_doctor_checks() {
+        // docs/install.md lists the runtimes `record`, `diff` and `bench` run the original in; it
+        // must not promise an older version than `doctor` accepts, or leave a checked one out.
+        let doc = include_str!("../docs/install.md")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        let named = [
+            ("node", "Node"),
+            ("python3", "Python"),
+            ("go", "Go"),
+            ("ruby", "Ruby"),
+            ("javac", "JDK"),
+            ("php", "PHP"),
+            ("pwsh", "PowerShell"),
+        ];
+        for r in RUNTIMES.iter().filter(|r| r.minimum.is_some()) {
+            assert!(
+                matches!(r.name, "cargo" | "java") || named.iter().any(|(n, _)| *n == r.name),
+                "add {} to this list and to docs/install.md",
+                r.name
+            );
+        }
+        for (name, label) in named {
+            let Version(major, minor, _) = minimum(name).unwrap();
+            let version = if minor == 0 {
+                major.to_string()
+            } else {
+                format!("{major}.{minor}")
+            };
+            let text = format!("{label} {version}+");
+            assert!(
+                doc.contains(&text),
+                "docs/install.md should say `{text}`, as doctor does"
+            );
+        }
+        for runtime in ["`kotlinc`", ".NET SDK"] {
+            assert!(
+                doc.contains(runtime),
+                "docs/install.md should name {runtime}"
+            );
+        }
+    }
 }
