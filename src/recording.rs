@@ -494,4 +494,14 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
         assert!(format!("{err:#}").contains("reason"), "{err:#}");
     }
+
+    #[test]
+    fn spans_collapse_runs_and_keep_gaps_apart() {
+        assert_eq!(spans(std::iter::empty()), "");
+        assert_eq!(spans([4].into_iter()), "4");
+        assert_eq!(spans([4, 5].into_iter()), "4-5");
+        assert_eq!(spans([1, 2, 3, 4].into_iter()), "1-4");
+        assert_eq!(spans([1, 3, 5].into_iter()), "1, 3, 5");
+        assert_eq!(spans([1, 2, 3, 5, 7, 8].into_iter()), "1-3, 5, 7-8");
+    }
 }
