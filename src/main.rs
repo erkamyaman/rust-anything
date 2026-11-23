@@ -568,7 +568,8 @@ enum AppCmd {
         /// the original when omitted.
         #[arg(long)]
         build: Option<String>,
-        /// Seconds before a run is killed.
+        /// Seconds before a run is killed (default: the one saved by `app record`, 30 seconds
+        /// unless it was changed).
         #[arg(long)]
         timeout: Option<u64>,
         /// Servers: the port the build always listens on; otherwise it gets a free one through

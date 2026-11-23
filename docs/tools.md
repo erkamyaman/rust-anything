@@ -303,7 +303,7 @@ Runs the original's code or commands.
 | `repo` | string | yes | Repository root. |
 | `build` | string |  | Command line of the build to test; the original when omitted. |
 | `port` | integer |  | Servers: the port the build always listens on; otherwise it gets a free one through PORT and {port}. |
-| `timeout` | integer |  | Seconds before a run is killed (default 30). |
+| `timeout` | integer |  | Seconds before a run is killed (default: the one saved by `app record`, 30 seconds unless it was changed). |
 | `case` | string |  | Replay only this case, by the name the report gives it (a library: only this unit): the fast loop for fixing one mismatch. |
 
 ## Scaffold Rust front door

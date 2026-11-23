@@ -613,7 +613,7 @@ fn tool_schemas() -> Value {
                 "repo": { "type": "string", "description": "Repository root." },
                 "build": { "type": "string", "description": "Command line of the build to test; the original when omitted." },
                 "port": { "type": "integer", "description": "Servers: the port the build always listens on; otherwise it gets a free one through PORT and {port}." },
-                "timeout": { "type": "integer", "description": "Seconds before a run is killed (default 30)." },
+                "timeout": { "type": "integer", "description": "Seconds before a run is killed (default: the one saved by `app record`, 30 seconds unless it was changed)." },
                 "case": { "type": "string", "description": "Replay only this case, by the name the report gives it (a library: only this unit): the fast loop for fixing one mismatch." },
             }, "required": ["repo"] },
         },
