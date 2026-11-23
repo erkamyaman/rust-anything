@@ -261,11 +261,14 @@ fn render(out: &mut String, r: &Report, title: &str) -> std::fmt::Result {
         writeln!(out)?;
     }
 
-    writeln!(out, "## Risk guide\n")?;
     let mut seen = std::collections::BTreeSet::new();
     for u in &r.units {
         seen.extend(u.risks.iter().map(|r| r.risk));
     }
+    if seen.is_empty() {
+        return Ok(());
+    }
+    writeln!(out, "## Risk guide\n")?;
     for risk in seen {
         writeln!(
             out,

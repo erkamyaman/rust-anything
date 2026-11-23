@@ -72,3 +72,36 @@ fn a_one_line_unit_prints_one_line_not_one_lines() {
     assert!(!md.contains("1 lines"), "{md}");
     let _ = std::fs::remove_dir_all(&root);
 }
+
+#[test]
+fn the_risk_guide_is_left_out_when_no_unit_has_a_risk() {
+    let root = std::env::temp_dir().join(format!("ra-report-norisk-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    std::fs::write(
+        root.join("package.json"),
+        "{\"name\":\"tiny\",\"version\":\"1.0.0\"}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("src/yes.ts"),
+        "export function yes(): boolean { return true }\n",
+    )
+    .unwrap();
+    let report = analyze(&root).unwrap();
+    assert!(report.units.iter().all(|u| u.risks.is_empty()));
+    let md = report::markdown(&report, "tiny");
+    assert!(!md.contains("## Risk guide"), "{md}");
+
+    // A unit with a risk still gets the guide, with that risk under it.
+    std::fs::write(
+        root.join("src/yes.ts"),
+        "export function read(s: string): unknown { return JSON.parse(s) }\n",
+    )
+    .unwrap();
+    let report = analyze(&root).unwrap();
+    let md = report::markdown(&report, "tiny");
+    let guide = md.split("## Risk guide\n").nth(1).expect(&md);
+    assert!(guide.trim_start().starts_with("- **"), "{md}");
+    let _ = std::fs::remove_dir_all(&root);
+}
