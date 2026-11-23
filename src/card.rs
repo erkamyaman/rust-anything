@@ -175,6 +175,19 @@ fn ns(v: f64) -> String {
     }
 }
 
+/// Only none or all of the cases print as `0.0%` or `100.0%`; a share that rounds to either
+/// reads `<0.1%` or `>99.9%`.
+fn fallback_percent(card: &Card) -> String {
+    let share = format!("{:.1}", 100.0 * card.fallback_rate());
+    if card.fallback_cases > 0 && share == "0.0" {
+        "<0.1%".into()
+    } else if card.fallback_cases < card.cases && share == "100.0" {
+        ">99.9%".into()
+    } else {
+        format!("{share}%")
+    }
+}
+
 fn state(card: &Card) -> &'static str {
     match card.enabled {
         Some(true) => "on",
@@ -190,7 +203,7 @@ pub fn markdown(card: &Card) -> String {
          | Unit | `{}` ({}) |\n\
          | Recorded cases matched | {} / {} |\n\
          | Speedup, call included | {} (geometric mean) |\n\
-         | Fallback to the original | {:.1}% ({} of {} cases) |\n\
+         | Fallback to the original | {} ({} of {} cases) |\n\
          | Switched on | {} |\n\n",
         card.crate_name,
         card.crate_name,
@@ -199,7 +212,7 @@ pub fn markdown(card: &Card) -> String {
         card.matched,
         card.cases,
         times(card.speedup),
-        100.0 * card.fallback_rate(),
+        fallback_percent(card),
         card.fallback_cases,
         card.cases,
         state(card),
@@ -287,7 +300,7 @@ pub fn svg(card: &Card) -> String {
 <text x="648" y="318" font-family="{mono}" font-size="64" font-weight="700" fill="#e8561a">{rust_t}</text>
 <rect x="648" y="360" width="{rust_w:.0}" height="14" rx="7" fill="#e8561a"/>
 <text x="600" y="460" font-size="28" fill="#1a1a1a" text-anchor="middle">{headline}: <tspan font-weight="700" fill="#e8561a">{speed}</tspan></text>
-<text x="600" y="500" font-size="18" fill="#777777" text-anchor="middle">Fallback to the original: {fallback:.1}% of cases · call included · {machine}</text>
+<text x="600" y="500" font-size="18" fill="#777777" text-anchor="middle">Fallback to the original: {fallback} of cases · call included · {machine}</text>
 <text x="600" y="556" font-size="17" fill="#888888" text-anchor="middle">github.com/erkamyaman/rust-anything</text>
 </g>
 </svg>
@@ -323,7 +336,7 @@ pub fn svg(card: &Card) -> String {
             format!("{} slower", times(1.0 / card.speedup.max(1e-9)))
         },
         crab = include_str!("card_crab.svg").trim(),
-        fallback = 100.0 * card.fallback_rate(),
+        fallback = esc(&fallback_percent(card)),
         machine = esc(&card.machine),
     )
 }
@@ -399,6 +412,28 @@ mod tests {
             md.contains("| `dedupe` | 412 | 9.1 ms | 290.0 µs | 31x |"),
             "{md}"
         );
+    }
+
+    #[test]
+    fn a_fallback_rate_never_rounds_to_none_or_all() {
+        let mut c = card();
+        c.cases = 2001;
+        c.fallback_cases = 1;
+        assert!(svg(&c).contains("Fallback to the original: &lt;0.1% of cases"));
+        assert!(markdown(&c).contains("| Fallback to the original | <0.1% (1 of 2001 cases) |"));
+        c.cases = 2000;
+        c.fallback_cases = 1999;
+        assert!(svg(&c).contains("Fallback to the original: &gt;99.9% of cases"));
+        assert!(
+            markdown(&c).contains("| Fallback to the original | >99.9% (1999 of 2000 cases) |")
+        );
+        // None and all still print as they are, and so does a share that rounds to neither.
+        c.fallback_cases = 0;
+        assert!(svg(&c).contains("Fallback to the original: 0.0% of cases"));
+        c.fallback_cases = 2000;
+        assert!(svg(&c).contains("Fallback to the original: 100.0% of cases"));
+        c.fallback_cases = 1;
+        assert!(svg(&c).contains("Fallback to the original: 0.1% of cases"));
     }
 
     #[test]
