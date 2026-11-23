@@ -16,8 +16,18 @@
   its name (`Err("FileNotFoundError: msg")`), not only the twelve the bindings matched before. A
   name that is no `Exception` subclass still gives `ValueError` with the whole message. `diff`
   compares exception classes, so a library with its own error class could not match before;
-  `diff` now keeps the original's packages importable (appended to `sys.path`, not imported), as
-  they are in the app.
+  `diff` now keeps the original's packages importable (put first on `sys.path` as `record` does,
+  not imported), as they are in the app.
+- `bridge` no longer refuses a Java, Kotlin or C# file because of an overloaded method. Every
+  overload of a name is kept in the original (the bindings name each export by its name
+  alone), but the duplicate-name check counted each kept overload, so the unit failed with "`pad`
+  is defined twice ... rename one of them" while `analyze` listed it as ready. An overload set
+  kept in the original is now one name in one file, also when `--keep` names it; other kept
+  functions that share a name still fail the check. C# blocked only the later overloads and
+  offered the first one for porting; it now keeps them all, as Java and Kotlin do, so `analyze`
+  stops counting it as bridgeable, and it tells overloads apart by class: `Json.Parse` and
+  `Xml.Parse` in one file are no longer called overloads (`bridge` still refuses them as one name
+  defined twice). The same overloaded name in two files of one unit is still refused.
 
 ## 3.3.0 (2026-11-22)
 

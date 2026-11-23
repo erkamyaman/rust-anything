@@ -1105,6 +1105,8 @@ pub fn bridge(opts: &Options) -> Result<Outcome> {
     let mut exports = Vec::new();
     let mut classes = Vec::new();
     let mut js_only = Vec::new();
+    // Name and file of each overloaded function already kept, so its other overloads join it.
+    let mut kept_overloads = std::collections::HashSet::new();
     if lang == crate::lang::Lang::C {
         crate::lang::c::use_typedefs(&root);
     }
@@ -1120,7 +1122,14 @@ pub fn bridge(opts: &Options) -> Result<Outcome> {
         if lang != crate::lang::Lang::Ts {
             let (functions, foreign_classes) = crate::lang::exports(lang, file, &text);
             for f in functions {
+                // The overloads of one name (Java, Kotlin, C#) stay in the original together: one
+                // name in one file, not two exports that would replace each other, whether they
+                // stay for being overloaded or because `--keep` names them.
+                let overload = f.blocker.as_deref() == Some(crate::lang::OVERLOADED);
                 match keep_reason(&opts.keep, &f.name).or_else(|| js_only_reason(&f, &[])) {
+                    Some(_)
+                        if overload && !kept_overloads.insert((f.name.clone(), f.file.clone())) => {
+                    }
                     Some(reason) => js_only.push(JsOnly {
                         name: f.name,
                         file: f.file,

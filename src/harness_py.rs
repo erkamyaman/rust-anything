@@ -520,7 +520,7 @@ def diff(cases_path, out_path, package_dir, name, key_order, sources_path=None):
     for source in sources:
         directory = import_root(source)[0]
         if directory not in sys.path:
-            sys.path.append(directory)
+            sys.path.insert(0, directory)
     sort = key_order == "sort"
     summary = {"total": 0, "passed": 0, "failed": 0, "missing": [], "mismatches": []}
     for index, line in enumerate(open(cases_path, encoding="utf-8")):

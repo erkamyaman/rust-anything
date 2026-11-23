@@ -656,7 +656,7 @@ fn collect(
             "Object".into()
         });
         if out.iter().any(|f: &ExportedFn| f.name == name) {
-            blocker = Some("overloaded: one name, several signatures".into());
+            blocker = Some(super::OVERLOADED.into());
         }
         out.push(ExportedFn {
             name,
@@ -788,7 +788,7 @@ pub fn exports(path: &str, source: &str) -> Vec<ExportedFn> {
     }
     for f in &mut out {
         if counts.get(&f.name).copied().unwrap_or(0) > 1 {
-            f.blocker = Some("overloaded: one name, several signatures".into());
+            f.blocker = Some(super::OVERLOADED.into());
         }
     }
     for f in &mut out {

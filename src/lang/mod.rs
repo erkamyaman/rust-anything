@@ -16,6 +16,10 @@ pub mod python;
 pub mod ruby;
 pub mod syntax;
 
+/// Why an export of an overloaded name stays in the original: the bindings name each export by
+/// its name alone, so one name cannot carry several signatures.
+pub const OVERLOADED: &str = "overloaded: one name, several signatures";
+
 #[derive(
     Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, clap::ValueEnum,
 )]

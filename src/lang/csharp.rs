@@ -722,9 +722,6 @@ fn method_export(
         blocker.get_or_insert(reason);
         "unknown".into()
     });
-    if out.iter().any(|f: &ExportedFn| f.name == name) {
-        blocker = Some("overloaded: one name, several signatures".into());
-    }
     out.push(ExportedFn {
         prototype: Some(format!("{qualified}.{name}({})", signature.join(", "))),
         name,
@@ -799,12 +796,52 @@ pub fn exports(path: &str, source: &str) -> Vec<ExportedFn> {
     };
     let mut out = Vec::new();
     collect(tree.root_node(), "", path, source, &mut out);
+    // The Rust side names each export by its name alone: an overload would pick one signature.
+    // Block every overload of a method, not just the later declaration, as Java and Kotlin do.
+    // Methods are told apart by class (the prototype up to `(`), so `Json.Parse` and
+    // `Xml.Parse` are not overloads; `bridge` reports such a clash itself.
+    let method = |f: &ExportedFn| -> String {
+        let prototype = f.prototype.as_deref().unwrap_or(&f.name);
+        prototype.split('(').next().unwrap_or(prototype).to_string()
+    };
+    let mut counts: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+    for f in &out {
+        *counts.entry(method(f)).or_default() += 1;
+    }
+    for f in &mut out {
+        if counts.get(&method(f)).copied().unwrap_or(0) > 1 {
+            f.blocker = Some(super::OVERLOADED.into());
+        }
+    }
     out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_overload_of_a_name_is_blocked() {
+        let src = "namespace Acme;\npublic static class Nums\n{\n\
+                   public static int Add(int a, int b) { return a + b; }\n\
+                   public static double Add(double a, double b) { return a + b; }\n\
+                   public static int One() { return 1; }\n}\n";
+        let fns = exports("src/Nums.cs", src);
+        let blocked: Vec<(&str, bool)> = fns
+            .iter()
+            .map(|f| (f.name.as_str(), f.blocker.is_some()))
+            .collect();
+        assert_eq!(blocked, [("Add", true), ("Add", true), ("One", false)]);
+    }
+
+    #[test]
+    fn methods_of_two_classes_are_not_overloads() {
+        let src = "namespace Acme;\npublic static class Json { public static int Parse(string s) { return 1; } }\n\
+                   public static class Xml { public static int Parse(string s) { return 2; } }\n";
+        let fns = exports("src/Parsers.cs", src);
+        assert_eq!(fns.len(), 2);
+        assert!(fns.iter().all(|f| f.blocker.is_none()), "{fns:?}");
+    }
 
     #[test]
     fn maps_types() {

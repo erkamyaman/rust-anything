@@ -39,6 +39,12 @@ so a unit `bridge` keeps in JS went into `start_here`. Both now call `bridge::ts
 `profile` and `go` made the same mistake per function (a hot callback-taking export was "port
 it"); they call `bridge::ts_functions` and `bridge::js_only_reason` too.
 
+**`bridge` refused a Java unit over an overload it keeps in Java.** The duplicate-name check
+listed every kept overload, so `pad(String)` and `pad(String, int)` were "defined twice".
+The overloads of one name in one file are now one kept entry, also under `--keep`; other
+kept functions that share a name still clash. `tests/overloads.rs` covers Java, Kotlin, C# and
+Ruby.
+
 **A bridge found no functions in a module that exports a list.** `export { a, b as c }` was not
 read. `ts/exports.rs` reads export lists; check `bridge` on a unit written that way.
 
