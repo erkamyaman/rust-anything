@@ -257,8 +257,8 @@ struct ShellWord {
 /// Splits a command into words as the shell does: whitespace, `;`, `&` and `|` separate words
 /// outside quotes, an unquoted `<` or `>` starts a redirect operator of its own, and quotes group
 /// without being part of the text. The body of a here-document is input, so it gives no words.
-/// cmd only quotes with `"`; sh also with `'` and a backslash escape, and skips a comment (`#` at
-/// the start of a word) to the end of the line.
+/// cmd quotes with `"` and escapes with `^`; sh also quotes with `'`, escapes with a backslash, and
+/// skips a comment (`#` at the start of a word) to the end of the line.
 fn shell_words(cmd: &str) -> Vec<ShellWord> {
     shell_words_as(cmd, cfg!(not(windows)))
 }
@@ -271,17 +271,38 @@ fn shell_words_as(cmd: &str, unix: bool) -> Vec<ShellWord> {
     // Here-documents whose bodies start on the next line: the delimiter, and whether it is `<<-`,
     // which strips leading tabs.
     let mut heredocs = Vec::new();
+    // cmd blocks open, `(` at the start of a word, and not yet closed.
+    let mut blocks = 0usize;
     let mut i = 0;
     while let Some(c) = cmd[i..].chars().next() {
         let len = c.len_utf8();
+        // A line continuation (`\` in sh, `^` in cmd, then a newline) joins the lines before the
+        // command is split into words, so it is part of no word and makes none of its own.
+        let escape = if unix { '\\' } else { '^' };
+        if quote.is_none() && c == escape {
+            let rest = &cmd[i + len..];
+            if let Some(newline) = ["\r\n", "\n"].into_iter().find(|n| rest.starts_with(n)) {
+                i += len + newline.len();
+                continue;
+            }
+        }
         let in_op = word.as_ref().is_some_and(|w| w.op);
         let redirect = quote.is_none() && matches!(c, '<' | '>');
-        // sh also groups commands with `(` and `)`; cmd keeps them in a word unless they open or
-        // close a block, which a script name never does.
+        // sh groups commands with `(` and `)`. cmd does with a `(` that starts a word and the `)`
+        // that closes it; elsewhere a parenthesis is part of a name (`my(1).py`).
+        let opens = !unix && quote.is_none() && c == '(' && word.is_none();
+        let closes = !unix && quote.is_none() && c == ')' && blocks > 0;
         let separator = quote.is_none()
             && (c.is_whitespace()
                 || matches!(c, ';' | '&' | '|')
-                || (unix && matches!(c, '(' | ')')));
+                || (unix && matches!(c, '(' | ')'))
+                || opens
+                || closes);
+        if opens {
+            blocks += 1;
+        } else if closes {
+            blocks -= 1;
+        }
         let op_goes_on = redirect || (c == '-' && word.as_ref().is_some_and(|w| w.text == "<<"));
         if separator || (redirect && !in_op) || (in_op && !op_goes_on) {
             finish(&mut words, &mut heredocs, word.take());
@@ -321,13 +342,10 @@ fn shell_words_as(cmd: &str, unix: bool) -> Vec<ShellWord> {
             (Some(_), c) => w.text.push(c),
             (None, '"') => quote = Some('"'),
             (None, '\'') if unix => quote = Some('\''),
-            // sh: a backslash escapes the next character, and a backslash-newline is a line
-            // continuation, part of no word.
-            (None, '\\') if unix => {
+            // A backslash (sh) or caret (cmd) escapes the next character.
+            (None, c) if c == escape => {
                 if let Some(next) = cmd[i + len..].chars().next() {
-                    if next != '\n' {
-                        w.text.push(next);
-                    }
+                    w.text.push(next);
                     i += len + next.len_utf8();
                     w.end = i;
                     continue;
@@ -718,11 +736,25 @@ mod tests {
             shell_words_as(cmd, true)
                 .into_iter()
                 .map(|w| w.text)
-                .filter(|t| !t.is_empty())
                 .collect()
         };
-        // A line continuation is no part of any word.
+        // A line continuation is no part of any word, and makes none of its own.
         assert_eq!(words("python3 \\\nreset.py"), ["python3", "reset.py"]);
+        assert_eq!(words("python3 \\\n  reset.py"), ["python3", "reset.py"]);
+        assert_eq!(words("echo '' x"), ["echo", "", "x"]);
+        let ops: Vec<(String, bool)> = shell_words_as("echo result > \\\n snapshot.sql", true)
+            .into_iter()
+            .map(|w| (w.text, w.op))
+            .collect();
+        assert_eq!(
+            ops,
+            [
+                ("echo".to_string(), false),
+                ("result".to_string(), false),
+                (">".to_string(), true),
+                ("snapshot.sql".to_string(), false)
+            ]
+        );
         assert_eq!(words("python3 re\\\nset.py"), ["python3", "reset.py"]);
         assert_eq!(words("python3 \"re\\\nset.py\""), ["python3", "reset.py"]);
         // Unquoted parentheses group commands; quoted ones are part of a name.
@@ -731,14 +763,26 @@ mod tests {
         // In double quotes a backslash escapes only `$`, `` ` ``, `"`, `\` and a newline.
         assert_eq!(words(r#"echo "a\"b" "c\d""#), ["echo", "a\"b", "c\\d"]);
         assert_eq!(words(r"echo 'a\b'"), ["echo", "a\\b"]);
-        // cmd: no continuations, and parentheses stay in the word.
-        assert_eq!(
-            shell_words_as("(python reset.py)", false)
+    }
+
+    #[test]
+    fn cmd_blocks_and_carets_are_read_as_cmd_reads_them() {
+        let words = |cmd: &str| -> Vec<String> {
+            shell_words_as(cmd, false)
                 .into_iter()
                 .map(|w| w.text)
-                .collect::<Vec<_>>(),
-            ["(python", "reset.py)"]
+                .collect()
+        };
+        // A `(` that starts a word opens a block, and a `)` in a block closes it.
+        assert_eq!(
+            words("if exist app.db (python reset.py)"),
+            ["if", "exist", "app.db", "python", "reset.py"]
         );
+        assert_eq!(words("(python reset.py)"), ["python", "reset.py"]);
+        // Outside a block, and quoted or escaped with `^`, parentheses are part of a name.
+        assert_eq!(words("python my(1).py"), ["python", "my(1).py"]);
+        assert_eq!(words(r#"python "a (1).py""#), ["python", "a (1).py"]);
+        assert_eq!(words("(echo ^(x^))"), ["echo", "(x)"]);
     }
 
     #[test]
