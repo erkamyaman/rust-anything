@@ -398,7 +398,8 @@ fn record_node(opts: &RecordOptions, manifest: &Manifest, cases: &[Value]) -> Re
     std::fs::write(work.join("resolve.mjs"), RESOLVE_JS)?;
     std::fs::write(work.join("register.mjs"), REGISTER_JS)?;
     let register = work.canonical()?.join("register.mjs");
-    let mut node_args = vec![format!("--import={}", file_url(&register))];
+    let mut node_args: Vec<String> = strip_types_args().iter().map(|a| a.to_string()).collect();
+    node_args.push(format!("--import={}", file_url(&register)));
     node_args.extend(opts.node_args.iter().cloned());
     let aliases = alias_env(manifest);
     let resolve_from = opts
@@ -438,6 +439,33 @@ fn record_node(opts: &RecordOptions, manifest: &Manifest, cases: &[Value]) -> Re
         record(true)?;
     }
     Ok(out)
+}
+
+/// The flags Node needs to load `.ts` sources: none from 22.18 and 23.6, which strip types by
+/// default, but `--experimental-strip-types` on 22.6 to 22.17 and 23.0 to 23.5.
+fn strip_types_args() -> &'static [&'static str] {
+    static NEEDED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    let needed = *NEEDED.get_or_init(|| {
+        let mut cmd = Command::new("node");
+        cmd.arg("--version");
+        crate::process::output(&mut cmd, crate::process::QUICK)
+            .ok()
+            .and_then(|out| crate::doctor::parse_version(&String::from_utf8_lossy(&out.stdout)))
+            .is_some_and(needs_strip_types_flag)
+    });
+    if needed {
+        &[
+            "--experimental-strip-types",
+            "--no-warnings=ExperimentalWarning",
+        ]
+    } else {
+        &[]
+    }
+}
+
+fn needs_strip_types_flag(node: crate::doctor::Version) -> bool {
+    let crate::doctor::Version(major, minor, _) = node;
+    (major == 22 && (6..18).contains(&minor)) || (major == 23 && minor < 6)
 }
 
 fn transform_flag() -> Option<&'static str> {
@@ -809,7 +837,8 @@ pub fn bench(opts: &BenchOptions) -> Result<Vec<BenchRow>> {
     let register = work.canonical()?.join("register.mjs");
     let mut cmd = Command::new("node");
     crate::enable::original_only(&mut cmd, &manifest);
-    cmd.args(transform_flag())
+    cmd.args(strip_types_args())
+        .args(transform_flag())
         .arg("--no-warnings")
         .arg(format!("--import={}", file_url(&register)))
         .args(opts.node_args)
@@ -997,7 +1026,8 @@ pub(crate) fn diff_exact(opts: &DiffOptions) -> Result<DiffOutcome> {
         "keep"
     };
     let mut cmd = Command::new("node");
-    cmd.args(opts.node_args)
+    cmd.args(strip_types_args())
+        .args(opts.node_args)
         .arg(&script)
         .args([&module, &cases, &out])
         .arg(flag);
@@ -2235,6 +2265,33 @@ writeFileSync(outPath, JSON.stringify(summary, null, 2))
 mod tests {
     use super::*;
     use crate::ts::exports::{ExportedFn, Param};
+
+    #[test]
+    fn node_gets_the_strip_types_flag_only_where_it_needs_it() {
+        use crate::doctor::Version;
+        for (major, minor, patch) in [(22, 6, 0), (22, 14, 0), (22, 17, 1), (23, 0, 0), (23, 5, 9)]
+        {
+            assert!(
+                needs_strip_types_flag(Version(major, minor, patch)),
+                "{major}.{minor}.{patch}"
+            );
+        }
+        // Before 22.6 the flag does not exist (doctor asks for 22.6); from 22.18 and 23.6 Node
+        // strips types by default.
+        for (major, minor, patch) in [
+            (22, 5, 9),
+            (22, 18, 0),
+            (22, 20, 0),
+            (23, 6, 0),
+            (24, 13, 1),
+            (25, 0, 0),
+        ] {
+            assert!(
+                !needs_strip_types_flag(Version(major, minor, patch)),
+                "{major}.{minor}.{patch}"
+            );
+        }
+    }
 
     #[test]
     fn the_js_codec_keeps_marker_shaped_data_and_typed_arrays() {

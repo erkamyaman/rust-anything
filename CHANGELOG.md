@@ -4,6 +4,9 @@
 
 - `app record` and `app replay` fail with `port <port> is already in use` before spawning a server
   on an occupied port and check whether the child exited before treating the port as ready (#326).
+- `record`, `fuzz`, `diff` and `bench` pass `--experimental-strip-types` to Node 22.6 to 22.17 (and
+  23.0 to 23.5), which only strip TypeScript types with that flag, so TS units no longer fail with
+  `ERR_UNKNOWN_FILE_EXTENSION` on Node versions `doctor` accepts (#340).
 
 ## 4.0.0 (2026-11-24)
 
