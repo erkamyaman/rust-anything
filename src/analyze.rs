@@ -514,8 +514,11 @@ fn build(root: &Path, ws: &Workspace, facts: &[Option<FileFacts>], lang: Lang) -
             let entry = unit.risks.entry(*risk).or_default();
             entry.0 += lines.len();
             for line in lines {
-                if entry.1.len() < SAMPLES_PER_RISK {
-                    entry.1.push(format!("{}:{line}", file.path));
+                let sample = format!("{}:{line}", file.path);
+                // Several hits on one line count separately but share one sample, so the slots
+                // go to distinct locations.
+                if entry.1.len() < SAMPLES_PER_RISK && !entry.1.contains(&sample) {
+                    entry.1.push(sample);
                 }
             }
         }

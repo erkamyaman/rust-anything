@@ -16,6 +16,8 @@ pub enum Shape {
     /// `int` in the type dialect.
     Int,
     Bool,
+    /// `bytes` in the type dialect.
+    Bytes,
     Null,
     Undefined,
     LitStr(String),
@@ -64,6 +66,7 @@ pub fn resolve(name: &str, args: &[Shape], types: &[LocalType]) -> Shape {
             other => other.clone(),
         },
         ("int", []) => Shape::Int,
+        ("pybytes", []) => Shape::Bytes,
         _ => match types.iter().find(|t| t.name == name) {
             Some(t) if t.alias => parse(&t.text),
             // An interface: its body is a type literal (`extends` is not followed).

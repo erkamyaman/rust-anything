@@ -4,6 +4,10 @@
 
 - The workflow skill's description names Kotlin, PHP, C# and PowerShell, so agents also pick it for those
   ports (#280).
+- Python `bytes`, `bytearray` and `memoryview` hints become `Vec<u8>` in the port, and the PyO3
+  bridge takes any of the three and returns `bytes` without going through JSON (#370).
+- `analyze` lists distinct lines as a risk's samples, so several hits on one line no longer fill
+  every slot and hide the next location (#347).
 - `map --write --json` is refused (`--write` cannot be used with `--json`) instead of printing the
   JSON and silently writing nothing (#343).
 

@@ -251,8 +251,8 @@ def enc(v, stack=()):
         return {"$tuple": [enc(x, stack) for x in v]}
     if isinstance(v, (set, frozenset)):
         return {"$set": sorted((enc(x, stack) for x in v), key=json.dumps)}
-    if isinstance(v, (bytes, bytearray)):
-        return {"$bytes": list(v)}
+    if isinstance(v, (bytes, bytearray, memoryview)):
+        return {"$bytes": list(bytes(v))}
     if isinstance(v, dict):
         if all(isinstance(k, str) for k in v):
             return {k: enc(x, stack) for k, x in v.items()}

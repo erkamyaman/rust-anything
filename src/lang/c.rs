@@ -361,12 +361,8 @@ pub fn lookup(header: &str) -> Option<CrateMatch> {
 
 /// A C scalar type: (dialect type, Rust type in the port, Rust type at the C ABI, ctypes name).
 pub fn scalar(c: &str) -> Option<(&'static str, &'static str, &'static str, &'static str)> {
-    let c = c
-        .split_whitespace()
-        .filter(|w| *w != "const")
-        .collect::<Vec<_>>()
-        .join(" ");
-    Some(match c.as_str() {
+    let spellings = spellings(c);
+    Some(match spellings.first()?.as_str() {
         "int" | "signed int" | "signed" => ("int", "i32", "std::ffi::c_int", "c_int"),
         "unsigned" | "unsigned int" => ("int", "u32", "std::ffi::c_uint", "c_uint"),
         "short" | "short int" | "signed short" => ("int", "i16", "std::ffi::c_short", "c_short"),
@@ -392,12 +388,36 @@ pub fn scalar(c: &str) -> Option<(&'static str, &'static str, &'static str, &'st
         "uint64_t" => ("int", "u64", "u64", "c_uint64"),
         "size_t" => ("int", "usize", "usize", "c_size_t"),
         "ssize_t" | "ptrdiff_t" | "intptr_t" => ("int", "isize", "isize", "c_ssize_t"),
+        "uintptr_t" => ("int", "usize", "usize", "c_size_t"),
         "float" => ("number", "f32", "f32", "c_float"),
         "double" => ("number", "f64", "f64", "c_double"),
         "bool" | "_Bool" => ("boolean", "bool", "bool", "c_bool"),
         "void" => ("void", "()", "()", "None"),
-        _ => return None,
+        _ => return spellings[1..].iter().find_map(|spelling| scalar(spelling)),
     })
+}
+
+/// The spellings of one C type worth trying, in order: C allows the integer specifiers in any
+/// order (`long unsigned int`), and `int` is implied (`signed long int` is `signed long`).
+fn spellings(c: &str) -> Vec<String> {
+    let mut words: Vec<&str> = c
+        .split_whitespace()
+        .filter(|w| !QUALIFIERS.contains(w))
+        .collect();
+    // Sign, then size, then the base type: the order the table's own spellings use.
+    let rank = |w: &str| match w {
+        "signed" | "unsigned" => 0,
+        "short" | "long" => 1,
+        "int" | "char" | "double" | "float" | "void" | "_Bool" | "bool" => 2,
+        _ => 3,
+    };
+    words.sort_by_key(|w| rank(w));
+    let sorted = words.join(" ");
+    let mut out = vec![sorted.clone()];
+    if let Some(without_int) = sorted.strip_suffix(" int").filter(|rest| !rest.is_empty()) {
+        out.push(without_int.to_string());
+    }
+    out
 }
 
 /// The C type of a declarator: base type plus pointers (`const char *`), and the name.
@@ -681,13 +701,22 @@ fn struct_type(c_type: &str) -> Option<String> {
     Some(format!("struct:{bare}:{}", fields.join(",")))
 }
 
+/// Type qualifiers that do not change the type: `volatile unsigned char *` is a `char *` buffer.
+const QUALIFIERS: [&str; 3] = ["const", "volatile", "restrict"];
+
+fn without_qualifiers(base: &str) -> String {
+    base.split_whitespace()
+        .filter(|w| !QUALIFIERS.contains(w))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// A declared type with typedefs and enums replaced by their scalar, `const` kept.
 fn resolve_type(c_type: &str) -> String {
     let stars = c_type.matches('*').count();
     let base = c_type.trim_end_matches(['*', ' ']).trim();
     let is_const = base.split_whitespace().any(|w| w == "const");
-    let bare: Vec<&str> = base.split_whitespace().filter(|w| *w != "const").collect();
-    let bare = bare.join(" ");
+    let bare = without_qualifiers(base);
     let resolved = if bare.starts_with("enum ") {
         "int".to_string()
     } else {
@@ -719,12 +748,7 @@ fn pointee(c_type: &str) -> Option<(String, bool)> {
     }
     let base = normalized.trim_end_matches(['*', ' ']).trim();
     let is_const = base.split_whitespace().any(|w| w == "const");
-    let bare = base
-        .split_whitespace()
-        .filter(|w| *w != "const")
-        .collect::<Vec<_>>()
-        .join(" ");
-    Some((bare, is_const))
+    Some((without_qualifiers(base), is_const))
 }
 
 fn is_integer(c_type: &str) -> bool {
@@ -1102,6 +1126,35 @@ pub fn defines_main(source: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_volatile_byte_buffer_is_still_a_buffer() {
+        // `volatile` does not change the type: the parameter is a `char *` buffer, not an out scalar.
+        assert_eq!(
+            pointee("volatile unsigned char *"),
+            Some(("unsigned char".to_string(), false))
+        );
+        assert_eq!(
+            pointee("const volatile char *"),
+            Some(("char".to_string(), true))
+        );
+        assert_eq!(resolve_type("volatile unsigned char *"), "unsigned char*");
+        assert_eq!(scalar("volatile unsigned long"), scalar("unsigned long"));
+    }
+
+    #[test]
+    fn specifiers_may_come_in_any_order_and_int_is_implied() {
+        // C allows `long unsigned int`; the table keeps one spelling of each type.
+        assert_eq!(scalar("long unsigned int"), scalar("unsigned long"));
+        assert_eq!(scalar("unsigned long int"), scalar("unsigned long"));
+        assert_eq!(scalar("signed long int"), scalar("signed long"));
+        assert_eq!(scalar("int unsigned"), scalar("unsigned int"));
+        assert_eq!(scalar("short unsigned int"), scalar("unsigned short"));
+        assert_eq!(scalar("const unsigned long int"), scalar("unsigned long"));
+        // `uintptr_t` is a pointer-sized unsigned integer.
+        assert_eq!(scalar("uintptr_t").map(|t| t.1), Some("usize"));
+        assert_eq!(scalar("uintptr_t").map(|t| t.0), Some("int"));
+    }
 
     #[test]
     fn reads_drop_in_candidates() {
