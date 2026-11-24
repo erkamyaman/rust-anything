@@ -189,6 +189,25 @@ fn a_c_unit_depends_on_what_its_own_header_includes() {
 }
 
 #[test]
+fn a_language_the_folder_lacks_is_an_error_not_an_empty_plan() {
+    use rust_anything::analyze::analyze_lang;
+    use rust_anything::lang::Lang;
+    let mini = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mini");
+    let err = analyze_lang(&mini, Lang::Python).unwrap_err().to_string();
+    assert!(err.contains("no Python source files"), "{err}");
+    assert!(err.contains("TypeScript/JavaScript"), "{err}");
+    assert!(analyze_lang(&mini, Lang::Ts).is_ok());
+
+    // A folder that is empty in its own detected language still gets its (empty) plan.
+    let empty = std::env::temp_dir().join(format!("ra-lang-empty-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&empty);
+    std::fs::create_dir_all(&empty).unwrap();
+    let plan = analyze(&empty);
+    std::fs::remove_dir_all(&empty).unwrap();
+    assert_eq!(plan.unwrap().summary.source_files, 0);
+}
+
+#[test]
 fn json_output_is_versioned() {
     let json = serde_json::to_value(mini()).unwrap();
     assert_eq!(json["schema"], "rust-anything/analyze@1");

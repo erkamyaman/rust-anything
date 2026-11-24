@@ -295,6 +295,18 @@ pub fn analyze_lang(root: &Path, lang: Lang) -> Result<Report> {
         })
         .collect();
     let mut report = build(root, &ws, &facts, lang);
+    // A language the folder does not hold (a typo, or code in a subfolder) would read like a
+    // finished plan with nothing to do.
+    if report.summary.source_files == 0 {
+        let detected = Lang::detect(root);
+        if detected != lang {
+            bail!(
+                "no {} source files found; the code here looks like {}",
+                lang.name(),
+                detected.name()
+            );
+        }
+    }
     check_bridgeable(root, &mut report, lang);
     Ok(report)
 }
