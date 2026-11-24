@@ -322,10 +322,21 @@ fn a_recorded_case_whose_input_times_out_now_is_removed() {
 
 #[test]
 fn a_folder_inside_a_removed_case_s_files_that_a_kept_case_reads_stays() {
+    a_kept_case_reads_inside_two_in("nested-base", "two.in/sub");
+}
+
+#[test]
+fn a_base_spelled_through_the_parent_folder_is_resolved() {
+    a_kept_case_reads_inside_two_in("parent-base", "../app-cases/two.in/sub");
+}
+
+/// `two` is recorded with `sub/x.txt`, a hand-written `mine` reads `sub` through `base`, and
+/// `two` is dropped: its `.in/` must stay for `mine`.
+fn a_kept_case_reads_inside_two_in(tag: &str, base: &str) {
     let Some(python) = common::python() else {
         return;
     };
-    let repo = repo("nested-base");
+    let repo = repo(tag);
     std::fs::write(
         repo.join("cli.py"),
         "import os\nprint(open('x.txt').read() if os.path.exists('x.txt') else 'none')\n",
@@ -344,7 +355,7 @@ fn a_folder_inside_a_removed_case_s_files_that_a_kept_case_reads_stays() {
     // Written by hand, reading a folder inside the files `two` was recorded with.
     std::fs::write(
         dir.join("mine.toml"),
-        two.replace("\"two.in\"", "\"two.in/sub\""),
+        two.replace("\"two.in\"", &format!("{base:?}")),
     )
     .unwrap();
     std::fs::write(dir.join("mine.stdout"), "from two\n").unwrap();

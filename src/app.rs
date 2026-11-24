@@ -1538,8 +1538,12 @@ pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Re
         }
         for ext in CASE_FILES {
             let path = outcome.dir.join(format!("{name}.{ext}"));
-            // A folder a case that stays reads, or that holds one it reads, stays.
-            if read.iter().any(|base| base.starts_with(&path)) {
+            // A folder a case that stays reads, or that holds one it reads, stays. Both are
+            // compared resolved, so `../app-cases/two.in/sub` counts as inside `two.in`.
+            if path
+                .canonicalize()
+                .is_ok_and(|path| read.iter().any(|base| base.starts_with(&path)))
+            {
                 continue;
             }
             if path.is_dir() {
@@ -1565,7 +1569,8 @@ pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Re
     Ok(())
 }
 
-/// The `fs.base` folders that the cases in `dir` other than `going` read.
+/// The `fs.base` folders that the cases in `dir` other than `going` read, resolved (a base that
+/// does not exist reads nothing).
 fn bases_read(dir: &Path, going: &BTreeSet<&str>) -> BTreeSet<PathBuf> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return BTreeSet::new();
@@ -1586,7 +1591,7 @@ fn bases_read(dir: &Path, going: &BTreeSet<&str>) -> BTreeSet<PathBuf> {
             doc.get("fs")
                 .and_then(|f| f.get("base"))
                 .and_then(Item::as_str)
-                .map(|base| dir.join(base))
+                .and_then(|base| dir.join(base).canonicalize().ok())
         })
         .collect()
 }
