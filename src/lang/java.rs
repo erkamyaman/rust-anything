@@ -345,6 +345,18 @@ pub fn lookup(name: &str) -> Option<CrateMatch> {
 /// A Java type in the TS-like dialect, or why the bridge cannot carry it.
 pub fn java_to_ts(t: &str) -> Result<String, String> {
     let t = t.trim();
+    // A wildcard cannot cross the recorder's converter yet: it casts each type argument to
+    // `Class`, so a `WildcardType` throws there. Say which wildcard, instead of calling it a class.
+    if let Some(rest) = t.strip_prefix('?') {
+        let rest = rest.trim();
+        return Err(
+            if rest.starts_with("super") || rest.starts_with("extends") {
+                format!("uses a wildcard `{t}`")
+            } else {
+                "takes or returns `Object`: values of any type".into()
+            },
+        );
+    }
     if let Some(inner) = t.strip_suffix("[]") {
         return java_to_ts(inner).map(|i| format!("{i}[]"));
     }
@@ -499,14 +511,26 @@ pub fn exports(path: &str, source: &str) -> Vec<ExportedFn> {
             if let Some(list) = method.child_by_field_name("parameters") {
                 for p in named_children(list) {
                     let (ty, pname) = match p.kind() {
-                        "formal_parameter" => (
-                            p.child_by_field_name("type")
+                        "formal_parameter" => {
+                            let base = p
+                                .child_by_field_name("type")
                                 .map_or("", |t| text(t, source))
-                                .to_string(),
-                            p.child_by_field_name("name")
-                                .map_or("", |n| text(n, source))
-                                .to_string(),
-                        ),
+                                .to_string();
+                            // `int values[]` is the same type as `int[] values`: tree-sitter keeps
+                            // the brackets in a separate `dimensions` child of the parameter.
+                            let dims = named_children(p)
+                                .iter()
+                                .find(|c| c.kind() == "dimensions")
+                                .map_or(String::new(), |d| {
+                                    text(*d, source).split_whitespace().collect::<String>()
+                                });
+                            (
+                                format!("{base}{dims}"),
+                                p.child_by_field_name("name")
+                                    .map_or("", |n| text(n, source))
+                                    .to_string(),
+                            )
+                        }
                         "spread_parameter" => {
                             blocker.get_or_insert_with(|| "is variadic".into());
                             continue;
@@ -581,6 +605,51 @@ pub fn receiver(f: &ExportedFn) -> (String, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_c_style_array_parameter_keeps_its_dimensions() {
+        // `int values[]` is `int[] values`: tree-sitter keeps the brackets in a `dimensions` child,
+        // which used to be dropped, so the parameter came out as a plain `int`.
+        // The brackets can hold a tab: `int values[\t]` is the same type as `int values[]`.
+        let src = "package acme;\npublic class Stats {\n    public static int sum(int values[]) { return 0; }\n    public static int plain(int[] values) { return 0; }\n    public static int grid(int rows[][]) { return 0; }\n    public static int tabbed(int xs[\t]) { return 0; }\n}\n";
+        let fns = exports("acme/Stats.java", src);
+        let types: Vec<(&str, &str)> = fns
+            .iter()
+            .map(|f| (f.name.as_str(), f.params[0].ts_type.as_str()))
+            .collect();
+        assert_eq!(
+            types,
+            [
+                ("sum", "int[]"),
+                ("plain", "int[]"),
+                ("grid", "int[][]"),
+                ("tabbed", "int[]"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_wildcard_is_named_as_one_and_stays_refused() {
+        // A wildcard is a wildcard, not a class name: the refusal says which one. It stays a refusal
+        // because the recorder's converter casts each type argument to `Class`.
+        for t in ["List<? extends CharSequence>", "List<? extends Number>"] {
+            let reason = java_to_ts(t).unwrap_err();
+            assert!(reason.contains("wildcard"), "{t}: {reason}");
+            assert!(!reason.contains("uses the class"), "{t}: {reason}");
+        }
+        assert_eq!(java_to_ts("List<String>").unwrap(), "string[]");
+        // `? super` writes, and an unbounded `?` is `Object`: both stay refusals that name why.
+        assert!(
+            java_to_ts("List<? super String>")
+                .unwrap_err()
+                .contains("? super String")
+        );
+        assert!(
+            java_to_ts("List<?>")
+                .unwrap_err()
+                .contains("values of any type")
+        );
+    }
 
     #[test]
     fn maps_types() {

@@ -289,6 +289,8 @@ pub enum RType {
     /// A whole number (`int` in the type dialect: Python, Go, Java and C have one; JS does not).
     Int,
     Bool,
+    /// A byte buffer (`bytes` in the type dialect): `Vec<u8>` in the port.
+    Bytes,
     Unit,
     Vec(Box<RType>),
     Opt(Box<RType>),
@@ -351,6 +353,7 @@ impl RType {
             "number" => Self::F64,
             "int" => Self::Int,
             "boolean" => Self::Bool,
+            "pybytes" => Self::Bytes,
             "void" | "undefined" => Self::Unit,
             _ if is_string_literal(ts) => Self::Str,
             _ => Self::Json,
@@ -367,6 +370,7 @@ impl RType {
             Self::F64 => "f64".into(),
             Self::Int => "i64".into(),
             Self::Bool => "bool".into(),
+            Self::Bytes => "Vec<u8>".into(),
             Self::Unit => "()".into(),
             Self::Vec(t) => format!("Vec<{}>", t.rust()),
             Self::Opt(t) => format!("Option<{}>", t.rust()),
