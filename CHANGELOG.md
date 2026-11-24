@@ -4,6 +4,9 @@
 
 - The workflow skill's description names Kotlin, PHP, C# and PowerShell, so agents also pick it for those
   ports (#280).
+- `app record` joins example commands wrapped with a trailing `\` before reading them, so a curl
+  example split over lines becomes its request instead of being dropped, and a wrapped `$ tool`
+  line is no longer recorded with `\` as an argument (#328).
 
 ## 3.4.0 (2026-11-23)
 

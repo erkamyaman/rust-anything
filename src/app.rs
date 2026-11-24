@@ -1248,10 +1248,13 @@ pub(crate) fn scan_examples<T>(repo: &Path, parse: impl Fn(&str, &Path) -> Optio
         };
         let doc_dir = path.parent().unwrap_or(repo);
         let mut fence: Option<String> = None;
+        // A command wrapped with trailing backslashes, joined so far.
+        let mut pending = String::new();
         for raw in text.lines() {
             let line = raw.trim();
-            if markdown {
+            let candidate = if markdown {
                 if line.starts_with("```") || line.starts_with("~~~") {
+                    pending.clear();
                     fence = match fence {
                         Some(_) => None,
                         None => Some(
@@ -1265,23 +1268,42 @@ pub(crate) fn scan_examples<T>(repo: &Path, parse: impl Fn(&str, &Path) -> Optio
                     continue;
                 }
                 let Some(lang) = &fence else { continue };
-                let candidate = match line.strip_prefix("$ ") {
-                    Some(rest) => rest,
-                    None if matches!(lang.as_str(), "sh" | "bash" | "shell" | "zsh") => line,
-                    None => continue,
-                };
-                if let Some(case) = parse(candidate, doc_dir) {
-                    out.push(case);
+                // Continuation lines carry no `$ ` prompt.
+                if !pending.is_empty() {
+                    line
+                } else {
+                    match line.strip_prefix("$ ") {
+                        Some(rest) => rest,
+                        None if matches!(lang.as_str(), "sh" | "bash" | "shell" | "zsh") => line,
+                        None => continue,
+                    }
                 }
+            } else if !pending.is_empty() {
+                line
             } else {
-                let candidate = line.strip_prefix("$ ").unwrap_or(line);
-                if let Some(case) = parse(candidate, doc_dir) {
-                    out.push(case);
-                }
+                line.strip_prefix("$ ").unwrap_or(line)
+            };
+            if let Some(head) = continued(candidate) {
+                pending.push_str(head);
+                pending.push(' ');
+                continue;
+            }
+            pending.push_str(candidate);
+            let command = std::mem::take(&mut pending);
+            if let Some(case) = parse(&command, doc_dir) {
+                out.push(case);
             }
         }
     }
     out
+}
+
+/// The line without its trailing `\` when the shell would join it with the next line. An even
+/// number of trailing backslashes ends in a literal one (`C:\\`), not a continuation.
+fn continued(line: &str) -> Option<&str> {
+    let head = line.strip_suffix('\\')?;
+    let escaped = (head.len() - head.trim_end_matches('\\').len()) % 2 == 1;
+    (!escaped).then_some(head)
 }
 
 fn read_inputs(path: &Path) -> Result<Vec<(Option<String>, Case)>> {
@@ -2843,6 +2865,33 @@ mod tests {
         assert_eq!(cases[2].env["LANG"], "C");
         assert_eq!(cases[3].stdin.as_deref(), Some(&b"hello\n"[..]));
         std::fs::remove_dir_all(&repo).unwrap();
+    }
+
+    #[test]
+    fn examples_continued_with_a_backslash_are_joined() {
+        let repo = temp_dir("continued-examples").unwrap();
+        std::fs::write(
+            repo.join("README.md"),
+            "```console\n$ tool upper \\\n    --loud \\\n    'x y'\n$ tool path C:\\\\\n$ tool count in.txt\n```\n",
+        )
+        .unwrap();
+        std::fs::write(repo.join("demo.sh"), "tool sort \\\n  --reverse\n").unwrap();
+        let names = vec!["tool".to_string()];
+        let args: Vec<Vec<String>> = find_examples(&repo, &names)
+            .iter()
+            .map(|c| c.args.clone())
+            .collect();
+        std::fs::remove_dir_all(&repo).unwrap();
+        // A doubled backslash is a literal one, not a continuation, so `count` stays its own case.
+        assert_eq!(
+            args,
+            [
+                vec!["upper", "--loud", "x y"],
+                vec!["path", "C:\\"],
+                vec!["count", "in.txt"],
+                vec!["sort", "--reverse"],
+            ]
+        );
     }
 
     #[test]

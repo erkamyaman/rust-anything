@@ -1266,6 +1266,27 @@ mod tests {
     }
 
     #[test]
+    fn a_curl_example_wrapped_over_lines_is_one_request() {
+        let repo = std::env::temp_dir().join(format!("ra-curl-wrapped-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&repo);
+        std::fs::create_dir_all(&repo).unwrap();
+        std::fs::write(
+            repo.join("README.md"),
+            "```sh\ncurl -X POST http://localhost:8080/users \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"name\":\"ada\"}'\n```\n",
+        )
+        .unwrap();
+        let reqs = app::scan_examples(&repo, |line, doc_dir| parse_curl(line, &repo, doc_dir));
+        std::fs::remove_dir_all(&repo).unwrap();
+        assert_eq!(reqs.len(), 1, "{reqs:?}");
+        assert_eq!(
+            (reqs[0].method.as_str(), reqs[0].path.as_str()),
+            ("POST", "/users")
+        );
+        assert_eq!(reqs[0].body.as_deref(), Some("{\"name\":\"ada\"}"));
+        assert_eq!(reqs[0].headers["Content-Type"], "application/json");
+    }
+
+    #[test]
     fn curl_data_and_binary_file_inputs_match_curl_file_semantics() {
         let root = app::temp_dir("curl-data").unwrap();
         std::fs::write(root.join("body.txt"), b"one\r\ntwo\0\nthree").unwrap();
