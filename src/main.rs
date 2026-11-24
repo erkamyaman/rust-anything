@@ -314,6 +314,12 @@ enum Cmd {
         /// Crate folder made by `bridge`.
         #[arg(default_value = ".", value_parser = absolute)]
         crate_dir: PathBuf,
+        /// Switch on only these exported functions (repeatable).
+        #[arg(long = "only")]
+        only: Vec<String>,
+        /// Switch on only the functions whose recorded cases all match; leave the rest in the original.
+        #[arg(long, conflicts_with_all = ["only", "force"])]
+        partial: bool,
         /// Switch it on even when recorded cases differ.
         #[arg(long)]
         force: bool,
@@ -1205,27 +1211,41 @@ fn run() -> Result<ExitCode> {
         }
         Cmd::Enable {
             crate_dir,
+            only,
+            partial,
             force,
             json,
         } => {
-            if !force {
+            let diff_opts = harness::DiffOptions {
+                crate_dir: &crate_dir,
+                module: None,
+                ignore_key_order: false,
+                node_args: &[],
+                float_tolerance: None,
+            };
+            let on = if partial || (!only.is_empty() && !force) {
                 harness::build(&crate_dir)?;
-                let d = harness::diff(&harness::DiffOptions {
-                    crate_dir: &crate_dir,
-                    module: None,
-                    ignore_key_order: false,
-                    node_args: &[],
-                    float_tolerance: None,
-                })?;
-                if d.failed > 0 || !d.missing.is_empty() {
-                    anyhow::bail!(
-                        "{}/{} recorded cases match; switch it on once they all do (`rust-anything diff` shows them), or pass --force",
-                        d.passed,
-                        d.total
-                    );
+                let (d, counts) = harness::diff_full_with_counts(&diff_opts)?;
+                let manifest = bridge::Manifest::load(&crate_dir)?;
+                let (selected, skipped) =
+                    rust_anything::enable::select_matching(&manifest, &d, &counts, &only)?;
+                rust_anything::enable::enable_only(&crate_dir, Some(&selected), &skipped)?
+            } else if !only.is_empty() {
+                rust_anything::enable::enable_only(&crate_dir, Some(&only), &[])?
+            } else {
+                if !force {
+                    harness::build(&crate_dir)?;
+                    let d = harness::diff(&diff_opts)?;
+                    if d.failed > 0 || !d.missing.is_empty() {
+                        anyhow::bail!(
+                            "{}/{} recorded cases match; switch it on once they all do (`rust-anything diff` shows them), or pass --partial / --only / --force",
+                            d.passed,
+                            d.total
+                        );
+                    }
                 }
-            }
-            let on = rust_anything::enable::enable(&crate_dir)?;
+                rust_anything::enable::enable(&crate_dir)?
+            };
             if json {
                 say!("{}", serde_json::to_string_pretty(&on)?);
             } else {

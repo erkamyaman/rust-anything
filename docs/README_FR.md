@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · Français · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · Français · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a></sub></p>
 <p align="center"><sub>Cette traduction est maintenue par la communauté et peut être en retard sur le <a href="../README.md">README anglais</a>.</sub></p>
 
 <p align="center"><b>Réécrivez votre application en Rust, et prouvez qu'elle se comporte toujours de la même façon.</b><br>
@@ -239,11 +239,12 @@ Chaque langage sauf C, PHP, C# et PowerShell obtient également des classes de t
 traversent la frontière une seule fois et restent en Rust, et chaque appel s'exécute sur l'ensemble des
 éléments sur tous les cœurs.
 
-Le langage est détecté à partir du dépôt (`go.mod`, `pom.xml`, un `.csproj` ou `.sln`, `pyproject.toml`,
-`Gemfile`, `composer.json`, `package.json`, sinon les fichiers sources les plus courants) ; `--lang`
-permet de le forcer. Les types proviennent des sources : types TS, annotations Python, signatures C, Go,
-Java et C#, balises Ruby YARD, types PHP et phpdoc ; les paramètres non typés utilisés comme des nombres
-sont inférés comme nombres.
+Le langage est détecté à partir du dépôt (`go.mod`, `pom.xml`, `build.gradle`/`build.gradle.kts`, un `.csproj`
+ou `.sln`, `pyproject.toml`, `Gemfile`, `composer.json`, `package.json`, sinon les fichiers sources les plus
+courants) ; un module Gradle avec des sources `.kt` et sans source `.java` est du Kotlin, les modules mixtes
+restent en Java. `--lang` permet de le forcer. Les types proviennent des sources : types TS, annotations
+Python, signatures C, Go, Java, Kotlin et C#, balises Ruby YARD, types PHP et phpdoc ; les paramètres non
+typés utilisés comme des nombres sont inférés comme nombres.
 
 Pour PHP, `analyze` planifie une application PHP (paquets Composer et chargement automatique
 PSR-4, risques tels que la comparaison souple et le débordement d'entiers en flottants, paquets Composer

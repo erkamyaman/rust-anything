@@ -509,8 +509,13 @@ fn tool_schemas() -> Value {
         },
         {
             "name": "enable",
-            "description": "Switch a ported TS/JS or Python unit on: one marked block in each original source file rebinds the unit's functions to the built Rust module, for every caller, with no import changed. RUST_ANYTHING_MODE=old or RUST_ANYTHING_UNIT_<NAME>=original runs the original for one run. Refuses while recorded cases differ unless `force`.",
-            "inputSchema": { "type": "object", "properties": { "crate": crate_dir, "force": { "type": "boolean", "description": "Switch it on even when recorded cases differ." } }, "required": ["crate"] },
+            "description": "Switch a ported TS/JS or Python unit on: one marked block in each original source file rebinds the unit's functions to the built Rust module, for every caller, with no import changed. RUST_ANYTHING_MODE=old or RUST_ANYTHING_UNIT_<NAME>=original runs the original for one run. Refuses while recorded cases differ unless `force`, `partial`, or `only` names functions that match.",
+            "inputSchema": { "type": "object", "properties": {
+                "crate": crate_dir,
+                "only": { "type": "array", "items": { "type": "string" }, "description": "Switch on only these exported functions." },
+                "partial": { "type": "boolean", "description": "Switch on only the functions whose recorded cases all match; leave the rest in the original." },
+                "force": { "type": "boolean", "description": "Switch it on even when recorded cases differ." },
+            }, "required": ["crate"] },
         },
         {
             "name": "disable",
@@ -949,23 +954,43 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         }
         "enable" => {
             let crate_dir = std::path::absolute(path("crate")?)?;
-            if !args["force"].as_bool().unwrap_or(false) {
+            let only = strings("only");
+            let partial = args["partial"].as_bool().unwrap_or(false);
+            let force = args["force"].as_bool().unwrap_or(false);
+            anyhow::ensure!(
+                !(partial && (!only.is_empty() || force)),
+                "`partial` cannot be combined with `only` or `force`"
+            );
+            let diff_opts = harness::DiffOptions {
+                crate_dir: &crate_dir,
+                module: None,
+                ignore_key_order: false,
+                node_args: &[],
+                float_tolerance: None,
+            };
+            let on = if partial || (!only.is_empty() && !force) {
                 harness::build(&crate_dir)?;
-                let d = harness::diff(&harness::DiffOptions {
-                    crate_dir: &crate_dir,
-                    module: None,
-                    ignore_key_order: false,
-                    node_args: &[],
-                    float_tolerance: None,
-                })?;
-                anyhow::ensure!(
-                    d.failed == 0 && d.missing.is_empty(),
-                    "{}/{} recorded cases match; switch it on once they all do, or pass force",
-                    d.passed,
-                    d.total
-                );
-            }
-            serde_json::to_value(crate::enable::enable(&crate_dir)?)?
+                let (d, counts) = harness::diff_full_with_counts(&diff_opts)?;
+                let manifest = bridge::Manifest::load(&crate_dir)?;
+                let (selected, skipped) =
+                    crate::enable::select_matching(&manifest, &d, &counts, &only)?;
+                crate::enable::enable_only(&crate_dir, Some(&selected), &skipped)?
+            } else if !only.is_empty() {
+                crate::enable::enable_only(&crate_dir, Some(&only), &[])?
+            } else {
+                if !force {
+                    harness::build(&crate_dir)?;
+                    let d = harness::diff(&diff_opts)?;
+                    anyhow::ensure!(
+                        d.failed == 0 && d.missing.is_empty(),
+                        "{}/{} recorded cases match; switch it on once they all do, or pass partial, only, or force",
+                        d.passed,
+                        d.total
+                    );
+                }
+                crate::enable::enable(&crate_dir)?
+            };
+            serde_json::to_value(on)?
         }
         "disable" => serde_json::to_value(crate::enable::disable(&std::path::absolute(path(
             "crate",

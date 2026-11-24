@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- On Windows, `profile` and `go` find the project's own functions in a Node workload: Node's
+  `file:///C:/...` frame URLs kept the slash before the drive letter, so no frame matched the
+  project root and `go` stopped with `no hot function to port`.
 - `app record` and `app replay` fail with `port <port> is already in use` before spawning a server
   on an occupied port and check whether the child exited before treating the port as ready (#326).
 - `app record --db-reset` and `--db-dump` run in the folder a CLI case runs in, as they already did
@@ -11,6 +14,9 @@
   output redirects (`> dump.sql`, also unspaced) stay in the case's folder, and here-document
   bodies and `#` comments are left as written. Quotes, line continuations and `( )` blocks are
   read as sh and cmd read them (#324).
+- `bridge` types Go `uint64` and `uint` as `u64` and `uintptr` as `usize` in `port.rs`, alone or as
+  slice items. They were `i64`, so a result above `i64::MAX` could not go back to Go and failed
+  `diff` (#357).
 
 ## 4.0.0 (2026-11-24)
 

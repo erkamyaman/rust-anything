@@ -140,11 +140,13 @@ Runs the original's code or commands.
 
 Tool `enable` · CLI `rust-anything enable`
 
-Switch a ported TS/JS or Python unit on: one marked block in each original source file rebinds the unit's functions to the built Rust module, for every caller, with no import changed. RUST_ANYTHING_MODE=old or RUST_ANYTHING_UNIT_<NAME>=original runs the original for one run. Refuses while recorded cases differ unless `force`.
+Switch a ported TS/JS or Python unit on: one marked block in each original source file rebinds the unit's functions to the built Rust module, for every caller, with no import changed. RUST_ANYTHING_MODE=old or RUST_ANYTHING_UNIT_<NAME>=original runs the original for one run. Refuses while recorded cases differ unless `force`, `partial`, or `only` names functions that match.
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `crate` | string | yes | Folder of the generated crate (holds rust-anything.json). |
+| `only` | string[] |  | Switch on only these exported functions. |
+| `partial` | boolean |  | Switch on only the functions whose recorded cases all match; leave the rest in the original. |
 | `force` | boolean |  | Switch it on even when recorded cases differ. |
 
 ## Switch a unit off

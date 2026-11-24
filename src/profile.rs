@@ -355,14 +355,9 @@ pub fn profile(root: &Path, command: &[String], lang: Option<Lang>) -> Result<Re
 /// A frame's file: repository-relative, or absolute for user code elsewhere (a workload
 /// script); `None` for the runtime and installed libraries.
 fn relative(root: &Path, file: &str) -> Option<String> {
-    let decoded;
-    let path = if let Some(url_path) = file.strip_prefix("file://") {
-        decoded = percent_encoding::percent_decode_str(url_path).decode_utf8_lossy();
-        decoded.as_ref()
-    } else {
-        file
-    };
-    if !path.starts_with('/') && !path.contains(":\\") {
+    let decoded = crate::walk::file_url_path(file, root);
+    let path = decoded.as_deref().unwrap_or(file);
+    if !path.starts_with('/') && !crate::walk::has_drive(path) && !path.contains(":\\") {
         let rel = path.trim_start_matches("./");
         return (!rel.starts_with(['<', '~']) && !rel.contains(':') && root.join(rel).is_file())
             .then(|| rel.replace('\\', "/")); // node:internal/..., <frozen ...>, ~
@@ -421,9 +416,18 @@ fn goroot() -> Option<&'static str> {
         .as_deref()
 }
 
-/// Whether a frame file is inside the repository (relative).
-fn in_repo(file: &str) -> bool {
-    !file.starts_with('/')
+/// Whether a frame file (a `relative` key) is inside the repository. A key that looks like a
+/// drive path is one only when it names a file under `root`: `relative` keeps `C:/src/a.mjs` for
+/// `/repo/C:/src/a.mjs` on Unix, while an unmatched `C:/Users/...` workload script stays out.
+fn in_repo(root: &Path, file: &str) -> bool {
+    if file.starts_with('/') {
+        return false;
+    }
+    if !crate::walk::has_drive(file) {
+        return true;
+    }
+    let joined = root.join(file);
+    joined.starts_with(root) && joined.is_file()
 }
 
 // ---- node --cpu-prof ------------------------------------------------------------------------
@@ -1574,7 +1578,7 @@ fn report(
     let mut judged: HashMap<String, Vec<(crate::ts::exports::ExportedFn, Option<String>)>> =
         HashMap::new();
     for ((file, _, _), a) in &functions {
-        if in_repo(file)
+        if in_repo(root, file)
             && total_ms > 0.0
             && a.total_ms / total_ms >= 0.01
             && !judged.contains_key(file)
@@ -1598,7 +1602,7 @@ fn report(
     };
     let repo_self: f64 = functions
         .iter()
-        .filter(|(k, _)| in_repo(&k.0))
+        .filter(|(k, _)| in_repo(root, &k.0))
         .map(|(_, a)| a.self_ms)
         .sum();
     let mut calls_in: HashMap<&str, Vec<SpawnCall>> = HashMap::new();
@@ -1631,7 +1635,7 @@ fn report(
     let child_pct = if child_pct >= 1.0 { child_pct } else { 0.0 };
     let mut hot: Vec<Hot> = functions
         .into_iter()
-        .filter(|((file, _, _), a)| in_repo(file) && total_ms > 0.0 && a.total_ms / total_ms >= 0.01)
+        .filter(|((file, _, _), a)| in_repo(root, file) && total_ms > 0.0 && a.total_ms / total_ms >= 0.01)
         .map(|((file, name, line), a)| {
             let unit = unit_of(&file);
             let (export, js_only) = match exports_of(&file, &name, line) {
@@ -2406,7 +2410,69 @@ mod tests {
             relative(root, "/tmp/bench.ts").as_deref(),
             Some("/tmp/bench.ts")
         );
-        assert!(in_repo("src/fuzzy.ts") && !in_repo("/tmp/bench.ts"));
+        assert!(in_repo(root, "src/fuzzy.ts") && !in_repo(root, "/tmp/bench.ts"));
+    }
+
+    #[test]
+    fn windows_file_urls_resolve_against_the_project_root() {
+        // Node on Windows writes `file:///C:/...`; the root is `C:\...` (here `C:/...`, which
+        // splits into the same components on every platform).
+        let root = Path::new("C:/repo");
+        assert_eq!(
+            relative(root, "file:///C:/repo/src/fuzzy.ts").as_deref(),
+            Some("src/fuzzy.ts")
+        );
+        assert_eq!(
+            relative(root, "file:///C:/repo/node_modules/x/index.js"),
+            None
+        );
+        let bench = relative(root, "file:///C:/Users/me/AppData/Local/Temp/bench.mjs");
+        assert_eq!(
+            bench.as_deref(),
+            Some("C:/Users/me/AppData/Local/Temp/bench.mjs")
+        );
+        assert!(
+            in_repo(root, "src/fuzzy.ts")
+                && !in_repo(root, "C:/Users/me/AppData/Local/Temp/bench.mjs")
+        );
+        assert_eq!(
+            crate::walk::file_url_path("file:///C:/My%20Repo/a.ts", root).as_deref(),
+            Some("C:/My Repo/a.ts")
+        );
+        assert_eq!(
+            crate::walk::file_url_path("file:///repo/a.ts", root).as_deref(),
+            Some("/repo/a.ts")
+        );
+    }
+
+    #[test]
+    fn a_unix_root_that_looks_like_a_drive_path_keeps_its_leading_slash() {
+        let root = Path::new("/C:/repo");
+        assert_eq!(
+            relative(root, "file:///C:/repo/src/a.ts").as_deref(),
+            Some("src/a.ts")
+        );
+        assert_eq!(
+            crate::walk::file_url_path("file:///C:/repo/src/a.ts", root).as_deref(),
+            Some("/C:/repo/src/a.ts")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_drive_looking_folder_inside_a_unix_root_stays_in_the_repository() {
+        let root = std::env::temp_dir().join(format!("ra-profile-drive-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("C:/src")).unwrap();
+        std::fs::write(root.join("C:/src/hot.mjs"), "").unwrap();
+        let url = format!("file://{}/C:/src/hot.mjs", root.display());
+        let key = relative(&root, &url);
+        assert_eq!(key.as_deref(), Some("C:/src/hot.mjs"));
+        assert!(in_repo(&root, &key.unwrap()));
+        // A Windows drive path that does not match the root stays out of the repository.
+        let other = relative(&root, "file:///C:/Users/me/bench.mjs");
+        assert_eq!(other.as_deref(), Some("/C:/Users/me/bench.mjs"));
+        assert!(!in_repo(&root, "C:/Users/me/bench.mjs"));
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]
