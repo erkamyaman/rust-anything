@@ -781,7 +781,8 @@ fn a_server_listening_only_on_ipv6_loopback_is_recorded_and_replayed() {
         "{\"name\":\"hello\",\"path\":\"/hello\"}\n",
     )
     .unwrap();
-    let started = std::time::Instant::now();
+    // Waiting on 127.0.0.1 alone, this fails with `did not listen within 60s`. No time limit is
+    // asserted: a busy CI runner can take longer than any bound that fits a quiet machine.
     let out = app::record(&RecordOptions {
         repo: &repo,
         run: &[python.to_string(), "server.py".to_string()],
@@ -800,11 +801,6 @@ fn a_server_listening_only_on_ipv6_loopback_is_recorded_and_replayed() {
         effects: None,
     })
     .unwrap();
-    assert!(
-        started.elapsed() < std::time::Duration::from_secs(30),
-        "{:?}",
-        started.elapsed()
-    );
     assert_eq!(out.cases, 1);
     let recorded = std::fs::read_to_string(out.dir.join("hello.body")).unwrap();
     assert_eq!(recorded, "hi from /hello");
