@@ -1,0 +1,277 @@
+{
+  "meta": {
+    "title": "کل برنامه‌تان را تکه‌تکه به Rust بازنویسی کنید",
+    "description": "برنامه‌تان را تکه‌تکه به Rust بازنویسی کنید و در هر گام با نسخه‌ی اصلی بسنجید. ابزارهای خط فرمان، سرورها و کتابخانه‌ها در TypeScript/JavaScript، Python، C، Go، Ruby، Java، Kotlin، PHP، PowerShell و C#."
+  },
+  "ui": {
+    "docs": "مستندات",
+    "languages": "زبان‌ها",
+    "realWorld": "پورت‌های واقعی",
+    "searchButton": "جستجو در مستندات…",
+    "searchDocs": "جستجو در مستندات",
+    "searchPlaceholder": "جستجو: record، known-diffs، front door…",
+    "searchQuery": "عبارت جستجو",
+    "searchEmpty": "برای جستجو در همه‌ی صفحه‌های مستندات تایپ کنید.",
+    "searchNone": "صفحه‌ی مطابقی پیدا نشد.",
+    "openMenu": "باز کردن منو",
+    "closeMenu": "بستن منو",
+    "menu": "منو",
+    "language": "زبان",
+    "home": "صفحه‌ی اصلی rust-anything",
+    "github": "rust-anything در GitHub",
+    "onThisPage": "در این صفحه",
+    "editPage": "ویرایش این صفحه در GitHub",
+    "previous": "قبلی",
+    "next": "بعدی",
+    "pager": "صفحه‌ی قبلی و بعدی",
+    "breadcrumb": "مسیر صفحه",
+    "themeDark": "تیره",
+    "themeLight": "روشن",
+    "themeSystem": "سیستم",
+    "theme": "پوسته",
+    "themeSwitch": "تغییر به",
+    "copy": "کپی",
+    "copied": "کپی شد",
+    "copyInstall": "کپی دستورهای نصب",
+    "installWith": "نصب با",
+    "skip": "رفتن به محتوا",
+    "legal": "با مجوز MIT. پورت‌ها و کدی که در مخزن شما تولید می‌شود متعلق به شماست. پروژه‌ای مستقل که به Rust Project یا Rust Foundation وابسته نیست و از سوی آن‌ها تأیید نشده است. «Rust» علامت تجاری Rust Foundation است.",
+    "quickStart": "شروع سریع",
+    "cliReference": "مرجع CLI",
+    "issues": "مشکل‌ها",
+    "status": "وضعیت",
+    "sponsor": "حمایت مالی",
+    "madeBy": "ساخته‌ی"
+  },
+  "nav": {
+    "groups": {
+      "introduction": "مقدمه",
+      "concepts": "مفاهیم",
+      "languages": "زبان‌ها",
+      "wholeApps": "برنامه‌های کامل",
+      "reference": "مرجع",
+      "realWorld": "پورت‌های واقعی",
+      "project": "پروژه"
+    },
+    "items": {
+      "/docs/introduction/what-is-rust-anything": "rust-anything چیست",
+      "/docs/introduction/quick-start": "شروع سریع",
+      "/docs/introduction/install": "نصب",
+      "/docs/introduction/agents": "راه‌اندازی عامل",
+      "/docs/introduction/doctor": "Doctor",
+      "/docs/concepts/the-loop": "چرخه‌ی کار",
+      "/docs/concepts/analyze": "پروفایل و تحلیل",
+      "/docs/concepts/bridge": "Bridge",
+      "/docs/concepts/record": "Record",
+      "/docs/concepts/port": "Port",
+      "/docs/concepts/diff": "Diff و تفاوت‌های شناخته‌شده",
+      "/docs/concepts/bench": "Bench",
+      "/docs/concepts/shadow": "Shadow",
+      "/docs/concepts/gate": "Gate",
+      "/docs/concepts/coverage": "پوشش",
+      "/docs/concepts/batches": "دسته‌ها و مسیرهای داغ",
+      "/docs/concepts/float-tolerance": "تحمل اعداد اعشاری",
+      "/docs/concepts/limits": "آنچه تشخیص نمی‌دهد",
+      "/docs/languages/overview": "نمای کلی",
+      "/docs/languages/typescript": "TypeScript/JavaScript",
+      "/docs/languages/python": "Python",
+      "/docs/languages/c": "C",
+      "/docs/languages/go": "Go",
+      "/docs/languages/ruby": "Ruby",
+      "/docs/languages/java": "Java",
+      "/docs/languages/php": "PHP",
+      "/docs/languages/csharp": "C#",
+      "/docs/whole-apps/overview": "پورت یک برنامه‌ی کامل",
+      "/docs/whole-apps/record-replay": "ضبط و بازپخش",
+      "/docs/whole-apps/front-door": "Front Door و Wire",
+      "/docs/whole-apps/lift": "Lift",
+      "/docs/whole-apps/servers": "سرورها",
+      "/docs/whole-apps/libraries": "کتابخانه‌ها",
+      "/docs/reference/cli": "CLI",
+      "/docs/reference/mcp-tools": "ابزارهای MCP",
+      "/docs/real-world/overview": "نمای کلی",
+      "/docs/real-world/json-server": "json-server",
+      "/docs/real-world/fuse-js": "Fuse.js",
+      "/docs/real-world/vercel-ms": "vercel/ms",
+      "/docs/real-world/x18n": "x18n",
+      "/docs/real-world/six-languages": "شش زبان",
+      "/docs/real-world/fixtures": "فیکسچرها و اجراهای ایستا",
+      "/docs/project/status": "وضعیت",
+      "/docs/project/faq": "پرسش‌های متداول",
+      "/docs/project/contributing": "مشارکت"
+    }
+  },
+  "hero": {
+    "title1": "برنامه‌تان را به Rust بازنویسی کنید.",
+    "title2": "ثابت کنید که همان رفتار را دارد.",
+    "sub": "rust-anything آنچه کدتان انجام می‌دهد را ضبط می‌کند و سپس هر مورد ضبط‌شده را روی پورت Rust بازپخش می‌کند. عامل شما Rust را می‌نویسد. تا زمانی که خروجی‌ها یکی نشوند، چیزی ارسال نمی‌شود.",
+    "cta": "خواندن شروع سریع",
+    "source": "کد منبع در GitHub",
+    "sourceLanguage": "زبان مبدأ",
+    "bridge": "Bridge",
+    "verified": "پورت {lang} تأییدشده، {what}: {count} مورد ضبط‌شده یکسان است",
+    "wholeApp": "برنامه‌های {lang} همین امروز از Front Door با نسخه‌ی اصلی ضبط و بازپخش می‌شوند."
+  },
+  "home": {
+    "stats": [
+      {
+        "v": "32",
+        "unit": "x",
+        "k": "جستجوی Fuse.js در هر درخواست روی 50,000 رشته، Apple M4"
+      },
+      {
+        "v": "3.5",
+        "unit": "MB",
+        "k": "حافظه‌ی json-server در حالت بیکار پس از lift، در برابر 74 MB در Node"
+      },
+      {
+        "v": "514/514",
+        "unit": "",
+        "k": "موردهای HTTP برای json-server روی یک باینری Rust خالص یکسان است"
+      },
+      {
+        "v": "10",
+        "unit": "",
+        "k": "زبان: هشت زبان با پورت تأییدشده، Kotlin و PowerShell به‌صورت سرتاسری آزمایش شده‌اند"
+      }
+    ],
+    "installTitle": "نصب",
+    "installDesc": "CLI را نصب کنید و سپس سرور MCP و مهارت گردش‌کار را در Claude Code، Codex، Cursor و Gemini CLI ثبت کنید.",
+    "installNote": "باینری‌های از پیش ساخته برای macOS، Linux و Windows در هر [انتشار GitHub]({releases}) هست.",
+    "agentPrompt": "rust-anything را نصب کن: `cargo install rust-anything` را اجرا کن، سپس `rust-anything setup`.",
+    "agentRestart": "بگو چه وقت باید دوباره راه‌اندازی‌ات کنم.",
+    "loopTitle": "یک پورت چگونه ساخته می‌شود",
+    "loopDesc": "نسخه‌ی اصلی مرجع می‌ماند. rust-anything کد را ترجمه نمی‌کند: چیزی را فراهم می‌کند که عامل نمی‌تواند حدس بزند و دروازه‌ای که می‌گوید پورت چه زمانی تمام است.",
+    "steps": [
+      {
+        "title": "ضبط",
+        "text": "`record` نسخه‌ی اصلی را با موردهای مرزی تولیدشده، تله‌های معنایی و ورودی‌های خودتان اجرا می‌کند و آنچه برمی‌گرداند یا پرتاب می‌کند را ذخیره می‌کند."
+      },
+      {
+        "title": "پورت",
+        "text": "`bridge` کرِیت Rust و یک پوشش می‌سازد تا فراخوان‌ها API اصلی را نگه دارند. شما یا عاملتان Rust را می‌نویسید."
+      },
+      {
+        "title": "بررسی",
+        "text": "`diff` هر مورد ضبط‌شده را روی Rust بازپخش می‌کند و تا وقتی همه یکسان نشوند و `gate` قبول نشود، چیزی ارسال نمی‌شود."
+      },
+      {
+        "title": "Lift",
+        "text": "وقتی بازپخش بدون بازگشت به نسخه‌ی اصلی قبول شود و هر واحد از `gate` بگذرد، `app lift` آن را به یک برنامه‌ی Rust خالص تبدیل می‌کند. نسخه‌ی اصلی هرگز دست نمی‌خورد."
+      }
+    ],
+    "vizSameApi": "همان API",
+    "vizCheck": "موردهای Fuse.js یکسان است، اولین بیلد",
+    "vizGate": "gate قبول شد",
+    "vizLift": "بازگشت به نسخه‌ی اصلی در json-server، 514/514 قبول",
+    "vizLiftSteps": [
+      "Front Door",
+      "خواندن‌ها متصل شد",
+      "هر مسیر"
+    ],
+    "demoTitle": "آنچه ضبط پیدا می‌کند",
+    "demoDesc": "نخستین پورت `fuzzyScore` از x18n که با `char` در Rust اندیس‌گذاری شده بود. آزمون‌های ساده را گذراند و در `diff` شکست خورد.",
+    "demoComments": {
+      "profile": "# زمان کجا می‌رود و چه کسی آن را فرا می‌خواند",
+      "write": "# src/port.rs را بنویسید (یا به عامل بسپارید)، سپس:",
+      "first": "# diff، پورت اول",
+      "matchLine": "198/200 مورد یکسان است",
+      "why": "# indexOf در JS واحدهای کد UTF-16 را می‌شمارد،\n# پس یک ایموجی دو جایگاه اشغال می‌کند.",
+      "fixed": "# با کمک‌های utf16 تولیدشده:\n# 2000/2000 مورد، و gate قبول می‌شود"
+    },
+    "portsTitle": "اندازه‌گیری‌شده روی پروژه‌های واقعی",
+    "portsDesc": "پشت هر عدد یک بنچمارک هست که ابتدا یکسان بودن نتیجه‌ها را بررسی می‌کند. موردهای کند هم همین‌جا آمده‌اند: فراخوانی Rust برای هر تابع کوچک معمولاً از یک JIT کندتر است.",
+    "ports": [
+      {
+        "href": "/docs/real-world/json-server",
+        "kind": "json-server · یک سرور کامل Node",
+        "big": "514/514",
+        "text": "موردهای HTTP پس از `app lift` روی یک باینری Rust خالص (5.3 MB) یکسان است، با 0% بازگشت به نسخه‌ی اصلی. شش واحد از `gate` گذشته‌اند.",
+        "rows": [
+          {
+            "k": "حافظه‌ی بیکار، پایگاه داده‌ی فیکسچر",
+            "v": "74 MB → 3.5 MB"
+          },
+          {
+            "k": "از شروع تا اولین پاسخ",
+            "v": "85 / 79 ms → 9.9 / 7.9 ms"
+          },
+          {
+            "k": "کل فهرست 10,000 پست، 1 اتصال",
+            "v": "1.2x",
+            "slow": true
+          }
+        ]
+      },
+      {
+        "href": "/docs/real-world/fuse-js",
+        "kind": "Fuse.js · جستجو در فهرست رشته‌ها",
+        "big": "32x",
+        "text": "سریع‌تر در هر درخواست روی 50,000 رشته (91.2 ms → 2.8 ms، Apple M4). 3,414/3,414 مورد ضبط‌شده یکسان است؛ نتیجه‌ها در 360 جستجو بایت‌به‌بایت با Fuse برابر است.",
+        "rows": [
+          {
+            "k": "10,000 رشته",
+            "v": "27 تا 30x"
+          },
+          {
+            "k": "1,000 رشته",
+            "v": "18x"
+          },
+          {
+            "k": "50,000 رشته، یک هسته",
+            "v": "5.3x",
+            "slow": true
+          }
+        ]
+      },
+      {
+        "href": "/docs/real-world/vercel-ms",
+        "kind": "vercel/ms · یک کتابخانه‌ی کوچک",
+        "big": "975/975",
+        "text": "موردها یکسان است که 340 مورد از آن‌ها از آزمون‌های Jest خود پروژه گرفته شده. پورتی خوب و هدفی بد برای سرعت، و `bench` همین را می‌گوید.",
+        "rows": [
+          {
+            "k": "در هر فراخوانی، روی موردهای ضبط‌شده",
+            "v": "0.56x",
+            "slow": true
+          },
+          {
+            "k": "دسته‌ای، parse x100,000",
+            "v": "18x"
+          },
+          {
+            "k": "دسته‌ای، format x100,000",
+            "v": "0.8x",
+            "slow": true
+          }
+        ]
+      }
+    ],
+    "benchTitle": "بنچمارک json-server · درخواست در ثانیه، اجرای 1 / اجرای 2 · Apple M4، Node 24.15.0",
+    "benchHead": [
+      "درخواست (پایگاه داده‌ی فیکسچر)",
+      "Node، 1 اتصال",
+      "Rust، 1 اتصال",
+      "Node، 50 اتصال",
+      "Rust، 50 اتصال"
+    ],
+    "benchPostRow": "POST /comments، 10 اتصال",
+    "benchNote": "جاهایی که فاصله کم است: یک اتصال که کل فهرست 10,000 پست را می‌خواند (1.2x) و نوشتن روی پایگاه داده‌ی بزرگ (1.1 تا 1.2x)، چون هر دو در هر نوشتن کل فایل را دوباره می‌نویسند. [جدول‌های کامل](/docs/real-world/json-server)",
+    "langsTitle": "زبان‌ها",
+    "langsDesc": "زبان از روی مخزن تشخیص داده می‌شود. هر زبانی جز C دسته‌ها را هم دارد: عنصرها یک بار از مرز می‌گذرند و روی همه‌ی هسته‌ها در Rust می‌مانند.",
+    "verified": "تأییدشده",
+    "wholeApps": "برنامه‌های کامل",
+    "langMeta": {
+      "typescript": "napi-rs یا wasm-bindgen. json-server، Fuse.js، vercel/ms، x18n",
+      "python": "PyO3. CPython colorsys: 2,400/2,400",
+      "c": "extern \"C\". نمای glibc: 1,859/1,859",
+      "go": "cgo و یک wire دودویی. Go path: 2,642/2,642",
+      "ruby": "magnus. shellwords: 1,617/1,617",
+      "java": "JNI و یک wire دودویی. نمای JDK: 4,492/4,492"
+    },
+    "sponsorsTitle": "حامیان مالی",
+    "sponsorsDesc": "rust-anything رایگان و متن‌باز است. اگر در کارتان به شما کمک می‌کند، لطفاً از آن حمایت کنید. حمایت شما توسعه را ادامه‌دار نگه می‌دارد.",
+    "companySponsor": "حامی شرکتی",
+    "becomeSponsor": "حامی شوید"
+  }
+}

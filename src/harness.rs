@@ -843,7 +843,81 @@ pub struct DiffOptions<'a> {
 const SHOWN_MISMATCHES: usize = 20;
 
 pub fn diff(opts: &DiffOptions) -> Result<DiffOutcome> {
-    diff_after(opts, diff_exact(opts)?)
+    let mut outcome = diff_full(opts)?;
+    outcome.mismatches.truncate(SHOWN_MISMATCHES);
+    Ok(outcome)
+}
+
+/// Like `diff`, without truncating `mismatches`, so callers can inspect per-function results.
+pub fn diff_full(opts: &DiffOptions) -> Result<DiffOutcome> {
+    let mut outcome = settle(opts, diff_exact(opts)?)?;
+    anyhow::ensure!(
+        outcome.total > 0,
+        "no recorded cases to compare; run `rust-anything record` first"
+    );
+    if opts.module.is_none() {
+        outcome.trend = crate::recording::track(opts.crate_dir, outcome.passed, outcome.total);
+    }
+    Ok(outcome)
+}
+
+/// `(passed, total)` recorded cases per function name.
+pub type FunctionCounts = BTreeMap<String, (usize, usize)>;
+
+/// `(passed, total)` recorded cases for each function in `cases.jsonl`, using the full
+/// (untruncated) mismatches in `outcome`.
+pub fn per_function_counts(crate_dir: &Path, outcome: &DiffOutcome) -> Result<FunctionCounts> {
+    let cases_path = crate_dir.join(CASES);
+    let text = std::fs::read_to_string(&cases_path)
+        .with_context(|| format!("reading {}", cases_path.display()))?;
+    counts_from_cases_text(&text, outcome)
+}
+
+/// Runs `diff_full` and computes [`per_function_counts`] from the exact `cases.jsonl` snapshot
+/// that `diff_full` verified, failing if `cases.jsonl` was modified concurrently.
+pub fn diff_full_with_counts(opts: &DiffOptions) -> Result<(DiffOutcome, FunctionCounts)> {
+    let cases_path = opts.crate_dir.join(CASES);
+    let snapshot = std::fs::read_to_string(&cases_path)
+        .with_context(|| format!("reading {}", cases_path.display()))?;
+    let outcome = diff_full(opts)?;
+    let current = std::fs::read_to_string(&cases_path)
+        .with_context(|| format!("reading {}", cases_path.display()))?;
+    anyhow::ensure!(
+        current == snapshot,
+        "{CASES} changed while diff was running; rerun `enable`"
+    );
+    let counts = counts_from_cases_text(&snapshot, &outcome)?;
+    Ok((outcome, counts))
+}
+
+fn counts_from_cases_text(
+    text: &str,
+    outcome: &DiffOutcome,
+) -> Result<BTreeMap<String, (usize, usize)>> {
+    let mut totals: BTreeMap<String, usize> = BTreeMap::new();
+    for line in text.lines().filter(|l| !l.is_empty()) {
+        let case: Value = parse_deep(line)?;
+        if let Some(name) = case["fn"].as_str().or_else(|| case["class"].as_str()) {
+            *totals.entry(name.to_string()).or_default() += 1;
+        }
+    }
+    let mut failed: BTreeMap<String, usize> = BTreeMap::new();
+    for m in &outcome.mismatches {
+        if let Some(name) = m["fn"].as_str().or_else(|| m["class"].as_str()) {
+            *failed.entry(name.to_string()).or_default() += 1;
+        }
+    }
+    Ok(totals
+        .into_iter()
+        .map(|(name, total)| {
+            let passed = if outcome.missing.contains(&name) {
+                0
+            } else {
+                total.saturating_sub(failed.get(&name).copied().unwrap_or(0))
+            };
+            (name, (passed, total))
+        })
+        .collect())
 }
 
 /// Diffs on a connected Android device, using the port built for the device's ABI.

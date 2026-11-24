@@ -1,0 +1,277 @@
+{
+  "meta": {
+    "title": "Reescribe toda tu aplicación en Rust, pieza a pieza",
+    "description": "Reescribe tu aplicación en Rust pieza a pieza, comprobada contra el original en cada paso. CLIs, servidores y bibliotecas en TypeScript/JavaScript, Python, C, Go, Ruby, Java, Kotlin, PHP, PowerShell y C#."
+  },
+  "ui": {
+    "docs": "Docs",
+    "languages": "Lenguajes",
+    "realWorld": "Portes reales",
+    "searchButton": "Buscar en la documentación…",
+    "searchDocs": "Buscar en la documentación",
+    "searchPlaceholder": "Buscar: record, known-diffs, front door…",
+    "searchQuery": "Consulta de búsqueda",
+    "searchEmpty": "Escribe para buscar en todas las páginas de la documentación.",
+    "searchNone": "Ninguna página coincide.",
+    "openMenu": "Abrir menú",
+    "closeMenu": "Cerrar menú",
+    "menu": "Menú",
+    "language": "Idioma",
+    "home": "Inicio de rust-anything",
+    "github": "rust-anything en GitHub",
+    "onThisPage": "En esta página",
+    "editPage": "Editar esta página en GitHub",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "pager": "Página anterior y siguiente",
+    "breadcrumb": "Ruta de navegación",
+    "themeDark": "Oscuro",
+    "themeLight": "Claro",
+    "themeSystem": "Sistema",
+    "theme": "Tema",
+    "themeSwitch": "Cambiar a",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "copyInstall": "Copiar comandos de instalación",
+    "installWith": "Instalar con",
+    "skip": "Saltar al contenido",
+    "legal": "Licencia MIT. Los portes y el código generado en tu repositorio son tuyos. Un proyecto independiente, sin relación con el Proyecto Rust ni con la Fundación Rust, y no respaldado por ellos. \"Rust\" es una marca registrada de la Fundación Rust.",
+    "quickStart": "Inicio rápido",
+    "cliReference": "Referencia de la CLI",
+    "issues": "Issues",
+    "status": "Estado",
+    "sponsor": "Patrocinar",
+    "madeBy": "Creado por"
+  },
+  "nav": {
+    "groups": {
+      "introduction": "Introducción",
+      "concepts": "Conceptos",
+      "languages": "Lenguajes",
+      "wholeApps": "Aplicaciones completas",
+      "reference": "Referencia",
+      "realWorld": "Portes reales",
+      "project": "Proyecto"
+    },
+    "items": {
+      "/docs/introduction/what-is-rust-anything": "Qué es rust-anything",
+      "/docs/introduction/quick-start": "Inicio rápido",
+      "/docs/introduction/install": "Instalación",
+      "/docs/introduction/agents": "Configurar tu agente",
+      "/docs/introduction/doctor": "Doctor",
+      "/docs/concepts/the-loop": "El bucle",
+      "/docs/concepts/analyze": "Perfilar y analizar",
+      "/docs/concepts/bridge": "Bridge",
+      "/docs/concepts/record": "Record",
+      "/docs/concepts/port": "Port",
+      "/docs/concepts/diff": "Diff y diferencias conocidas",
+      "/docs/concepts/bench": "Bench",
+      "/docs/concepts/shadow": "Shadow",
+      "/docs/concepts/gate": "Gate",
+      "/docs/concepts/coverage": "Cobertura",
+      "/docs/concepts/batches": "Lotes y rutas calientes",
+      "/docs/concepts/float-tolerance": "Tolerancia en flotantes",
+      "/docs/concepts/limits": "Lo que no detecta",
+      "/docs/languages/overview": "Resumen",
+      "/docs/languages/typescript": "TypeScript/JavaScript",
+      "/docs/languages/python": "Python",
+      "/docs/languages/c": "C",
+      "/docs/languages/go": "Go",
+      "/docs/languages/ruby": "Ruby",
+      "/docs/languages/java": "Java",
+      "/docs/languages/php": "PHP",
+      "/docs/languages/csharp": "C#",
+      "/docs/whole-apps/overview": "Portar una aplicación completa",
+      "/docs/whole-apps/record-replay": "Grabar y reproducir",
+      "/docs/whole-apps/front-door": "Front door y wire",
+      "/docs/whole-apps/lift": "Lift",
+      "/docs/whole-apps/servers": "Servidores",
+      "/docs/whole-apps/libraries": "Bibliotecas",
+      "/docs/reference/cli": "CLI",
+      "/docs/reference/mcp-tools": "Herramientas MCP",
+      "/docs/real-world/overview": "Resumen",
+      "/docs/real-world/json-server": "json-server",
+      "/docs/real-world/fuse-js": "Fuse.js",
+      "/docs/real-world/vercel-ms": "vercel/ms",
+      "/docs/real-world/x18n": "x18n",
+      "/docs/real-world/six-languages": "Seis lenguajes",
+      "/docs/real-world/fixtures": "Fixtures y ejecuciones estáticas",
+      "/docs/project/status": "Estado",
+      "/docs/project/faq": "FAQ",
+      "/docs/project/contributing": "Contribuir"
+    }
+  },
+  "hero": {
+    "title1": "Reescribe tu aplicación en Rust.",
+    "title2": "Demuestra que se comporta igual.",
+    "sub": "rust-anything registra lo que hace tu código y luego reproduce cada caso registrado contra el porte en Rust. Tu agente escribe el Rust. Nada se publica hasta que las salidas coinciden.",
+    "cta": "Leer el inicio rápido",
+    "source": "Código fuente en GitHub",
+    "sourceLanguage": "Lenguaje de origen",
+    "bridge": "Bridge",
+    "verified": "Porte verificado de {lang}, {what}: {count} casos registrados coinciden",
+    "wholeApp": "Las aplicaciones en {lang} ya se graban y reproducen contra el original, desde el front door."
+  },
+  "home": {
+    "stats": [
+      {
+        "v": "32",
+        "unit": "x",
+        "k": "búsqueda de Fuse.js por solicitud sobre 50,000 cadenas, Apple M4"
+      },
+      {
+        "v": "3.5",
+        "unit": "MB",
+        "k": "memoria en reposo de json-server tras el lift, frente a 74 MB en Node"
+      },
+      {
+        "v": "514/514",
+        "unit": "",
+        "k": "casos HTTP de json-server coinciden en un binario Rust puro"
+      },
+      {
+        "v": "10",
+        "unit": "",
+        "k": "lenguajes: ocho con portes verificados, Kotlin y PowerShell probados de extremo a extremo"
+      }
+    ],
+    "installTitle": "Instalación",
+    "installDesc": "Instala la CLI y luego registra el servidor MCP y la skill de flujo de trabajo en Claude Code, Codex, Cursor y Gemini CLI.",
+    "installNote": "Los binarios precompilados para macOS, Linux y Windows están en cada [versión de GitHub]({releases}).",
+    "agentPrompt": "Instala rust-anything: ejecuta `cargo install rust-anything` y luego `rust-anything setup`.",
+    "agentRestart": "Dime cuándo debo reiniciarte.",
+    "loopTitle": "Cómo se hace un porte",
+    "loopDesc": "El original sigue siendo la fuente de verdad. rust-anything no traduce código: aporta lo que un agente no puede adivinar y una puerta que dice cuándo un porte está terminado.",
+    "steps": [
+      {
+        "title": "Grabar",
+        "text": "`record` ejecuta el original con casos límite generados, trampas semánticas y tus propias entradas, y guarda lo que devuelve o lanza."
+      },
+      {
+        "title": "Portar",
+        "text": "`bridge` genera el crate de Rust y un envoltorio para que quien llama conserve la API original. Tú o tu agente escribes el Rust."
+      },
+      {
+        "title": "Comprobar",
+        "text": "`diff` reproduce cada caso registrado contra el Rust, y no se publica nada hasta que todos coinciden y `gate` pasa."
+      },
+      {
+        "title": "Lift",
+        "text": "Cuando la reproducción pasa sin recurrir al original y cada unidad pasa `gate`, `app lift` la convierte en una aplicación de Rust puro. El original nunca se toca."
+      }
+    ],
+    "vizSameApi": "misma API",
+    "vizCheck": "los casos de Fuse.js coinciden, primera compilación",
+    "vizGate": "gate pasa",
+    "vizLift": "json-server sin recurrir al original, 514/514 pasan",
+    "vizLiftSteps": [
+      "Front door",
+      "lecturas conectadas",
+      "cada ruta"
+    ],
+    "demoTitle": "Lo que encuentra la grabación",
+    "demoDesc": "Un primer porte de `fuzzyScore` de x18n, indexado por `char` de Rust. Pasó las pruebas sencillas y falló en `diff`.",
+    "demoComments": {
+      "profile": "# dónde se va el tiempo y quién lo llama",
+      "write": "# escribe src/port.rs (o deja que lo haga el agente), luego:",
+      "first": "# diff, primer porte",
+      "matchLine": "198/200 casos coinciden",
+      "why": "# indexOf de JS cuenta unidades de código UTF-16,\n# así que un emoji ocupa dos posiciones.",
+      "fixed": "# con los ayudantes utf16 generados:\n# 2000/2000 casos, y el gate pasa"
+    },
+    "portsTitle": "Medido en proyectos reales",
+    "portsDesc": "Detrás de cada número hay un benchmark que primero comprueba que los resultados son idénticos. Los casos lentos también están aquí: llamar a Rust una vez por cada función pequeña suele ser más lento que un JIT.",
+    "ports": [
+      {
+        "href": "/docs/real-world/json-server",
+        "kind": "json-server · un servidor Node completo",
+        "big": "514/514",
+        "text": "casos HTTP coinciden tras `app lift` en un binario de Rust puro (5.3 MB), con 0% de recurso al original. Seis unidades pasan `gate`.",
+        "rows": [
+          {
+            "k": "Memoria en reposo, base de datos de fixture",
+            "v": "74 MB → 3.5 MB"
+          },
+          {
+            "k": "Del inicio a la primera respuesta",
+            "v": "85 / 79 ms → 9.9 / 7.9 ms"
+          },
+          {
+            "k": "Lista completa de 10,000 posts, 1 conexión",
+            "v": "1.2x",
+            "slow": true
+          }
+        ]
+      },
+      {
+        "href": "/docs/real-world/fuse-js",
+        "kind": "Fuse.js · búsqueda en listas de cadenas",
+        "big": "32x",
+        "text": "Más rápido por solicitud sobre 50,000 cadenas (91.2 ms → 2.8 ms, Apple M4). 3,414/3,414 casos registrados coinciden; resultados idénticos byte a byte a los de Fuse en 360 búsquedas.",
+        "rows": [
+          {
+            "k": "10,000 cadenas",
+            "v": "27 a 30x"
+          },
+          {
+            "k": "1,000 cadenas",
+            "v": "18x"
+          },
+          {
+            "k": "50,000 cadenas, un solo núcleo",
+            "v": "5.3x",
+            "slow": true
+          }
+        ]
+      },
+      {
+        "href": "/docs/real-world/vercel-ms",
+        "kind": "vercel/ms · una biblioteca diminuta",
+        "big": "975/975",
+        "text": "casos coinciden, 340 de ellos capturados de sus propias pruebas de Jest. Un buen porte y un mal objetivo de velocidad, y `bench` lo dice.",
+        "rows": [
+          {
+            "k": "Por llamada, sobre los casos registrados",
+            "v": "0.56x",
+            "slow": true
+          },
+          {
+            "k": "Lote, parse x100,000",
+            "v": "18x"
+          },
+          {
+            "k": "Lote, format x100,000",
+            "v": "0.8x",
+            "slow": true
+          }
+        ]
+      }
+    ],
+    "benchTitle": "Benchmark de json-server · solicitudes por segundo, ejecución 1 / ejecución 2 · Apple M4, Node 24.15.0",
+    "benchHead": [
+      "Solicitud (base de datos de fixture)",
+      "Node, 1 conex.",
+      "Rust, 1 conex.",
+      "Node, 50 conex.",
+      "Rust, 50 conex."
+    ],
+    "benchPostRow": "POST /comments, 10 conexiones",
+    "benchNote": "Donde la diferencia es pequeña: una conexión que lee la lista completa de 10,000 posts (1.2x), y las escrituras en la base de datos grande (1.1 a 1.2x), porque ambas reescriben el archivo entero en cada escritura. [Tablas completas](/docs/real-world/json-server)",
+    "langsTitle": "Lenguajes",
+    "langsDesc": "El lenguaje se detecta a partir del repositorio. Todos los lenguajes salvo C también obtienen lotes: los elementos cruzan una sola vez y se quedan en Rust, en todos los núcleos.",
+    "verified": "Verificado",
+    "wholeApps": "Aplicaciones completas",
+    "langMeta": {
+      "typescript": "napi-rs o wasm-bindgen. json-server, Fuse.js, vercel/ms, x18n",
+      "python": "PyO3. colorsys de CPython: 2,400/2,400",
+      "c": "extern \"C\". fachada de glibc: 1,859/1,859",
+      "go": "cgo y un wire binario. path de Go: 2,642/2,642",
+      "ruby": "magnus. shellwords: 1,617/1,617",
+      "java": "JNI y un wire binario. fachada del JDK: 4,492/4,492"
+    },
+    "sponsorsTitle": "Patrocinadores",
+    "sponsorsDesc": "rust-anything es gratuito y de código abierto. Si te ayuda en tu trabajo, considera patrocinarlo. Tu apoyo mantiene el desarrollo en marcha.",
+    "companySponsor": "Patrocinador de empresa",
+    "becomeSponsor": "Hazte patrocinador"
+  }
+}

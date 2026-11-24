@@ -34,7 +34,7 @@ export function faviconPlugin() {
   }
 }
 
-const LOCALE_CODES = ['en', 'tr', 'zh', 'zh-tw', 'de', 'fr', 'ru', 'uk', 'ja', 'ko', 'az', 'uz', 'kk', 'ky', 'tk', 'tt', 'ug', 'pt', 'ar']
+const LOCALE_CODES = ['en', 'tr', 'zh', 'zh-tw', 'de', 'fr', 'ru', 'uk', 'ja', 'ko', 'az', 'uz', 'kk', 'ky', 'tk', 'tt', 'ug', 'pt', 'ar', 'fa', 'vi', 'hi', 'es', 'it', 'id']
 
 function searchEntries(locale = 'en') {
   const prefix = locale === 'en' ? '/docs/' : `/${locale}/docs/`

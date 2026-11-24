@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Logo from '../Logo'
 import ThemeToggle from './ThemeToggle'
 import SearchDialog, { SearchButton } from './SearchDialog'
-import { CloseIcon, DiscordIcon, GitHubIcon, MenuIcon } from './icons'
+import { CloseIcon, DiscordIcon, GitHubIcon, HeartIcon, MenuIcon } from './icons'
 import type { NavGroup } from '../../lib/nav'
 import type { Messages } from '../../lib/messages/en'
 import { LOCALES, stripLocale, withLocale } from '../../lib/locales'
@@ -12,39 +12,69 @@ import { REPO_URL } from '../../lib/site'
 function LanguageMenu({ currentPath, locale, label }: { currentPath: string; locale: string; label: string }) {
   const rest = stripLocale(currentPath)
   const current = LOCALES.find((l) => l.code === locale) ?? LOCALES[0]
+  const ref = useRef<HTMLDetailsElement>(null)
+
+  useEffect(() => {
+    const close = () => ref.current?.removeAttribute('open')
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) close()
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close()
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [])
+
   return (
-    <details className="lang-menu relative">
+    <details ref={ref} className="lang-menu relative">
       <summary
-        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md px-2 text-sm text-fg/80 hover:text-fg"
+        className="inline-flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-md px-2 text-sm text-fg/80 hover:bg-bg-soft hover:text-fg"
         aria-label={label}
         title={label}
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-          <circle cx="12" cy="12" r="9" />
-          <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" />
-        </svg>
+        <Flag l={current} />
         <span className="hidden xl:inline">{current.name}</span>
+        <svg className="hidden opacity-60 sm:block" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </summary>
-      <ul className="thin-scrollbar absolute end-0 top-11 z-[70] max-h-[70vh] w-48 overflow-y-auto rounded-lg border border-line bg-bg p-1 shadow-xl">
-        {LOCALES.map((l) => (
-          <li key={l.code}>
-            <a
-              href={withLocale(rest, l.code)}
-              lang={l.lang}
-              hrefLang={l.lang}
-              aria-current={l.code === locale ? 'true' : undefined}
-              className={`block rounded-md px-3 py-1.5 text-sm ${l.code === locale ? 'bg-brand-soft font-medium text-brand-ink' : 'text-fg/80 hover:bg-bg-soft hover:text-fg'}`}
-              onClick={() => {
-                try {
-                  localStorage.setItem('locale', l.code)
-                } catch {}
-              }}
-            >
-              {l.name}
-            </a>
-          </li>
-        ))}
-      </ul>
+      <div className="absolute end-0 top-11 z-[70] w-[24rem] max-sm:fixed max-sm:inset-x-3 max-sm:top-[4.25rem] max-sm:w-auto rounded-xl border border-line bg-bg p-2 shadow-2xl">
+        <div className="px-2 pb-1.5 pt-1 text-xs font-semibold uppercase tracking-wide text-muted">{label}</div>
+        <ul className="thin-scrollbar grid max-h-[min(30rem,75vh)] grid-cols-2 gap-0.5 overflow-y-auto">
+          {LOCALES.map((l) => {
+            const on = l.code === locale
+            return (
+              <li key={l.code}>
+                <a
+                  href={withLocale(rest, l.code)}
+                  lang={l.lang}
+                  hrefLang={l.lang}
+                  aria-current={on ? 'true' : undefined}
+                  className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${on ? 'bg-brand-soft font-semibold text-brand-ink' : 'text-fg/85 hover:bg-bg-soft hover:text-fg'}`}
+                  onClick={() => {
+                    try {
+                      localStorage.setItem('locale', l.code)
+                    } catch {}
+                  }}
+                >
+                  <Flag l={l} />
+                  <span className="min-w-0 flex-1 truncate">{l.name}</span>
+                  {on && (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
+                      <path d="M5 12l5 5L20 7" />
+                    </svg>
+                  )}
+                </a>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
     </details>
   )
 }
@@ -133,6 +163,14 @@ export default function Navbar({
         >
           <DiscordIcon className="h-[22px] w-[22px]" />
         </a>
+        <a
+          href="https://github.com/sponsors/erkamyaman"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[#db61a2] hover:text-[#e879b4]"
+          aria-label={ui.sponsor}
+          title={ui.sponsor}
+        >
+          <HeartIcon className="h-[20px] w-[20px]" />
+        </a>
         <button
           type="button"
           className="inline-flex h-9 w-9 items-center justify-center rounded-md text-fg/80 hover:text-fg lg:hidden"
@@ -198,5 +236,28 @@ export default function Navbar({
 
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} ui={ui} locale={locale} />
     </div>
+  )
+}
+
+function Flag({ l }: { l: (typeof LOCALES)[number] }) {
+  const country = 'country' in l ? l.country : undefined
+  if (!country) {
+    return (
+      <svg className="h-[15px] w-5 shrink-0 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z" />
+      </svg>
+    )
+  }
+  return (
+    <img
+      src={`/flags/${country}.svg`}
+      width={20}
+      height={15}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      className="h-[15px] w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-black/10"
+    />
   )
 }

@@ -19,6 +19,19 @@ pub fn results(f: &ExportedFn) -> (Vec<String>, bool) {
     (parts, fallible)
 }
 
+/// The port type of a Go type whose range `i64` cannot hold (`uint64`, `uint`, `uintptr`), alone
+/// or as the items of a slice; `None` for every other type.
+pub fn unsigned_port_type(go: &str) -> Option<String> {
+    match go.trim() {
+        "uint64" | "uint" => Some("u64".into()),
+        "uintptr" => Some("usize".into()),
+        go => go
+            .strip_prefix("[]")
+            .and_then(unsigned_port_type)
+            .map(|item| format!("Vec<{item}>")),
+    }
+}
+
 fn split_top(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut depth = 0i32;

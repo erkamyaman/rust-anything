@@ -509,8 +509,13 @@ fn tool_schemas() -> Value {
         },
         {
             "name": "enable",
-            "description": "Switch a ported TS/JS or Python unit on: one marked block in each original source file rebinds the unit's functions to the built Rust module, for every caller, with no import changed. RUST_ANYTHING_MODE=old or RUST_ANYTHING_UNIT_<NAME>=original runs the original for one run. Refuses while recorded cases differ unless `force`.",
-            "inputSchema": { "type": "object", "properties": { "crate": crate_dir, "force": { "type": "boolean", "description": "Switch it on even when recorded cases differ." } }, "required": ["crate"] },
+            "description": "Switch a ported TS/JS or Python unit on: one marked block in each original source file rebinds the unit's functions to the built Rust module, for every caller, with no import changed. RUST_ANYTHING_MODE=old or RUST_ANYTHING_UNIT_<NAME>=original runs the original for one run. Refuses while recorded cases differ unless `force`, `partial`, or `only` names functions that match.",
+            "inputSchema": { "type": "object", "properties": {
+                "crate": crate_dir,
+                "only": { "type": "array", "items": { "type": "string" }, "description": "Switch on only these exported functions." },
+                "partial": { "type": "boolean", "description": "Switch on only the functions whose recorded cases all match; leave the rest in the original." },
+                "force": { "type": "boolean", "description": "Switch it on even when recorded cases differ." },
+            }, "required": ["crate"] },
         },
         {
             "name": "disable",
@@ -598,8 +603,8 @@ fn tool_schemas() -> Value {
                 "port": { "type": "integer", "description": "A port the server always listens on (implies http)." },
                 "effects": { "type": "array", "items": { "type": "string" }, "description": "Record what leaves the process: \"http\" (a local sink set as HTTP_PROXY, http_proxy and RUST_ANYTHING_HTTP_SINK) and \"smtp\" (a local mail server, SMTP_HOST and SMTP_PORT). Each case stores what reached them, in order, and replay compares it." },
                 "effect_env": { "type": "array", "items": { "type": "string" }, "description": "Point the app's own settings at a sink: VAR=http-url, VAR=smtp-host, VAR=smtp-port or VAR=smtp-url." },
-                "db_reset": { "type": "string", "description": "Shell command that resets the database before each case (each start for servers); cases then run one at a time." },
-                "db_dump": { "type": "string", "description": "Shell command that prints the database's state (e.g. `sqlite3 app.db .dump`), run after each case or request and recorded with the effects." },
+                "db_reset": { "type": "string", "description": "Shell command that resets the database before each case (each start for servers), run in the folder the case runs in; a script it names by a relative path with a script extension (.py, .sh, .js, .ts, .rb, .php, .pl, .ps1, .bat, .cmd, .sql and similar) is the repository's, while other relative paths, extensionless scripts included, are the case folder's. Cases then run one at a time." },
+                "db_dump": { "type": "string", "description": "Shell command that prints the database's state (e.g. `sqlite3 app.db .dump`), run after each case or request in the folder the case runs in, and recorded with the effects." },
                 "args": { "type": "array", "items": { "type": "string" }, "description": "Servers: arguments every start gets after its command, the original's and every build's ([\"db.json\"]). Implies http; saved." },
                 "fresh": { "type": "array", "items": { "type": "string" }, "description": "Repository files or folders the app reads or writes (a project tree, a database file), snapshotted and copied into a fresh working directory before every case (CLIs) or start (servers); a CLI's removed files are compared too. Saved." },
                 "pace": { "type": "integer", "description": "Servers: milliseconds to wait after each response, for work the server does after answering (a file watcher). Implies http; saved and used by replay; 0 removes it." },
@@ -949,23 +954,43 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         }
         "enable" => {
             let crate_dir = std::path::absolute(path("crate")?)?;
-            if !args["force"].as_bool().unwrap_or(false) {
+            let only = strings("only");
+            let partial = args["partial"].as_bool().unwrap_or(false);
+            let force = args["force"].as_bool().unwrap_or(false);
+            anyhow::ensure!(
+                !(partial && (!only.is_empty() || force)),
+                "`partial` cannot be combined with `only` or `force`"
+            );
+            let diff_opts = harness::DiffOptions {
+                crate_dir: &crate_dir,
+                module: None,
+                ignore_key_order: false,
+                node_args: &[],
+                float_tolerance: None,
+            };
+            let on = if partial || (!only.is_empty() && !force) {
                 harness::build(&crate_dir)?;
-                let d = harness::diff(&harness::DiffOptions {
-                    crate_dir: &crate_dir,
-                    module: None,
-                    ignore_key_order: false,
-                    node_args: &[],
-                    float_tolerance: None,
-                })?;
-                anyhow::ensure!(
-                    d.failed == 0 && d.missing.is_empty(),
-                    "{}/{} recorded cases match; switch it on once they all do, or pass force",
-                    d.passed,
-                    d.total
-                );
-            }
-            serde_json::to_value(crate::enable::enable(&crate_dir)?)?
+                let (d, counts) = harness::diff_full_with_counts(&diff_opts)?;
+                let manifest = bridge::Manifest::load(&crate_dir)?;
+                let (selected, skipped) =
+                    crate::enable::select_matching(&manifest, &d, &counts, &only)?;
+                crate::enable::enable_only(&crate_dir, Some(&selected), &skipped)?
+            } else if !only.is_empty() {
+                crate::enable::enable_only(&crate_dir, Some(&only), &[])?
+            } else {
+                if !force {
+                    harness::build(&crate_dir)?;
+                    let d = harness::diff(&diff_opts)?;
+                    anyhow::ensure!(
+                        d.failed == 0 && d.missing.is_empty(),
+                        "{}/{} recorded cases match; switch it on once they all do, or pass partial, only, or force",
+                        d.passed,
+                        d.total
+                    );
+                }
+                crate::enable::enable(&crate_dir)?
+            };
+            serde_json::to_value(on)?
         }
         "disable" => serde_json::to_value(crate::enable::disable(&std::path::absolute(path(
             "crate",
