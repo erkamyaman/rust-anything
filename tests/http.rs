@@ -842,13 +842,15 @@ fn a_server_started_through_a_wrapper_is_stopped_with_it() {
 }
 
 /// A server that takes a minute to answer `/slow`, so `app record` is still running it when the
-/// test interrupts. It writes its pid, so the test can clean up a server that outlived it.
+/// test interrupts. It writes its pid, so the test can clean up a server that outlived it, and
+/// `slow.started` once that request is being handled.
 #[cfg(unix)]
 const SLOW_SERVER: &str = r#"import http.server, os, time
 open("server.pid", "w").write(str(os.getpid()))
 class H(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/slow":
+            open("slow.started", "w").close()
             time.sleep(60)
         body = b"hi"
         self.send_response(200)
@@ -947,7 +949,16 @@ fn an_interrupted_record_leaves_no_server_listening() {
         }
         std::thread::sleep(Duration::from_millis(100));
     }
-    std::thread::sleep(Duration::from_millis(500));
+    // Interrupt while the request is being handled, not only once the port is open.
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let mut handling = came_up;
+    while came_up && !repo.join("slow.started").is_file() {
+        if Instant::now() > deadline {
+            handling = false;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
     // Ctrl-C: SIGINT to the whole foreground group.
     std::process::Command::new("kill")
         .args(["-INT", "--", &format!("-{}", run.cli.id())])
@@ -970,6 +981,7 @@ fn an_interrupted_record_leaves_no_server_listening() {
     // Everything is stopped before any assertion can fail.
     drop(run);
     assert!(came_up, "the server never listened on port {port}");
+    assert!(handling, "the server never started handling /slow");
     assert!(cli_exited, "app record did not stop on SIGINT");
     assert!(
         !still_listening,
