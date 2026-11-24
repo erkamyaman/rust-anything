@@ -4,6 +4,8 @@
 
 - The workflow skill's description names Kotlin, PHP, C# and PowerShell, so agents also pick it for those
   ports (#280).
+- `analyze` lists distinct lines as a risk's samples, so several hits on one line no longer fill
+  every slot and hide the next location (#347).
 
 ## 3.4.0 (2026-11-23)
 
