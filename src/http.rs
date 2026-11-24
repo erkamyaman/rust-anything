@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{Ipv6Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
@@ -180,8 +180,20 @@ pub fn free_port() -> Result<u16> {
     Ok(TcpListener::bind("127.0.0.1:0")?.local_addr()?.port())
 }
 
-fn local(port: u16) -> SocketAddr {
-    SocketAddr::from(([127, 0, 0, 1], port))
+/// The loopback addresses a server may listen on. A server that binds to `localhost` can get only
+/// `::1` (Node 17+ may pick it), so both are tried, IPv4 first.
+fn local(port: u16) -> [SocketAddr; 2] {
+    [
+        SocketAddr::from(([127, 0, 0, 1], port)),
+        SocketAddr::from((Ipv6Addr::LOCALHOST, port)),
+    ]
+}
+
+/// The first loopback address that accepts a connection on `port`.
+fn listening(port: u16, wait: Duration) -> Option<SocketAddr> {
+    local(port)
+        .into_iter()
+        .find(|addr| TcpStream::connect_timeout(addr, wait).is_ok())
 }
 
 fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -309,13 +321,13 @@ fn read_response(stream: &mut impl Read, head_only: bool) -> Result<Resp> {
     })
 }
 
-fn send(port: u16, req: &Req, timeout: Duration) -> Result<Resp> {
-    let mut stream = TcpStream::connect_timeout(&local(port), timeout)?;
+fn send(addr: SocketAddr, req: &Req, timeout: Duration) -> Result<Resp> {
+    let mut stream = TcpStream::connect_timeout(&addr, timeout)?;
     stream.set_read_timeout(Some(timeout))?;
     stream.set_write_timeout(Some(timeout))?;
     let body = req.body.as_deref().unwrap_or("").as_bytes();
     let mut head = format!(
-        "{} {} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n",
+        "{} {} HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n",
         req.method, req.path
     );
     for (k, v) in &req.headers {
@@ -338,7 +350,8 @@ fn send(port: u16, req: &Req, timeout: Duration) -> Result<Resp> {
 /// A server process; stopped (SIGTERM, then SIGKILL) when dropped.
 struct Server {
     child: Child,
-    port: u16,
+    /// The loopback address that answered while waiting for the server; requests go there.
+    addr: SocketAddr,
     dir: PathBuf,
     cwd: PathBuf,
     log: PathBuf,
@@ -348,7 +361,7 @@ struct Server {
 
 impl Server {
     fn start(command: &[String], launch: &Launch, repo: &Path, port: u16) -> Result<Server> {
-        if TcpStream::connect_timeout(&local(port), Duration::from_millis(100)).is_ok() {
+        if listening(port, Duration::from_millis(100)).is_some() {
             bail!("port {port} is already in use");
         }
         let dir = app::temp_dir("server")?;
@@ -392,14 +405,14 @@ impl Server {
             .spawn()
             .with_context(|| format!("starting `{}`", command.join(" ")))?;
         let deadline = Instant::now() + READY;
-        loop {
+        let addr = loop {
             let failure = if let Some(status) = child.try_wait()? {
                 Some(format!("exited ({status}) before listening"))
-            } else if TcpStream::connect_timeout(&local(port), Duration::from_millis(200)).is_ok() {
+            } else if let Some(addr) = listening(port, Duration::from_millis(200)) {
                 if let Some(status) = child.try_wait()? {
                     Some(format!("exited ({status}) before listening"))
                 } else {
-                    break;
+                    break addr;
                 }
             } else if Instant::now() > deadline {
                 Some(format!("did not listen within {}s", READY.as_secs()))
@@ -424,10 +437,10 @@ impl Server {
                 );
             }
             std::thread::sleep(Duration::from_millis(50));
-        }
+        };
         Ok(Server {
             child,
-            port,
+            addr,
             dir,
             cwd,
             log,
@@ -500,7 +513,7 @@ fn run_all(
     let mut out = Vec::new();
     for req in reqs {
         let before = server.fallbacks().unwrap_or(0);
-        let resp = send(server.port, req, timeout).map_err(|e| format!("{e:#}"));
+        let resp = send(server.addr, req, timeout).map_err(|e| format!("{e:#}"));
         if let Some(pace) = launch.pace {
             std::thread::sleep(pace);
         }

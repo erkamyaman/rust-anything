@@ -4,6 +4,9 @@
 
 - `app record` and `app replay` fail with `port <port> is already in use` before spawning a server
   on an occupied port and check whether the child exited before treating the port as ready (#326).
+- `app record --http` and `app replay` find a server that listens only on `::1` (a `localhost`
+  bind can get IPv6 only) and send its requests there, instead of waiting 60 seconds and failing
+  with `did not listen within 60s` (#327).
 
 ## 4.0.0 (2026-11-24)
 

@@ -747,3 +747,68 @@ fn http_fixed_port_rejects_existing_listener_and_early_exit() {
 
     std::fs::remove_dir_all(repo).unwrap();
 }
+
+const IPV6_ONLY: &str = r#"import http.server, os, socket
+class S(http.server.HTTPServer):
+    address_family = socket.AF_INET6
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = ("hi from " + self.path).encode()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *args):
+        pass
+S(("::1", int(os.environ["PORT"])), H).serve_forever()
+"#;
+
+#[test]
+fn a_server_listening_only_on_ipv6_loopback_is_recorded_and_replayed() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    if std::net::TcpListener::bind("[::1]:0").is_err() {
+        eprintln!("skipping: this machine has no IPv6 loopback");
+        return;
+    }
+    let repo = std::env::temp_dir().join(format!("rust-anything-http-v6-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("server.py"), IPV6_ONLY).unwrap();
+    std::fs::write(
+        repo.join("inputs.jsonl"),
+        "{\"name\":\"hello\",\"path\":\"/hello\"}\n",
+    )
+    .unwrap();
+    let started = std::time::Instant::now();
+    let out = app::record(&RecordOptions {
+        repo: &repo,
+        run: &[python.to_string(), "server.py".to_string()],
+        inputs: Some(&repo.join("inputs.jsonl")),
+        normalize: &[],
+        name: None,
+        traps: false,
+        timeout_secs: None,
+        http: true,
+        server_args: &[],
+        fresh: &[],
+        pace_ms: None,
+        port: None,
+        float_tolerance: None,
+        float_files: &[],
+        effects: None,
+    })
+    .unwrap();
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(30),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(out.cases, 1);
+    let recorded = std::fs::read_to_string(out.dir.join("hello.body")).unwrap();
+    assert_eq!(recorded, "hi from /hello");
+    let again = replay(&repo, None);
+    assert_eq!(again.passed, 1, "{:?}", again.failures);
+    std::fs::remove_dir_all(repo).unwrap();
+}
