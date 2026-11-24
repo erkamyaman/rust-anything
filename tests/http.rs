@@ -747,3 +747,305 @@ fn http_fixed_port_rejects_existing_listener_and_early_exit() {
 
     std::fs::remove_dir_all(repo).unwrap();
 }
+
+const IPV6_ONLY: &str = r#"import http.server, os, socket
+class S(http.server.HTTPServer):
+    address_family = socket.AF_INET6
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = ("hi from " + self.path).encode()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *args):
+        pass
+S(("::1", int(os.environ["PORT"])), H).serve_forever()
+"#;
+
+#[test]
+fn a_server_listening_only_on_ipv6_loopback_is_recorded_and_replayed() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    if std::net::TcpListener::bind("[::1]:0").is_err() {
+        eprintln!("skipping: this machine has no IPv6 loopback");
+        return;
+    }
+    let repo = std::env::temp_dir().join(format!("rust-anything-http-v6-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("server.py"), IPV6_ONLY).unwrap();
+    std::fs::write(
+        repo.join("inputs.jsonl"),
+        "{\"name\":\"hello\",\"path\":\"/hello\"}\n",
+    )
+    .unwrap();
+    // Waiting on 127.0.0.1 alone, this fails with `did not listen within 60s`. No time limit is
+    // asserted: a busy CI runner can take longer than any bound that fits a quiet machine.
+    let out = app::record(&RecordOptions {
+        repo: &repo,
+        run: &[python.to_string(), "server.py".to_string()],
+        inputs: Some(&repo.join("inputs.jsonl")),
+        normalize: &[],
+        name: None,
+        traps: false,
+        timeout_secs: None,
+        http: true,
+        server_args: &[],
+        fresh: &[],
+        pace_ms: None,
+        port: None,
+        float_tolerance: None,
+        float_files: &[],
+        effects: None,
+    })
+    .unwrap();
+    assert_eq!(out.cases, 1);
+    let recorded = std::fs::read_to_string(out.dir.join("hello.body")).unwrap();
+    assert_eq!(recorded, "hi from /hello");
+    let again = replay(&repo, None);
+    assert_eq!(again.passed, 1, "{:?}", again.failures);
+    std::fs::remove_dir_all(repo).unwrap();
+}
+
+const PLAIN_SERVER: &str = r#"import http.server, os
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = b"hi"
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *args):
+        pass
+http.server.HTTPServer(("127.0.0.1", int(os.environ["PORT"])), H).serve_forever()
+"#;
+
+#[test]
+fn a_server_started_through_a_wrapper_is_stopped_with_it() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = std::env::temp_dir().join(format!("rust-anything-http-tree-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("server.py"), PLAIN_SERVER).unwrap();
+    std::fs::write(
+        repo.join("inputs.jsonl"),
+        "{\"name\":\"hi\",\"path\":\"/\"}\n",
+    )
+    .unwrap();
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    // The interpreter itself, not a launcher or alias that hands off and exits.
+    let python = String::from_utf8(
+        std::process::Command::new(python)
+            .args(["-c", "import sys; print(sys.executable)"])
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap()
+    .trim()
+    .to_string();
+    // The real server is a grandchild: the wrapper keeps running after it, so it does not exec it.
+    #[cfg(windows)]
+    let run = {
+        std::fs::write(
+            repo.join("wrapper.bat"),
+            format!("@\"{python}\" server.py\r\n@echo done\r\n"),
+        )
+        .unwrap();
+        vec!["wrapper.bat".to_string()]
+    };
+    #[cfg(not(windows))]
+    let run = {
+        std::fs::write(
+            repo.join("wrapper.sh"),
+            format!("'{python}' server.py\necho done\n"),
+        )
+        .unwrap();
+        vec!["sh".to_string(), "wrapper.sh".to_string()]
+    };
+    let out = app::record(&RecordOptions {
+        repo: &repo,
+        run: &run,
+        inputs: Some(&repo.join("inputs.jsonl")),
+        normalize: &[],
+        name: None,
+        traps: false,
+        timeout_secs: None,
+        http: true,
+        server_args: &[],
+        fresh: &[],
+        pace_ms: None,
+        port: Some(port),
+        float_tolerance: None,
+        float_files: &[],
+        effects: None,
+    });
+    let still_listening = std::net::TcpStream::connect_timeout(
+        &std::net::SocketAddr::from(([127, 0, 0, 1], port)),
+        std::time::Duration::from_secs(1),
+    )
+    .is_ok();
+    // A server left running keeps the folder open (it is its working directory).
+    let _ = std::fs::remove_dir_all(&repo);
+    assert_eq!(out.unwrap().cases, 1);
+    assert!(
+        !still_listening,
+        "the wrapped server still listens on port {port} after record returned"
+    );
+}
+
+/// A server that takes a minute to answer `/slow`, so `app record` is still running it when the
+/// test interrupts. It writes its pid, so the test can clean up a server that outlived it, and
+/// `slow.started` once that request is being handled.
+#[cfg(unix)]
+const SLOW_SERVER: &str = r#"import http.server, os, time
+open("server.pid", "w").write(str(os.getpid()))
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/slow":
+            open("slow.started", "w").close()
+            time.sleep(60)
+        body = b"hi"
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *args):
+        pass
+http.server.HTTPServer(("127.0.0.1", int(os.environ["PORT"])), H).serve_forever()
+"#;
+
+/// Ends the CLI's process group and the server, whatever the test saw, before it asserts.
+#[cfg(unix)]
+struct Interrupted {
+    cli: std::process::Child,
+    repo: std::path::PathBuf,
+}
+
+#[cfg(unix)]
+impl Drop for Interrupted {
+    fn drop(&mut self) {
+        let kill = |target: &str| {
+            let _ = std::process::Command::new("kill")
+                .args(["-KILL", "--", target])
+                .stderr(std::process::Stdio::null())
+                .status();
+        };
+        kill(&format!("-{}", self.cli.id()));
+        if let Ok(pid) = std::fs::read_to_string(self.repo.join("server.pid")) {
+            kill(pid.trim());
+        }
+        let _ = self.cli.kill();
+        let _ = self.cli.wait();
+        let _ = std::fs::remove_dir_all(&self.repo);
+    }
+}
+
+/// A terminal sends Ctrl-C to its foreground process group. The server, here started through a
+/// wrapper, must be in that group, or an interrupted `app record` leaves it listening.
+#[cfg(unix)]
+#[test]
+fn an_interrupted_record_leaves_no_server_listening() {
+    use std::os::unix::process::CommandExt as _;
+    use std::time::{Duration, Instant};
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = std::env::temp_dir().join(format!(
+        "rust-anything-http-interrupt-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("server.py"), SLOW_SERVER).unwrap();
+    std::fs::write(
+        repo.join("wrapper.sh"),
+        format!("{python} server.py\necho done\n"),
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("inputs.jsonl"),
+        "{\"name\":\"slow\",\"path\":\"/slow\"}\n",
+    )
+    .unwrap();
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    let listening =
+        || std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_ok();
+    let cli = std::process::Command::new(env!("CARGO_BIN_EXE_rust-anything"))
+        .args(["app", "record"])
+        .arg(&repo)
+        .args(["--http", "--port", &port.to_string()])
+        .args(["--inputs", "inputs.jsonl", "--", "sh", "wrapper.sh"])
+        .current_dir(&repo)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        // As a shell runs a foreground job: a process group of its own.
+        .process_group(0)
+        .spawn()
+        .unwrap();
+    let mut run = Interrupted {
+        cli,
+        repo: repo.clone(),
+    };
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let mut came_up = true;
+    while !listening() {
+        if Instant::now() > deadline {
+            came_up = false;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    // Interrupt while the request is being handled, not only once the port is open.
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let mut handling = came_up;
+    while came_up && !repo.join("slow.started").is_file() {
+        if Instant::now() > deadline {
+            handling = false;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    // Ctrl-C: SIGINT to the whole foreground group.
+    std::process::Command::new("kill")
+        .args(["-INT", "--", &format!("-{}", run.cli.id())])
+        .status()
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let mut cli_exited = false;
+    while Instant::now() < deadline {
+        if run.cli.try_wait().unwrap().is_some() {
+            cli_exited = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while listening() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let still_listening = listening();
+    // Everything is stopped before any assertion can fail.
+    drop(run);
+    assert!(came_up, "the server never listened on port {port}");
+    assert!(handling, "the server never started handling /slow");
+    assert!(cli_exited, "app record did not stop on SIGINT");
+    assert!(
+        !still_listening,
+        "the server still listens on port {port} after app record was interrupted"
+    );
+}

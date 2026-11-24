@@ -85,6 +85,7 @@ paths in what you commit. CI runs it on every file.
   - `tests/go_internal_packages.rs`, `tests/go_mod_directives.rs`, `tests/go_module_paths.rs` and
     `tests/go_record_cgo.rs`: recording Go modules (internal packages, `go.mod` directives,
     versioned paths with spaces, cgo).
+  - `tests/go_unsigned.rs`: Go `uint64`, `uint` and `uintptr` keep their range in the port.
   - `tests/java_package_declaration.rs` and `tests/java_replay.rs`: Java recording with comments in
     the package declaration, and replay that tells `null` from a rejected argument.
   - `tests/ruby_recording.rs`: Ruby results that cannot be encoded.
@@ -131,7 +132,8 @@ the same way:
 
 ## Translate the README
 
-Translations are welcome and community-maintained. A new one:
+Translations are welcome and community-maintained. Say which language you are taking in
+[#425](https://github.com/erkamyaman/rust-anything/issues/425) so two people don't do the same one. A new one:
 
 1. Lives in `docs/README_<CODE>.md` (for example `docs/README_PT.md`); the root `README.md` stays
    English and is never renamed or replaced.

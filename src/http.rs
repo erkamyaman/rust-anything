@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{Ipv6Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
@@ -180,8 +180,20 @@ pub fn free_port() -> Result<u16> {
     Ok(TcpListener::bind("127.0.0.1:0")?.local_addr()?.port())
 }
 
-fn local(port: u16) -> SocketAddr {
-    SocketAddr::from(([127, 0, 0, 1], port))
+/// The loopback addresses a server may listen on. A server that binds to `localhost` can get only
+/// `::1` (Node 17+ may pick it), so both are tried, IPv4 first.
+fn local(port: u16) -> [SocketAddr; 2] {
+    [
+        SocketAddr::from(([127, 0, 0, 1], port)),
+        SocketAddr::from((Ipv6Addr::LOCALHOST, port)),
+    ]
+}
+
+/// The first loopback address that accepts a connection on `port`.
+fn listening(port: u16, wait: Duration) -> Option<SocketAddr> {
+    local(port)
+        .into_iter()
+        .find(|addr| TcpStream::connect_timeout(addr, wait).is_ok())
 }
 
 fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -309,13 +321,13 @@ fn read_response(stream: &mut impl Read, head_only: bool) -> Result<Resp> {
     })
 }
 
-fn send(port: u16, req: &Req, timeout: Duration) -> Result<Resp> {
-    let mut stream = TcpStream::connect_timeout(&local(port), timeout)?;
+fn send(addr: SocketAddr, req: &Req, timeout: Duration) -> Result<Resp> {
+    let mut stream = TcpStream::connect_timeout(&addr, timeout)?;
     stream.set_read_timeout(Some(timeout))?;
     stream.set_write_timeout(Some(timeout))?;
     let body = req.body.as_deref().unwrap_or("").as_bytes();
     let mut head = format!(
-        "{} {} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n",
+        "{} {} HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n",
         req.method, req.path
     );
     for (k, v) in &req.headers {
@@ -338,7 +350,8 @@ fn send(port: u16, req: &Req, timeout: Duration) -> Result<Resp> {
 /// A server process; stopped (SIGTERM, then SIGKILL) when dropped.
 struct Server {
     child: Child,
-    port: u16,
+    /// The loopback address that answered while waiting for the server; requests go there.
+    addr: SocketAddr,
     dir: PathBuf,
     cwd: PathBuf,
     log: PathBuf,
@@ -348,7 +361,7 @@ struct Server {
 
 impl Server {
     fn start(command: &[String], launch: &Launch, repo: &Path, port: u16) -> Result<Server> {
-        if TcpStream::connect_timeout(&local(port), Duration::from_millis(100)).is_ok() {
+        if listening(port, Duration::from_millis(100)).is_some() {
             bail!("port {port} is already in use");
         }
         let dir = app::temp_dir("server")?;
@@ -370,12 +383,12 @@ impl Server {
             .effects
             .map(|config| -> Result<_> {
                 let sinks = crate::effects::Sinks::start(config)?;
-                sinks.reset(&cwd)?;
+                sinks.reset(&cwd, repo)?;
                 Ok(sinks)
             })
             .transpose()?;
-        let mut child = Command::new(program)
-            .args(rest)
+        let mut cmd = Command::new(program);
+        cmd.args(rest)
             .args(
                 launch
                     .args
@@ -388,18 +401,19 @@ impl Server {
             .env(app::FALLBACK_ENV, &log)
             .stdin(Stdio::null())
             .stdout(std::fs::File::create(dir.join("stdout"))?)
-            .stderr(std::fs::File::create(dir.join("stderr"))?)
+            .stderr(std::fs::File::create(dir.join("stderr"))?);
+        let mut child = cmd
             .spawn()
             .with_context(|| format!("starting `{}`", command.join(" ")))?;
         let deadline = Instant::now() + READY;
-        loop {
+        let addr = loop {
             let failure = if let Some(status) = child.try_wait()? {
                 Some(format!("exited ({status}) before listening"))
-            } else if TcpStream::connect_timeout(&local(port), Duration::from_millis(200)).is_ok() {
+            } else if let Some(addr) = listening(port, Duration::from_millis(200)) {
                 if let Some(status) = child.try_wait()? {
                     Some(format!("exited ({status}) before listening"))
                 } else {
-                    break;
+                    break addr;
                 }
             } else if Instant::now() > deadline {
                 Some(format!("did not listen within {}s", READY.as_secs()))
@@ -424,10 +438,10 @@ impl Server {
                 );
             }
             std::thread::sleep(Duration::from_millis(50));
-        }
+        };
         Ok(Server {
             child,
-            port,
+            addr,
             dir,
             cwd,
             log,
@@ -447,19 +461,33 @@ impl Server {
             return;
         }
         self.stopped = true;
+        // The whole process tree: the real server can be a grandchild (`npm start`, `sh -c`).
+        // The server stays in our process group, so a Ctrl-C in the terminal still reaches it.
         #[cfg(unix)]
         {
-            let _ = Command::new("kill")
-                .args(["-TERM", &self.child.id().to_string()])
+            // The one we started is reaped only below, so its pid cannot go to another process
+            // while `end_tree` may still signal it.
+            end_tree(
+                self.child.id(),
+                Duration::from_secs(5),
+                processes,
+                |signal, pids| {
+                    let _ = Command::new("kill")
+                        .arg(signal)
+                        .arg("--")
+                        .args(pids.iter().map(u32::to_string))
+                        .stderr(Stdio::null())
+                        .status();
+                },
+            );
+        }
+        #[cfg(windows)]
+        {
+            let _ = Command::new("taskkill")
+                .args(["/T", "/F", "/PID", &self.child.id().to_string()])
+                .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .status();
-            let deadline = Instant::now() + Duration::from_secs(5);
-            while Instant::now() < deadline {
-                if let Ok(Some(_)) = self.child.try_wait() {
-                    break;
-                }
-                std::thread::sleep(Duration::from_millis(20));
-            }
         }
         let _ = self.child.kill();
         let _ = self.child.wait();
@@ -471,6 +499,160 @@ impl Drop for Server {
     fn drop(&mut self) {
         self.stop();
     }
+}
+
+/// Every process as `pid ppid stat start` lines, from `ps` (the start time is several words).
+#[cfg(unix)]
+fn processes() -> Option<String> {
+    let out = Command::new("ps")
+        .args([
+            "-A", "-o", "pid=", "-o", "ppid=", "-o", "stat=", "-o", "lstart=",
+        ])
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// Ends `root` and every process below it: TERM, a wait of up to `grace` until a listing shows
+/// none of them running (so nothing still holds the port), then KILL and the same wait. Every
+/// listing adds the processes forked since the last one below a process it tracks, and sends them
+/// the current signal too. A failed listing proves nothing: the wait goes on and KILL still
+/// follows, to `root` alone if the listing before it failed too, and to the rest of the tree
+/// once a listing shows them running as they were. A process whose parent exited
+/// before any listing saw it is reparented and can no longer be traced to the server. Returns
+/// whether a listing showed the whole tree gone.
+///
+/// A process is tracked with its start time, and is signalled only while the latest listing shows
+/// that pid with that start time, so a pid that went to another process after its own exited is
+/// left alone (two processes started in the same second on the same pid look alike, and a pid
+/// reused between a listing and the signal is not caught). `root` is the caller's child, not yet
+/// reaped, so its pid stays its own and it needs no start time.
+#[cfg(any(unix, test))]
+fn end_tree(
+    root: u32,
+    grace: Duration,
+    mut list: impl FnMut() -> Option<String>,
+    mut signal: impl FnMut(&str, &[u32]),
+) -> bool {
+    let mut tree: Vec<(u32, Option<String>)> = vec![(root, None)];
+    for sig in ["-TERM", "-KILL"] {
+        // Each stage's targets come from a listing taken now: an older one may name a pid that
+        // went to another process since. Without a listing, only `root` is surely ours, and the
+        // others get the signal once a listing shows them again.
+        let mut sent: Vec<(u32, Option<String>)> = Vec::new();
+        let fresh = list();
+        if let Some(ps) = &fresh {
+            grow(ps, &mut tree);
+        }
+        signal_due(sig, fresh.as_deref(), &tree, &mut sent, &mut signal);
+        let deadline = Instant::now() + grace;
+        loop {
+            if let Some(ps) = list() {
+                grow(&ps, &mut tree);
+                signal_due(sig, Some(&ps), &tree, &mut sent, &mut signal);
+                if running(Some(&ps), &tree).is_empty() {
+                    return true;
+                }
+            }
+            if Instant::now() > deadline {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+    false
+}
+
+/// Sends `sig` to the processes in `tree` that `ps` shows running (see `running`) and that have
+/// not had it yet, and records them in `sent`.
+#[cfg(any(unix, test))]
+fn signal_due(
+    sig: &str,
+    ps: Option<&str>,
+    tree: &[(u32, Option<String>)],
+    sent: &mut Vec<(u32, Option<String>)>,
+    signal: &mut impl FnMut(&str, &[u32]),
+) {
+    let due: Vec<_> = tree.iter().filter(|t| !sent.contains(t)).cloned().collect();
+    let pids = running(ps, &due);
+    if !pids.is_empty() {
+        signal(sig, &pids);
+        sent.extend(due.into_iter().filter(|(pid, _)| pids.contains(pid)));
+    }
+}
+
+/// A process in a `ps` line of `pid ppid stat start`.
+#[cfg(any(unix, test))]
+struct Listed<'a> {
+    pid: u32,
+    ppid: u32,
+    stat: &'a str,
+    start: String,
+}
+
+#[cfg(any(unix, test))]
+fn listed(ps: &str) -> Vec<Listed<'_>> {
+    ps.lines()
+        .filter_map(|line| {
+            let mut fields = line.split_whitespace();
+            Some(Listed {
+                pid: fields.next()?.parse().ok()?,
+                ppid: fields.next()?.parse().ok()?,
+                stat: fields.next()?,
+                start: fields.collect::<Vec<_>>().join(" "),
+            })
+        })
+        .collect()
+}
+
+/// Whether a listed process is the tracked one: the same pid, and the same start time if one was
+/// recorded.
+#[cfg(any(unix, test))]
+fn same(p: &Listed, pid: u32, start: Option<&str>) -> bool {
+    p.pid == pid && start.is_none_or(|s| s == p.start)
+}
+
+/// Adds to `tree` every process listed below one in it, with its start time.
+#[cfg(any(unix, test))]
+fn grow(ps: &str, tree: &mut Vec<(u32, Option<String>)>) {
+    let procs = listed(ps);
+    let mut i = 0;
+    while let Some((pid, start)) = tree.get(i).cloned() {
+        // A pid that went to another process has no children of ours.
+        if procs.iter().any(|p| same(p, pid, start.as_deref())) {
+            for p in procs.iter().filter(|p| p.ppid == pid) {
+                if !tree.iter().any(|(t, s)| same(p, *t, s.as_deref())) {
+                    tree.push((p.pid, Some(p.start.clone())));
+                }
+            }
+        }
+        i += 1;
+    }
+}
+
+/// The tracked processes that still run as the listing shows them: the same process (see `same`)
+/// and not a zombie, which holds no port. With no listing, only `root` (no start time) is known.
+#[cfg(any(unix, test))]
+fn running(ps: Option<&str>, tree: &[(u32, Option<String>)]) -> Vec<u32> {
+    let Some(ps) = ps else {
+        return tree
+            .iter()
+            .filter(|(_, start)| start.is_none())
+            .map(|(pid, _)| *pid)
+            .collect();
+    };
+    let procs = listed(ps);
+    tree.iter()
+        .filter(|(pid, start)| {
+            procs
+                .iter()
+                .any(|p| same(p, *pid, start.as_deref()) && !p.stat.starts_with('Z'))
+        })
+        .map(|(pid, _)| *pid)
+        .collect()
 }
 
 type Answer = (
@@ -500,12 +682,12 @@ fn run_all(
     let mut out = Vec::new();
     for req in reqs {
         let before = server.fallbacks().unwrap_or(0);
-        let resp = send(server.port, req, timeout).map_err(|e| format!("{e:#}"));
+        let resp = send(server.addr, req, timeout).map_err(|e| format!("{e:#}"));
         if let Some(pace) = launch.pace {
             std::thread::sleep(pace);
         }
         let fell_back = server.fallbacks().map(|after| after > before);
-        let effects = server.sinks.as_ref().map(|s| s.take(&server.cwd));
+        let effects = server.sinks.as_ref().map(|s| s.take(&server.cwd, repo));
         out.push((resp, fell_back, effects));
     }
     server.stop();
@@ -1243,6 +1425,178 @@ pub(crate) fn replay(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_tree_of_a_server_is_found_and_zombies_are_not_alive() {
+        // pid ppid stat start, as `ps -A -o pid= -o ppid= -o stat= -o lstart=` prints them.
+        let ps = "    1     0 Ss   Tue Nov 24 13:00:00 2026\n  100     1 S    Tue Nov 24 14:00:00 2026\n  200   100 Z    Tue Nov 24 14:00:01 2026\n  300   100 S    Tue Nov 24 14:00:01 2026\n  400   300 R    Tue Nov 24 14:00:02 2026\n  500     1 S    Tue Nov 24 14:00:00 2026\n  600   500 S    Tue Nov 24 14:00:01 2026\n";
+        let tree = |root| {
+            let mut tree = vec![(root, None)];
+            grow(ps, &mut tree);
+            tree
+        };
+        let pids =
+            |tree: &[(u32, Option<String>)]| tree.iter().map(|(p, _)| *p).collect::<Vec<_>>();
+        assert_eq!(pids(&tree(100)), [100, 200, 300, 400]);
+        assert_eq!(tree(100)[2].1.as_deref(), Some("Tue Nov 24 14:00:01 2026"));
+        assert_eq!(pids(&tree(400)), [400]);
+        assert_eq!(pids(&tree(999)), [999]);
+        assert_eq!(
+            running(Some(ps), &tree(100)),
+            [100, 300, 400],
+            "a zombie holds no port"
+        );
+        assert!(running(Some(ps), &[(999, None)]).is_empty());
+        assert_eq!(running(None, &tree(100)), [100]);
+    }
+
+    /// Runs `end_tree` on these listings (`None` a failed `ps`, and failing once they run out)
+    /// and returns the signals it sent and whether it saw the tree gone.
+    fn ending(listings: &[Option<&str>], grace: Duration) -> (Vec<(String, Vec<u32>)>, bool) {
+        let mut listings = listings.iter().map(|l| l.map(str::to_string));
+        let mut sent = Vec::new();
+        let gone = end_tree(
+            100,
+            grace,
+            || listings.next().flatten(),
+            |signal, pids| sent.push((signal.to_string(), pids.to_vec())),
+        );
+        (sent, gone)
+    }
+
+    #[test]
+    fn a_failed_listing_after_term_still_ends_in_kill() {
+        // `ps` works for TERM, then fails: the wait goes on to the deadline, and KILL goes to
+        // the started child only, since 300's pid may belong to another process by then.
+        let (sent, gone) = ending(
+            &[Some("  100 1 S\n  300 100 S\n")],
+            Duration::from_millis(60),
+        );
+        assert!(!gone);
+        assert_eq!(
+            sent,
+            [
+                ("-TERM".to_string(), vec![100, 300]),
+                ("-KILL".to_string(), vec![100])
+            ]
+        );
+    }
+
+    #[test]
+    fn a_process_forked_while_stopping_gets_the_signal_too() {
+        let (sent, gone) = ending(
+            &[
+                Some("  100 1 S\n  300 100 S\n"),
+                // 300 forked 700 after the first listing.
+                Some("  100 1 S\n  300 100 S\n  700 300 S\n"),
+                // 300 is gone and 700 reparented, still running: still waited for.
+                Some("  100 1 Z\n  700 1 S\n"),
+                Some("  100 1 Z\n"),
+            ],
+            Duration::from_secs(5),
+        );
+        assert!(gone);
+        assert_eq!(
+            sent,
+            [
+                ("-TERM".to_string(), vec![100, 300]),
+                ("-TERM".to_string(), vec![700])
+            ]
+        );
+    }
+
+    #[test]
+    fn a_pid_reused_while_stopping_gets_no_kill() {
+        // 300 exited and its pid went to another process; 100 ignores TERM. Listed so through
+        // the TERM wait (60 ms, about 3 polls) and in the listing taken before KILL.
+        const REUSED: &str =
+            "  100 1 S Tue Nov 24 14:00:00 2026\n  300 1 S Tue Nov 24 14:00:05 2026\n";
+        let (sent, gone) = ending(
+            &[
+                Some("  100 1 S Tue Nov 24 14:00:00 2026\n  300 100 S Tue Nov 24 14:00:01 2026\n"),
+                Some(REUSED),
+                Some(REUSED),
+                Some(REUSED),
+                Some(REUSED),
+                Some(REUSED),
+                Some(REUSED),
+                Some(REUSED),
+                Some(REUSED),
+            ],
+            Duration::from_millis(60),
+        );
+        assert!(!gone);
+        assert_eq!(
+            sent,
+            [
+                ("-TERM".to_string(), vec![100, 300]),
+                ("-KILL".to_string(), vec![100])
+            ]
+        );
+    }
+
+    #[test]
+    fn a_process_the_listing_before_kill_missed_gets_kill_once_a_listing_shows_it() {
+        // 100 and 300 ignore TERM. `ps` fails through the TERM wait and right before KILL, so
+        // KILL first goes to 100 alone; the next listing shows 300 still running as it was.
+        let tree = "  100 1 S Tue Nov 24 14:00:00 2026\n  300 100 S Tue Nov 24 14:00:01 2026\n";
+        let sent = std::cell::RefCell::new(Vec::<(String, Vec<u32>)>::new());
+        let calls = std::cell::Cell::new(0);
+        let gone = end_tree(
+            100,
+            Duration::from_millis(60),
+            || {
+                calls.set(calls.get() + 1);
+                let sent = sent.borrow();
+                let killed = |pid| sent.iter().any(|(s, p)| s == "-KILL" && p.contains(&pid));
+                if calls.get() == 1 {
+                    Some(tree.to_string())
+                } else if !killed(100) {
+                    None
+                } else if !killed(300) {
+                    Some(tree.to_string())
+                } else {
+                    Some(String::new())
+                }
+            },
+            |signal, pids| sent.borrow_mut().push((signal.to_string(), pids.to_vec())),
+        );
+        assert!(gone);
+        assert_eq!(
+            sent.into_inner(),
+            [
+                ("-TERM".to_string(), vec![100, 300]),
+                ("-KILL".to_string(), vec![100]),
+                ("-KILL".to_string(), vec![300])
+            ]
+        );
+    }
+
+    #[test]
+    fn stopping_waits_after_kill_until_the_tree_is_gone() {
+        let killed = std::cell::Cell::new(false);
+        let after_kill = std::cell::Cell::new(0);
+        let gone = end_tree(
+            100,
+            Duration::from_millis(60),
+            || {
+                let alive = "  100 1 S Tue Nov 24 14:00:00 2026\n".to_string();
+                if !killed.get() {
+                    return Some(alive);
+                }
+                after_kill.set(after_kill.get() + 1);
+                // Still running once after KILL, then gone.
+                Some(if after_kill.get() == 1 {
+                    alive
+                } else {
+                    String::new()
+                })
+            },
+            |signal, _| killed.set(killed.get() || signal == "-KILL"),
+        );
+        assert!(gone);
+        assert_eq!(after_kill.get(), 2, "both listings after KILL were read");
+    }
 
     #[test]
     fn curl_lines_become_requests() {
