@@ -507,8 +507,9 @@ fn processes() -> Option<String> {
 /// none of them running (so nothing still holds the port), then KILL and the same wait. Every
 /// listing adds the processes forked since the last one below a process it tracks, and sends them
 /// the current signal too. A failed listing proves nothing: the wait goes on and KILL still
-/// follows. A process whose parent exited before any listing saw it is reparented and can no
-/// longer be traced to the server. Returns whether a listing showed the whole tree gone.
+/// follows, to `root` alone if the listing before it failed too. A process whose parent exited
+/// before any listing saw it is reparented and can no longer be traced to the server. Returns
+/// whether a listing showed the whole tree gone.
 ///
 /// A process is tracked with its start time, and is signalled only while the latest listing shows
 /// that pid with that start time, so a pid that went to another process after its own exited is
@@ -523,12 +524,14 @@ fn end_tree(
     mut signal: impl FnMut(&str, &[u32]),
 ) -> bool {
     let mut tree: Vec<(u32, Option<String>)> = vec![(root, None)];
-    let mut last = list();
-    if let Some(ps) = &last {
-        grow(ps, &mut tree);
-    }
     for sig in ["-TERM", "-KILL"] {
-        signal(sig, &running(last.as_deref(), &tree));
+        // Each stage's targets come from a listing taken now: an older one may name a pid that
+        // went to another process since. Without a listing, only `root` is surely ours.
+        let fresh = list();
+        if let Some(ps) = &fresh {
+            grow(ps, &mut tree);
+        }
+        signal(sig, &running(fresh.as_deref(), &tree));
         let mut signalled = tree.len();
         let deadline = Instant::now() + grace;
         loop {
@@ -538,9 +541,7 @@ fn end_tree(
                     signal(sig, &running(Some(&ps), &tree[signalled..]));
                     signalled = tree.len();
                 }
-                let done = running(Some(&ps), &tree).is_empty();
-                last = Some(ps);
-                if done {
+                if running(Some(&ps), &tree).is_empty() {
                     return true;
                 }
             }
@@ -1431,6 +1432,8 @@ mod tests {
 
     #[test]
     fn a_failed_listing_after_term_still_ends_in_kill() {
+        // `ps` works for TERM, then fails: the wait goes on to the deadline, and KILL goes to
+        // the started child only, since 300's pid may belong to another process by then.
         let (sent, gone) = ending(
             &[Some("  100 1 S\n  300 100 S\n")],
             Duration::from_millis(60),
@@ -1440,7 +1443,7 @@ mod tests {
             sent,
             [
                 ("-TERM".to_string(), vec![100, 300]),
-                ("-KILL".to_string(), vec![100, 300])
+                ("-KILL".to_string(), vec![100])
             ]
         );
     }
@@ -1470,11 +1473,21 @@ mod tests {
 
     #[test]
     fn a_pid_reused_while_stopping_gets_no_kill() {
+        // 300 exited and its pid went to another process; 100 ignores TERM. Listed so through
+        // the TERM wait (60 ms, about 3 polls) and in the listing taken before KILL.
+        const REUSED: &str =
+            "  100 1 S Tue Nov 24 14:00:00 2026\n  300 1 S Tue Nov 24 14:00:05 2026\n";
         let (sent, gone) = ending(
             &[
                 Some("  100 1 S Tue Nov 24 14:00:00 2026\n  300 100 S Tue Nov 24 14:00:01 2026\n"),
-                // 300 exited and its pid went to another process; 100 ignores TERM.
-                Some("  100 1 S Tue Nov 24 14:00:00 2026\n  300 1 S Tue Nov 24 14:00:05 2026\n"),
+                Some(REUSED),
+                Some(REUSED),
+                Some(REUSED),
+                Some(REUSED),
+                Some(REUSED),
+                Some(REUSED),
+                Some(REUSED),
+                Some(REUSED),
             ],
             Duration::from_millis(60),
         );
