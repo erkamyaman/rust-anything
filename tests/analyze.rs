@@ -896,6 +896,25 @@ fn map_names_a_path_that_does_not_exist() {
 }
 
 #[test]
+fn map_refuses_write_and_json_together() {
+    let root = std::env::temp_dir().join(format!("ra-map-write-json-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_rust-anything"))
+        .args(["map", "--write", "--json"])
+        .arg(&root)
+        .output()
+        .unwrap();
+    let wrote = root.join("rust/PORT_MAP.md").exists();
+    std::fs::remove_dir_all(&root).unwrap();
+    // `--json` used to win silently: exit 0, JSON printed, nothing written.
+    assert!(!out.status.success());
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("cannot be used with"), "{err}");
+    assert!(!wrote);
+}
+
+#[test]
 fn bridgeable_exports_are_counted_as_bridge_judges_them() {
     let root = std::env::temp_dir().join(format!("ra-analyze-dts-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);

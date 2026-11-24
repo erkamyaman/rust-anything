@@ -4,6 +4,8 @@
 
 - The workflow skill's description names Kotlin, PHP, C# and PowerShell, so agents also pick it for those
   ports (#280).
+- `map --write --json` is refused (`--write` cannot be used with `--json`) instead of printing the
+  JSON and silently writing nothing (#343).
 
 ## 3.4.0 (2026-11-23)
 

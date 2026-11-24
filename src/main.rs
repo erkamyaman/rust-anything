@@ -454,7 +454,7 @@ enum Cmd {
         #[arg(long = "crates")]
         crates: Vec<PathBuf>,
         /// Write the map to rust/PORT_MAP.md in the repository instead of printing it.
-        #[arg(long)]
+        #[arg(long, conflicts_with = "json")]
         write: bool,
         /// Exit 1 when the original changed since any port was recorded.
         #[arg(long)]
