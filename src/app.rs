@@ -412,6 +412,15 @@ fn run_in(
         }
         std::fs::write(&target, bytes)?;
     }
+    // The database lives where the case runs, so reset it there, before taking the snapshot that
+    // tells the case's own writes apart.
+    let sinks = effects
+        .map(|config| -> Result<_> {
+            let sinks = crate::effects::Sinks::start(config)?;
+            sinks.reset(&work, repo)?;
+            Ok(sinks)
+        })
+        .transpose()?;
     let before: BTreeMap<PathBuf, FileStamp> = walk_files(&work)
         .into_iter()
         .filter_map(|path| {
@@ -442,13 +451,6 @@ fn run_in(
     for key in &case.env_remove {
         cmd.env_remove(key);
     }
-    let sinks = effects
-        .map(|config| -> Result<_> {
-            let sinks = crate::effects::Sinks::start(config)?;
-            sinks.reset(repo)?;
-            Ok(sinks)
-        })
-        .transpose()?;
     if let Some(sinks) = &sinks {
         cmd.envs(sinks.env());
     }
@@ -550,7 +552,7 @@ fn run_in(
         .cloned()
         .collect();
     let fallback = std::fs::metadata(&log).ok().map(|m| m.len() > 0);
-    let effects = sinks.map(|s| redact(s.take(repo)));
+    let effects = sinks.map(|s| redact(s.take(&work, repo)));
     Ok(Run {
         stdout: redact(stdout),
         stderr: redact(stderr),

@@ -2,11 +2,27 @@
 
 ## Unreleased
 
+- On Windows, `profile` and `go` find the project's own functions in a Node workload: Node's
+  `file:///C:/...` frame URLs kept the slash before the drive letter, so no frame matched the
+  project root and `go` stopped with `no hot function to port`.
 - `app record` and `app replay` fail with `port <port> is already in use` before spawning a server
   on an occupied port and check whether the child exited before treating the port as ready (#326).
 - `record`, `fuzz`, `diff` and `bench` pass `--experimental-strip-types` to Node 22.6 to 22.17 (and
   23.0 to 23.5), which only strip TypeScript types with that flag, so TS units no longer fail with
   `ERR_UNKNOWN_FILE_EXTENSION` on Node versions `doctor` accepts (#340).
+- `app record --http` and `app replay` find a server that listens only on `::1` (a `localhost`
+  bind can get IPv6 only) and send its requests there, instead of waiting 60 seconds and failing
+  with `did not listen within 60s` (#327).
+- `app record --db-reset` and `--db-dump` run in the folder a CLI case runs in, as they already did
+  for servers, so a database the app keeps next to it is the one reset and dumped, and the
+  repository's own copy is left alone. Scripts they name by a relative path with a script
+  extension (`reset.py`, `"my scripts/seed.sh"`, `< schema.sql`) still come from the repository;
+  output redirects (`> dump.sql`, also unspaced) stay in the case's folder, and here-document
+  bodies and `#` comments are left as written. Quotes, line continuations and `( )` blocks are
+  read as sh and cmd read them (#324).
+- `bridge` types Go `uint64` and `uint` as `u64` and `uintptr` as `usize` in `port.rs`, alone or as
+  slice items. They were `i64`, so a result above `i64::MAX` could not go back to Go and failed
+  `diff` (#357).
 
 ## 4.0.0 (2026-11-24)
 

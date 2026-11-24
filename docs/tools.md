@@ -140,11 +140,13 @@ Runs the original's code or commands.
 
 Tool `enable` · CLI `rust-anything enable`
 
-Switch a ported TS/JS or Python unit on: one marked block in each original source file rebinds the unit's functions to the built Rust module, for every caller, with no import changed. RUST_ANYTHING_MODE=old or RUST_ANYTHING_UNIT_<NAME>=original runs the original for one run. Refuses while recorded cases differ unless `force`.
+Switch a ported TS/JS or Python unit on: one marked block in each original source file rebinds the unit's functions to the built Rust module, for every caller, with no import changed. RUST_ANYTHING_MODE=old or RUST_ANYTHING_UNIT_<NAME>=original runs the original for one run. Refuses while recorded cases differ unless `force`, `partial`, or `only` names functions that match.
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `crate` | string | yes | Folder of the generated crate (holds rust-anything.json). |
+| `only` | string[] |  | Switch on only these exported functions. |
+| `partial` | boolean |  | Switch on only the functions whose recorded cases all match; leave the rest in the original. |
 | `force` | boolean |  | Switch it on even when recorded cases differ. |
 
 ## Switch a unit off
@@ -283,8 +285,8 @@ Runs the original's code or commands.
 | `port` | integer |  | A port the server always listens on (implies http). |
 | `effects` | string[] |  | Record what leaves the process: "http" (a local sink set as HTTP_PROXY, http_proxy and RUST_ANYTHING_HTTP_SINK) and "smtp" (a local mail server, SMTP_HOST and SMTP_PORT). Each case stores what reached them, in order, and replay compares it. |
 | `effect_env` | string[] |  | Point the app's own settings at a sink: VAR=http-url, VAR=smtp-host, VAR=smtp-port or VAR=smtp-url. |
-| `db_reset` | string |  | Shell command that resets the database before each case (each start for servers); cases then run one at a time. |
-| `db_dump` | string |  | Shell command that prints the database's state (e.g. `sqlite3 app.db .dump`), run after each case or request and recorded with the effects. |
+| `db_reset` | string |  | Shell command that resets the database before each case (each start for servers), run in the folder the case runs in; a script it names by a relative path with a script extension (.py, .sh, .js, .ts, .rb, .php, .pl, .ps1, .bat, .cmd, .sql and similar) is the repository's, while other relative paths, extensionless scripts included, are the case folder's. Cases then run one at a time. |
+| `db_dump` | string |  | Shell command that prints the database's state (e.g. `sqlite3 app.db .dump`), run after each case or request in the folder the case runs in, and recorded with the effects. |
 | `args` | string[] |  | Servers: arguments every start gets after its command, the original's and every build's (["db.json"]). Implies http; saved. |
 | `fresh` | string[] |  | Repository files or folders the app reads or writes (a project tree, a database file), snapshotted and copied into a fresh working directory before every case (CLIs) or start (servers); a CLI's removed files are compared too. Saved. |
 | `pace` | integer |  | Servers: milliseconds to wait after each response, for work the server does after answering (a file watcher). Implies http; saved and used by replay; 0 removes it. |

@@ -55,6 +55,17 @@ pub fn original_only(cmd: &mut Command, manifest: &Manifest) {
 }
 
 pub fn enable(crate_dir: &Path) -> Result<Switched> {
+    enable_only(crate_dir, None, &[])
+}
+
+/// Switches on either all exports (`only = None`) or a specific subset (`only = Some(names)`).
+/// `extra_skipped` holds human-readable skip reasons already decided by the caller (e.g.
+/// per-function diff counts under `--partial`).
+pub fn enable_only(
+    crate_dir: &Path,
+    only: Option<&[String]>,
+    extra_skipped: &[String],
+) -> Result<Switched> {
     let crate_dir = crate_dir.canonical().with_context(|| {
         format!(
             "resolving {} (run `rust-anything bridge` first)",
@@ -63,21 +74,67 @@ pub fn enable(crate_dir: &Path) -> Result<Switched> {
     })?;
     let manifest = Manifest::load(&crate_dir)?;
     supported(&manifest)?;
+    let selected: Option<Vec<&str>> = match only {
+        Some(names) => {
+            let mut unknown = Vec::new();
+            let mut chosen = Vec::new();
+            for name in names {
+                if manifest.exports.iter().any(|e| e.name == *name) {
+                    if !chosen.contains(&name.as_str()) {
+                        chosen.push(name.as_str());
+                    }
+                } else {
+                    unknown.push(name.as_str());
+                }
+            }
+            if !unknown.is_empty() {
+                bail!(
+                    "unknown export(s) in {}: {}",
+                    manifest.crate_name,
+                    unknown.join(", ")
+                );
+            }
+            if manifest.language == Lang::Powershell && chosen.len() < manifest.exports.len() {
+                bail!(
+                    "partial enable (--only / --partial) is not supported for PowerShell units: \
+                     dot-sourcing the wrapper rebinds every function in the file"
+                );
+            }
+            Some(chosen)
+        }
+        None => None,
+    };
     let switch = crate::front_door::kill_switch(&manifest.crate_name);
     let mut by_file: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for f in &manifest.exports {
         by_file.entry(&f.file).or_default().push(&f.name);
+    }
+    let mut skipped: Vec<String> = manifest
+        .js_only
+        .iter()
+        .map(|j| format!("{}: kept in the original", j.name))
+        .collect();
+    skipped.extend(extra_skipped.iter().cloned());
+    if let Some(chosen) = &selected {
+        for f in &manifest.exports {
+            if !chosen.contains(&f.name.as_str())
+                && !extra_skipped
+                    .iter()
+                    .any(|s| s.starts_with(&format!("{}:", f.name)))
+            {
+                skipped.push(format!(
+                    "{}: not selected (--only), kept in the original",
+                    f.name
+                ));
+            }
+        }
     }
     let mut out = Switched {
         crate_name: manifest.crate_name.clone(),
         on: true,
         files: Vec::new(),
         functions: Vec::new(),
-        skipped: manifest
-            .js_only
-            .iter()
-            .map(|j| format!("{}: kept in the original", j.name))
-            .collect(),
+        skipped,
         switch: switch.clone(),
     };
     let mut edits = Vec::new();
@@ -85,17 +142,22 @@ pub fn enable(crate_dir: &Path) -> Result<Switched> {
         let path = manifest.root.join(file);
         let text = std::fs::read_to_string(&path)
             .with_context(|| format!("reading {}", path.display()))?;
-        if find_block(&text, &manifest.crate_name).is_some() {
-            out.functions.extend(names.iter().map(|n| n.to_string()));
-            continue;
-        }
-        let (swap, skip): (Vec<&str>, Vec<&str>) = names
+        let base = remove(&text, &manifest.crate_name).unwrap_or_else(|| text.clone());
+        let wanted: Vec<&str> = match &selected {
+            Some(chosen) => names.into_iter().filter(|n| chosen.contains(n)).collect(),
+            None => names,
+        };
+        let (swap, skip): (Vec<&str>, Vec<&str>) = wanted
             .into_iter()
-            .partition(|n| declared(&text, n, manifest.language));
+            .partition(|n| declared(&base, n, manifest.language));
         out.skipped.extend(skip.iter().map(|n| {
             format!("{n}: not a plain function declaration in {file}, so callers keep the original")
         }));
         if swap.is_empty() {
+            if base != text {
+                edits.push((path.clone(), base));
+                out.files.push(path);
+            }
             continue;
         }
         let dir = path
@@ -111,12 +173,14 @@ pub fn enable(crate_dir: &Path) -> Result<Switched> {
                 &dir,
                 &swap,
                 &switch,
-                esm(file, &text),
+                esm(file, &base),
             ),
         };
-        let edited = insert(&text, &block, manifest.language);
-        edits.push((path.clone(), edited));
-        out.files.push(path);
+        let edited = insert(&base, &block, manifest.language);
+        if edited != text {
+            edits.push((path.clone(), edited));
+            out.files.push(path);
+        }
         out.functions.extend(swap.iter().map(|n| n.to_string()));
     }
     if out.functions.is_empty() {
@@ -130,6 +194,99 @@ pub fn enable(crate_dir: &Path) -> Result<Switched> {
         std::fs::write(&path, text).with_context(|| format!("writing {}", path.display()))?;
     }
     Ok(out)
+}
+
+/// Picks which exports to switch on from per-function diff counts.
+///
+/// - When `only` is non-empty (`--only`), validates each requested export exists and that all of
+///   its recorded cases match, returning `(selected, skipped_reasons)`.
+/// - When `only` is empty (`--partial`), selects every export whose recorded cases all match and
+///   lists the rest as `"<name>: <passed>/<total> match, kept in the original"`.
+pub fn select_matching(
+    manifest: &Manifest,
+    outcome: &crate::harness::DiffOutcome,
+    counts: &BTreeMap<String, (usize, usize)>,
+    only: &[String],
+) -> Result<(Vec<String>, Vec<String>)> {
+    let status = |name: &str| -> (bool, String) {
+        if outcome.missing.iter().any(|m| m == name) {
+            return (
+                false,
+                format!("{name}: missing from the Rust module, kept in the original"),
+            );
+        }
+        match counts.get(name).copied() {
+            Some((passed, total)) if total > 0 && passed == total => (true, String::new()),
+            Some((passed, total)) if total > 0 => (
+                false,
+                format!("{name}: {passed}/{total} match, kept in the original"),
+            ),
+            _ => (
+                false,
+                format!("{name}: no recorded cases, kept in the original"),
+            ),
+        }
+    };
+
+    if !only.is_empty() {
+        let mut unknown = Vec::new();
+        let mut selected = Vec::new();
+        let mut failures = Vec::new();
+        for name in only {
+            if !manifest.exports.iter().any(|e| e.name == *name) {
+                unknown.push(name.as_str());
+                continue;
+            }
+            if selected.contains(name) {
+                continue;
+            }
+            let (ok, reason) = status(name);
+            if ok {
+                selected.push(name.clone());
+            } else {
+                failures.push(reason);
+            }
+        }
+        if !unknown.is_empty() {
+            bail!(
+                "unknown export(s) in {}: {}",
+                manifest.crate_name,
+                unknown.join(", ")
+            );
+        }
+        if !failures.is_empty() {
+            bail!(
+                "requested function(s) do not match all recorded cases ({}); pass --force to switch them on anyway",
+                failures.join("; ")
+            );
+        }
+        let skipped = manifest
+            .exports
+            .iter()
+            .filter(|e| !selected.contains(&e.name))
+            .map(|e| format!("{}: not selected (--only), kept in the original", e.name))
+            .collect();
+        return Ok((selected, skipped));
+    }
+
+    let mut selected = Vec::new();
+    let mut skipped = Vec::new();
+    for e in &manifest.exports {
+        let (ok, reason) = status(&e.name);
+        if ok {
+            selected.push(e.name.clone());
+        } else {
+            skipped.push(reason);
+        }
+    }
+    if selected.is_empty() {
+        bail!(
+            "no functions in {} have all recorded cases matching ({})",
+            manifest.crate_name,
+            skipped.join("; ")
+        );
+    }
+    Ok((selected, skipped))
 }
 
 pub fn disable(crate_dir: &Path) -> Result<Switched> {
@@ -454,5 +611,78 @@ mod tests {
             "const x = require('y')\nmodule.exports = {}\n"
         ));
         assert!(!esm("a.cjs", "export function f() {}\n"));
+    }
+
+    #[test]
+    fn select_matching_handles_partial_and_only_modes() {
+        use crate::harness::DiffOutcome;
+        use crate::ts::exports::ExportedFn;
+
+        let export = |name: &str| ExportedFn {
+            name: name.into(),
+            file: "util.py".into(),
+            line: 1,
+            ..Default::default()
+        };
+        let manifest = Manifest {
+            schema: "1".into(),
+            root: PathBuf::from("/tmp"),
+            root_written: None,
+            unit: "util.py".into(),
+            language: Lang::Python,
+            kind: Kind::Pyo3,
+            crate_name: "util-rs".into(),
+            exports: vec![export("slug"), export("words"), export("missing_fn")],
+            classes: Vec::new(),
+            js_only: Vec::new(),
+            batches: Vec::new(),
+            allocator: Default::default(),
+            float_tolerance: None,
+        };
+        let outcome = DiffOutcome {
+            total: 446,
+            passed: 223,
+            failed: 223,
+            missing: vec!["missing_fn".into()],
+            ..Default::default()
+        };
+        let counts = BTreeMap::from([
+            ("slug".into(), (223, 223)),
+            ("words".into(), (0, 223)),
+            ("missing_fn".into(), (0, 10)),
+        ]);
+
+        // --partial picks only `slug` and reports per-function skip reasons for the rest.
+        let (selected, skipped) = select_matching(&manifest, &outcome, &counts, &[]).unwrap();
+        assert_eq!(selected, ["slug"]);
+        assert_eq!(
+            skipped,
+            [
+                "words: 0/223 match, kept in the original",
+                "missing_fn: missing from the Rust module, kept in the original",
+            ]
+        );
+
+        // --only accepts a matching function even while others fail.
+        let (selected, skipped) =
+            select_matching(&manifest, &outcome, &counts, &["slug".into()]).unwrap();
+        assert_eq!(selected, ["slug"]);
+        assert_eq!(skipped.len(), 2);
+
+        // --only rejects a failing requested function.
+        let err = select_matching(&manifest, &outcome, &counts, &["words".into()]).unwrap_err();
+        assert!(format!("{err:#}").contains("words: 0/223 match"), "{err:#}");
+
+        // --only rejects an unknown export name.
+        let err = select_matching(&manifest, &outcome, &counts, &["nope".into()]).unwrap_err();
+        assert!(format!("{err:#}").contains("unknown export(s)"), "{err:#}");
+
+        // --partial fails clearly when nothing matches.
+        let none_counts = BTreeMap::from([("slug".into(), (1, 2)), ("words".into(), (0, 223))]);
+        let err = select_matching(&manifest, &outcome, &none_counts, &[]).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("no functions in util-rs have all recorded cases matching"),
+            "{err:#}"
+        );
     }
 }
