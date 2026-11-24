@@ -370,7 +370,7 @@ impl Server {
             .effects
             .map(|config| -> Result<_> {
                 let sinks = crate::effects::Sinks::start(config)?;
-                sinks.reset(&cwd)?;
+                sinks.reset(&cwd, repo)?;
                 Ok(sinks)
             })
             .transpose()?;
@@ -505,7 +505,7 @@ fn run_all(
             std::thread::sleep(pace);
         }
         let fell_back = server.fallbacks().map(|after| after > before);
-        let effects = server.sinks.as_ref().map(|s| s.take(&server.cwd));
+        let effects = server.sinks.as_ref().map(|s| s.take(&server.cwd, repo));
         out.push((resp, fell_back, effects));
     }
     server.stop();

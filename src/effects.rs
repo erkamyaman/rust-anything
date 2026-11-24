@@ -149,9 +149,10 @@ impl Sinks {
         out
     }
 
-    pub fn reset(&self, cwd: &Path) -> Result<()> {
+    /// Runs `--db-reset` in `cwd`, the folder the case or server runs in.
+    pub fn reset(&self, cwd: &Path, repo: &Path) -> Result<()> {
         if let Some(cmd) = &self.config.db_reset {
-            let out = shell(cmd, cwd, &self.env())?;
+            let out = shell(cmd, cwd, repo, &self.env())?;
             if !out.status.success() {
                 bail!(
                     "--db-reset `{cmd}` failed ({}): {}",
@@ -163,7 +164,8 @@ impl Sinks {
         Ok(())
     }
 
-    pub fn take(&self, cwd: &Path) -> Vec<u8> {
+    /// Collects the effects and runs `--db-dump` in `cwd`, the folder the case or server ran in.
+    pub fn take(&self, cwd: &Path, repo: &Path) -> Vec<u8> {
         let deadline = Instant::now() + SETTLE;
         while self.active.load(Ordering::SeqCst) > 0 && Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(10));
@@ -175,7 +177,7 @@ impl Sinks {
             .unwrap_or_default();
         if let Some(cmd) = &self.config.db_dump {
             text.push_str("db\n");
-            match shell(cmd, cwd, &self.env()) {
+            match shell(cmd, cwd, repo, &self.env()) {
                 Ok(out) => {
                     text.push_str(&String::from_utf8_lossy(&out.stdout));
                     if !out.status.success() {
@@ -203,17 +205,63 @@ impl Drop for Sinks {
     }
 }
 
-fn shell(cmd: &str, cwd: &Path, env: &[(String, String)]) -> Result<crate::process::Output> {
+/// Extensions of the files `with_repo_scripts` points at the repository.
+const SCRIPTS: [&str; 14] = [
+    "py", "sh", "bash", "js", "mjs", "cjs", "ts", "rb", "php", "pl", "ps1", "bat", "cmd", "sql",
+];
+
+/// The command runs where the case runs, so a script it names by a relative path (`reset.py`,
+/// `scripts/reset-db.sh`, `schema.sql`) is pointed at the repository's copy. Other words, such as
+/// `app.db`, stay relative: they name the case's own files.
+fn with_repo_scripts(cmd: &str, repo: &Path) -> String {
+    cmd.split(' ')
+        .map(|word| {
+            let path = Path::new(word);
+            let script = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|e| SCRIPTS.contains(&e.to_ascii_lowercase().as_str()));
+            let in_repo = repo.join(word);
+            if script && path.is_relative() && in_repo.is_file() {
+                quoted(&in_repo)
+            } else {
+                word.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[cfg(windows)]
+fn quoted(path: &Path) -> String {
+    format!("\"{}\"", path.display())
+}
+
+#[cfg(not(windows))]
+fn quoted(path: &Path) -> String {
+    format!("'{}'", path.display().to_string().replace('\'', r"'\''"))
+}
+
+fn shell(
+    cmd: &str,
+    cwd: &Path,
+    repo: &Path,
+    env: &[(String, String)],
+) -> Result<crate::process::Output> {
+    let cmd = with_repo_scripts(cmd, repo);
     #[cfg(windows)]
     let mut c = {
+        use std::os::windows::process::CommandExt as _;
+        // `/S` strips exactly the outer quotes, so the command keeps the quotes `quoted` added;
+        // `arg` would escape them as `\"`, which cmd does not read.
         let mut c = Command::new("cmd");
-        c.args(["/C", cmd]);
+        c.args(["/S", "/C"]).raw_arg(format!("\"{cmd}\""));
         c
     };
     #[cfg(not(windows))]
     let mut c = {
         let mut c = Command::new("sh");
-        c.args(["-c", cmd]);
+        c.args(["-c", &cmd]);
         c
     };
     c.current_dir(cwd)
@@ -442,6 +490,35 @@ fn serve_smtp(stream: TcpStream, events: &Mutex<Vec<String>>) {
 mod tests {
     use super::*;
 
+    #[test]
+    fn only_scripts_of_the_repository_are_pointed_at_it() {
+        let repo = std::env::temp_dir().join(format!("ra-effects-scripts-{}", std::process::id()));
+        std::fs::create_dir_all(repo.join("scripts")).unwrap();
+        for file in ["reset.py", "scripts/seed.sh", "app.db"] {
+            std::fs::write(repo.join(file), "").unwrap();
+        }
+        let at = |file: &str| quoted(&repo.join(file));
+        assert_eq!(
+            with_repo_scripts("python3 reset.py --all", &repo),
+            format!("python3 {} --all", at("reset.py"))
+        );
+        assert_eq!(
+            with_repo_scripts("sh scripts/seed.sh && sqlite3 app.db .dump", &repo),
+            format!("sh {} && sqlite3 app.db .dump", at("scripts/seed.sh"))
+        );
+        // Not in the repository, or not a relative path: left as written.
+        assert_eq!(
+            with_repo_scripts("python3 missing.py", &repo),
+            "python3 missing.py"
+        );
+        let absolute = repo.join("reset.py").display().to_string();
+        assert_eq!(
+            with_repo_scripts(&format!("python3 {absolute}"), &repo),
+            format!("python3 {absolute}")
+        );
+        std::fs::remove_dir_all(&repo).unwrap();
+    }
+
     fn send(port: u16, text: &str) -> String {
         let mut s = TcpStream::connect(("127.0.0.1", port)).unwrap();
         s.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
@@ -479,13 +556,13 @@ mod tests {
         let mut out = String::new();
         let _ = mail.read_to_string(&mut out);
         assert!(out.contains("221"), "{out}");
-        let text = String::from_utf8(sinks.take(Path::new("."))).unwrap();
+        let text = String::from_utf8(sinks.take(Path::new("."), Path::new("."))).unwrap();
         assert_eq!(
             text,
             "http POST http://hooks.example/new\ncontent-type: application/json\n\n{\"a\":1}\n\
              smtp from <a@x.test> to <b@y.test>\nSubject: hi\n\n.dot\n"
         );
-        assert!(sinks.take(Path::new(".")).is_empty());
+        assert!(sinks.take(Path::new("."), Path::new(".")).is_empty());
     }
 
     #[test]
