@@ -842,9 +842,10 @@ fn a_server_started_through_a_wrapper_is_stopped_with_it() {
 }
 
 /// A server that takes a minute to answer `/slow`, so `app record` is still running it when the
-/// test interrupts.
+/// test interrupts. It writes its pid, so the test can clean up a server that outlived it.
 #[cfg(unix)]
 const SLOW_SERVER: &str = r#"import http.server, os, time
+open("server.pid", "w").write(str(os.getpid()))
 class H(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/slow":
@@ -859,8 +860,34 @@ class H(http.server.BaseHTTPRequestHandler):
 http.server.HTTPServer(("127.0.0.1", int(os.environ["PORT"])), H).serve_forever()
 "#;
 
-/// A terminal sends Ctrl-C to its foreground process group. The server must be in that group,
-/// or an interrupted `app record` leaves it listening.
+/// Ends the CLI's process group and the server, whatever the test saw, before it asserts.
+#[cfg(unix)]
+struct Interrupted {
+    cli: std::process::Child,
+    repo: std::path::PathBuf,
+}
+
+#[cfg(unix)]
+impl Drop for Interrupted {
+    fn drop(&mut self) {
+        let kill = |target: &str| {
+            let _ = std::process::Command::new("kill")
+                .args(["-KILL", "--", target])
+                .stderr(std::process::Stdio::null())
+                .status();
+        };
+        kill(&format!("-{}", self.cli.id()));
+        if let Ok(pid) = std::fs::read_to_string(self.repo.join("server.pid")) {
+            kill(pid.trim());
+        }
+        let _ = self.cli.kill();
+        let _ = self.cli.wait();
+        let _ = std::fs::remove_dir_all(&self.repo);
+    }
+}
+
+/// A terminal sends Ctrl-C to its foreground process group. The server, here started through a
+/// wrapper, must be in that group, or an interrupted `app record` leaves it listening.
 #[cfg(unix)]
 #[test]
 fn an_interrupted_record_leaves_no_server_listening() {
@@ -877,6 +904,11 @@ fn an_interrupted_record_leaves_no_server_listening() {
     std::fs::create_dir_all(&repo).unwrap();
     std::fs::write(repo.join("server.py"), SLOW_SERVER).unwrap();
     std::fs::write(
+        repo.join("wrapper.sh"),
+        format!("{python} server.py\necho done\n"),
+    )
+    .unwrap();
+    std::fs::write(
         repo.join("inputs.jsonl"),
         "{\"name\":\"slow\",\"path\":\"/slow\"}\n",
     )
@@ -889,11 +921,11 @@ fn an_interrupted_record_leaves_no_server_listening() {
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
     let listening =
         || std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_ok();
-    let mut cli = std::process::Command::new(env!("CARGO_BIN_EXE_rust-anything"))
+    let cli = std::process::Command::new(env!("CARGO_BIN_EXE_rust-anything"))
         .args(["app", "record"])
         .arg(&repo)
         .args(["--http", "--port", &port.to_string()])
-        .args(["--inputs", "inputs.jsonl", "--", python, "server.py"])
+        .args(["--inputs", "inputs.jsonl", "--", "sh", "wrapper.sh"])
         .current_dir(&repo)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
@@ -902,22 +934,31 @@ fn an_interrupted_record_leaves_no_server_listening() {
         .process_group(0)
         .spawn()
         .unwrap();
+    let mut run = Interrupted {
+        cli,
+        repo: repo.clone(),
+    };
     let deadline = Instant::now() + Duration::from_secs(60);
+    let mut came_up = true;
     while !listening() {
-        assert!(Instant::now() < deadline, "the server never listened");
+        if Instant::now() > deadline {
+            came_up = false;
+            break;
+        }
         std::thread::sleep(Duration::from_millis(100));
     }
     std::thread::sleep(Duration::from_millis(500));
     // Ctrl-C: SIGINT to the whole foreground group.
     std::process::Command::new("kill")
-        .args(["-INT", "--", &format!("-{}", cli.id())])
+        .args(["-INT", "--", &format!("-{}", run.cli.id())])
         .status()
         .unwrap();
     let deadline = Instant::now() + Duration::from_secs(20);
-    while cli.try_wait().unwrap().is_none() {
-        if Instant::now() > deadline {
-            let _ = cli.kill();
-            panic!("app record did not stop on SIGINT");
+    let mut cli_exited = false;
+    while Instant::now() < deadline {
+        if run.cli.try_wait().unwrap().is_some() {
+            cli_exited = true;
+            break;
         }
         std::thread::sleep(Duration::from_millis(100));
     }
@@ -926,7 +967,10 @@ fn an_interrupted_record_leaves_no_server_listening() {
         std::thread::sleep(Duration::from_millis(100));
     }
     let still_listening = listening();
-    let _ = std::fs::remove_dir_all(&repo);
+    // Everything is stopped before any assertion can fail.
+    drop(run);
+    assert!(came_up, "the server never listened on port {port}");
+    assert!(cli_exited, "app record did not stop on SIGINT");
     assert!(
         !still_listening,
         "the server still listens on port {port} after app record was interrupted"

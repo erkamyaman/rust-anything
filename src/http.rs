@@ -452,31 +452,25 @@ impl Server {
         // The server stays in our process group, so a Ctrl-C in the terminal still reaches it.
         #[cfg(unix)]
         {
-            let tree = processes()
-                .map(|ps| tree(&ps, self.child.id()))
-                .unwrap_or_else(|| vec![self.child.id()]);
-            'signals: for signal in ["-TERM", "-KILL"] {
-                let _ = Command::new("kill")
-                    .arg(signal)
-                    .arg("--")
-                    .args(tree.iter().map(u32::to_string))
-                    .stderr(Stdio::null())
-                    .status();
-                // Until every process of the tree is gone, not only the one we started, so
-                // nothing still holds the port when `stop` returns.
-                let deadline = Instant::now() + Duration::from_secs(5);
-                loop {
-                    // Reap the one we started, so it does not linger as a zombie.
-                    let _ = self.child.try_wait();
-                    if !processes().is_some_and(|ps| any_alive(&ps, &tree)) {
-                        break 'signals;
-                    }
-                    if Instant::now() > deadline {
-                        break;
-                    }
-                    std::thread::sleep(Duration::from_millis(20));
-                }
-            }
+            let root = self.child.id();
+            let child = &mut self.child;
+            end_tree(
+                root,
+                Duration::from_secs(5),
+                processes,
+                |signal, pids| {
+                    let _ = Command::new("kill")
+                        .arg(signal)
+                        .arg("--")
+                        .args(pids.iter().map(u32::to_string))
+                        .stderr(Stdio::null())
+                        .status();
+                },
+                // Reap the one we started, so it does not linger as a zombie.
+                || {
+                    let _ = child.try_wait();
+                },
+            );
         }
         #[cfg(windows)]
         {
@@ -511,9 +505,52 @@ fn processes() -> Option<String> {
         .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
-/// `root` and every process below it, from `ps` lines of `pid ppid stat`.
+/// Ends `root` and every process below it: TERM, a wait of up to `grace` until a listing shows
+/// none of them running (so nothing still holds the port), then KILL and the same wait. Every
+/// listing adds the processes forked since the last one below a process it tracks, and sends them
+/// the current signal too. A failed listing proves nothing: the wait goes on and KILL still
+/// follows. A process whose parent exited before any listing saw it is reparented and can no
+/// longer be traced to the server. Returns whether a listing showed the whole tree gone.
 #[cfg(any(unix, test))]
-fn tree(ps: &str, root: u32) -> Vec<u32> {
+fn end_tree(
+    root: u32,
+    grace: Duration,
+    mut list: impl FnMut() -> Option<String>,
+    mut signal: impl FnMut(&str, &[u32]),
+    mut reap: impl FnMut(),
+) -> bool {
+    let mut tree = vec![root];
+    if let Some(ps) = list() {
+        grow(&ps, &mut tree);
+    }
+    for sig in ["-TERM", "-KILL"] {
+        signal(sig, &tree);
+        let mut signalled = tree.len();
+        let deadline = Instant::now() + grace;
+        loop {
+            reap();
+            if let Some(ps) = list() {
+                grow(&ps, &mut tree);
+                if tree.len() > signalled {
+                    signal(sig, &tree[signalled..]);
+                    signalled = tree.len();
+                }
+                if !any_alive(&ps, &tree) {
+                    return true;
+                }
+            }
+            if Instant::now() > deadline {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+    false
+}
+
+/// Adds to `tree` every process below one in it, from `ps` lines of `pid ppid stat`.
+#[cfg(any(unix, test))]
+fn grow(ps: &str, tree: &mut Vec<u32>) {
     let parents: Vec<(u32, u32)> = ps
         .lines()
         .filter_map(|line| {
@@ -521,7 +558,6 @@ fn tree(ps: &str, root: u32) -> Vec<u32> {
             Some((fields.next()?.parse().ok()?, fields.next()?.parse().ok()?))
         })
         .collect();
-    let mut tree = vec![root];
     let mut i = 0;
     while let Some(&pid) = tree.get(i) {
         for &(child, parent) in &parents {
@@ -531,7 +567,6 @@ fn tree(ps: &str, root: u32) -> Vec<u32> {
         }
         i += 1;
     }
-    tree
 }
 
 /// Whether any of `pids` still runs: listed by `ps` and not a zombie, which holds no port.
@@ -1316,12 +1351,71 @@ mod tests {
     fn the_tree_of_a_server_is_found_and_zombies_are_not_alive() {
         // pid ppid stat, as `ps -A -o pid= -o ppid= -o stat=` prints them.
         let ps = "    1     0 Ss\n  100     1 S\n  200   100 Z\n  300   100 S\n  400   300 R\n  500     1 S\n  600   500 S\n";
-        assert_eq!(tree(ps, 100), [100, 200, 300, 400]);
-        assert_eq!(tree(ps, 400), [400]);
-        assert_eq!(tree(ps, 999), [999]);
+        let tree = |root| {
+            let mut tree = vec![root];
+            grow(ps, &mut tree);
+            tree
+        };
+        assert_eq!(tree(100), [100, 200, 300, 400]);
+        assert_eq!(tree(400), [400]);
+        assert_eq!(tree(999), [999]);
         assert!(any_alive(ps, &[200, 300]));
         assert!(!any_alive(ps, &[200]), "a zombie holds no port");
         assert!(!any_alive(ps, &[999]));
+    }
+
+    /// Runs `end_tree` on these listings (`None` a failed `ps`, and failing once they run out)
+    /// and returns the signals it sent and whether it saw the tree gone.
+    fn ending(listings: &[Option<&str>], grace: Duration) -> (Vec<(String, Vec<u32>)>, bool) {
+        let mut listings = listings.iter().map(|l| l.map(str::to_string));
+        let mut sent = Vec::new();
+        let gone = end_tree(
+            100,
+            grace,
+            || listings.next().flatten(),
+            |signal, pids| sent.push((signal.to_string(), pids.to_vec())),
+            || {},
+        );
+        (sent, gone)
+    }
+
+    #[test]
+    fn a_failed_listing_after_term_still_ends_in_kill() {
+        let (sent, gone) = ending(
+            &[Some("  100 1 S\n  300 100 S\n")],
+            Duration::from_millis(60),
+        );
+        assert!(!gone);
+        assert_eq!(
+            sent,
+            [
+                ("-TERM".to_string(), vec![100, 300]),
+                ("-KILL".to_string(), vec![100, 300])
+            ]
+        );
+    }
+
+    #[test]
+    fn a_process_forked_while_stopping_gets_the_signal_too() {
+        let (sent, gone) = ending(
+            &[
+                Some("  100 1 S\n  300 100 S\n"),
+                // 300 forked 700 after the first listing.
+                Some("  100 1 S\n  300 100 S\n  700 300 S\n"),
+                // 300 is gone and 700 reparented, still running: still waited for.
+                Some("  100 1 Z\n  700 1 S\n"),
+                Some("  100 1 Z\n"),
+            ],
+            Duration::from_secs(5),
+        );
+        assert!(gone);
+        assert_eq!(
+            sent,
+            [
+                ("-TERM".to_string(), vec![100, 300]),
+                ("-TERM".to_string(), vec![700])
+            ]
+        );
     }
 
     #[test]
