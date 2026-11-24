@@ -1497,7 +1497,8 @@ pub struct RecordOutcome {
     pub timed_out: Vec<String>,
     /// The cases this recording wrote.
     pub recorded: Vec<String>,
-    /// Cases the last recording wrote (or that timed out now) and this one did not: removed.
+    /// Cases the last recording in this folder wrote and this one did not (a timeout included):
+    /// removed, apart from files a case that stays reads (`fs.base`).
     pub stale: Vec<String>,
     /// Cases in the folder that no recording wrote (by hand, or before the list was kept):
     /// left in place.
@@ -1517,16 +1518,18 @@ const CASE_FILES: [&str; 9] = [
     "out",
 ];
 
-/// Removes the cases the last recording wrote, or this one planned, that it did not write now,
-/// and names the cases in the folder that did not come from a recording, which it keeps.
+/// Removes the cases the last recording in this folder wrote (`previous`) that this one did not
+/// write, and names the cases in the folder that did not come from a recording, which it keeps.
+/// Only `previous` marks a case as a recording's: a case written by hand stays even when an input
+/// of its name timed out now. Files a case that stays reads through `fs.base` stay too.
 pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Result<()> {
     let written: BTreeSet<&str> = outcome.recorded.iter().map(String::as_str).collect();
     let ours: BTreeSet<&str> = previous
         .iter()
-        .chain(&outcome.timed_out)
         .map(String::as_str)
         .filter(|name| !written.contains(name))
         .collect();
+    let read = bases_read(&outcome.dir, &ours);
     let mut stale = Vec::new();
     for name in &ours {
         if outcome.dir.join(format!("{name}.toml")).is_file() {
@@ -1534,6 +1537,9 @@ pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Re
         }
         for ext in CASE_FILES {
             let path = outcome.dir.join(format!("{name}.{ext}"));
+            if read.contains(&path) {
+                continue;
+            }
             if path.is_dir() {
                 std::fs::remove_dir_all(&path)
                     .with_context(|| format!("removing {}", path.display()))?;
@@ -1555,6 +1561,32 @@ pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Re
     outcome.stale = stale;
     outcome.kept = kept;
     Ok(())
+}
+
+/// The `fs.base` folders that the cases in `dir` other than `going` read.
+fn bases_read(dir: &Path, going: &BTreeSet<&str>) -> BTreeSet<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return BTreeSet::new();
+    };
+    entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.extension().is_some_and(|e| e == "toml")
+                && path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .is_some_and(|stem| !going.contains(stem))
+        })
+        .filter_map(|path| std::fs::read_to_string(path).ok())
+        .filter_map(|text| text.parse::<DocumentMut>().ok())
+        .filter_map(|doc| {
+            doc.get("fs")
+                .and_then(|f| f.get("base"))
+                .and_then(Item::as_str)
+                .map(|base| dir.join(base))
+        })
+        .collect()
 }
 
 struct Recorded {
@@ -1789,9 +1821,11 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
         .canonical()
         .with_context(|| format!("no folder {}", opts.repo.display()))?;
     let existing = Config::load(&repo)?;
-    let previous = existing
+    // The names the last recording wrote, and whether it wrote them to `http/` or to the CLI
+    // folder: they are a recording's only in that folder.
+    let (previous, previous_http) = existing
         .as_ref()
-        .map(|c| c.recorded.clone())
+        .map(|c| (c.recorded.clone(), c.http.is_some()))
         .unwrap_or_default();
     let run = if !opts.run.is_empty() {
         opts.run.to_vec()
@@ -1877,7 +1911,7 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
     if config.http.is_some() {
         let mut outcome = crate::http::record(&repo, &config, &norm, opts)?;
         config.unordered = unordered_of(&outcome.noise);
-        drop_stale(&mut outcome, &previous)?;
+        drop_stale(&mut outcome, if previous_http { &previous } else { &[] })?;
         config.recorded = outcome.recorded.clone();
         std::fs::write(
             cases_dir(&repo).join(CONFIG_FILE),
@@ -1992,7 +2026,7 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
         }
     }
     config.unordered = unordered_of(&outcome.noise);
-    drop_stale(&mut outcome, &previous)?;
+    drop_stale(&mut outcome, if previous_http { &[] } else { &previous })?;
     config.recorded = outcome.recorded.clone();
     std::fs::write(
         dir.join(CONFIG_FILE),

@@ -16,6 +16,15 @@ fn repo(tag: &str) -> PathBuf {
 }
 
 fn record(repo: &Path, run: &[String], http: bool) -> app::RecordOutcome {
+    record_within(repo, run, http, None)
+}
+
+fn record_within(
+    repo: &Path,
+    run: &[String],
+    http: bool,
+    timeout_secs: Option<u64>,
+) -> app::RecordOutcome {
     app::record(&RecordOptions {
         repo,
         run,
@@ -23,7 +32,7 @@ fn record(repo: &Path, run: &[String], http: bool) -> app::RecordOutcome {
         normalize: &[],
         name: None,
         traps: false,
-        timeout_secs: None,
+        timeout_secs,
         http,
         server_args: &[],
         fresh: &[],
@@ -148,4 +157,165 @@ fn an_http_case_dropped_from_the_inputs_is_removed_on_rerecord() {
         "two's files are left: {left:?}"
     );
     assert_eq!((again.passed, again.total), (1, 1), "{:?}", again.failures);
+}
+
+#[test]
+fn a_hand_written_case_named_like_an_input_that_times_out_is_kept() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = repo("timeout");
+    std::fs::write(
+        repo.join("cli.py"),
+        "import sys, time\nif sys.argv[1:] == ['slow']:\n    time.sleep(30)\nprint(sys.argv[1:])\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("in.jsonl"),
+        "{\"name\":\"one\",\"args\":[\"a\"]}\n",
+    )
+    .unwrap();
+    let run = [python.to_string(), "cli.py".to_string()];
+    record(&repo, &run, false);
+    let dir = app::cases_dir(&repo);
+    // Written by hand: no recording ever wrote `slow`.
+    std::fs::copy(dir.join("one.toml"), dir.join("slow.toml")).unwrap();
+    std::fs::copy(dir.join("one.stdout"), dir.join("slow.stdout")).unwrap();
+    std::fs::copy(dir.join("one.stderr"), dir.join("slow.stderr")).unwrap();
+
+    std::fs::write(
+        repo.join("in.jsonl"),
+        "{\"name\":\"one\",\"args\":[\"a\"]}\n{\"name\":\"slow\",\"args\":[\"slow\"]}\n",
+    )
+    .unwrap();
+    let second = record_within(&repo, &run, false, Some(2));
+    let left = files(&dir);
+    std::fs::remove_dir_all(&repo).unwrap();
+
+    assert_eq!(second.timed_out, ["slow"], "{second:?}");
+    assert!(second.stale.is_empty(), "{second:?}");
+    assert!(left.contains(&"slow.toml".to_string()), "{left:?}");
+    assert_eq!(second.kept, ["slow"], "{second:?}");
+}
+
+#[test]
+fn files_a_kept_case_reads_stay_when_the_case_that_wrote_them_goes() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = repo("base");
+    std::fs::write(
+        repo.join("cli.py"),
+        "import os\nprint(open('x.txt').read() if os.path.exists('x.txt') else 'none')\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("in.jsonl"),
+        "{\"name\":\"one\",\"args\":[]}\n{\"name\":\"two\",\"args\":[],\"files\":{\"x.txt\":\"from two\"}}\n",
+    )
+    .unwrap();
+    let run = [python.to_string(), "cli.py".to_string()];
+    record(&repo, &run, false);
+    let dir = app::cases_dir(&repo);
+    let two = std::fs::read_to_string(dir.join("two.toml")).unwrap();
+    assert!(two.contains("two.in"), "{two}");
+    // Written by hand, reading the files `two` was recorded with.
+    std::fs::write(dir.join("mine.toml"), &two).unwrap();
+    std::fs::copy(dir.join("two.stdout"), dir.join("mine.stdout")).unwrap();
+    std::fs::copy(dir.join("two.stderr"), dir.join("mine.stderr")).unwrap();
+
+    std::fs::write(repo.join("in.jsonl"), "{\"name\":\"one\",\"args\":[]}\n").unwrap();
+    let second = record(&repo, &run, false);
+    let left = files(&dir);
+    let again = replay(&repo);
+    std::fs::remove_dir_all(&repo).unwrap();
+
+    assert_eq!(second.stale, ["two"], "{second:?}");
+    assert!(!left.contains(&"two.toml".to_string()), "{left:?}");
+    assert!(left.contains(&"two.in".to_string()), "{left:?}");
+    assert_eq!((again.passed, again.total), (2, 2), "{:?}", again.failures);
+}
+
+#[test]
+fn names_a_cli_recording_wrote_are_not_removed_from_http_cases() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    // An HTTP case `two`, recorded elsewhere, to put in by hand.
+    let other = repo("switch-other");
+    std::fs::write(other.join("server.py"), SERVER).unwrap();
+    std::fs::write(
+        other.join("in.jsonl"),
+        "{\"name\":\"two\",\"path\":\"/two\"}\n",
+    )
+    .unwrap();
+    let server = [python.to_string(), "server.py".to_string()];
+    let theirs = record(&other, &server, true).dir;
+
+    let repo = repo("switch");
+    std::fs::write(repo.join("cli.py"), "import sys\nprint(sys.argv[1:])\n").unwrap();
+    std::fs::write(repo.join("server.py"), SERVER).unwrap();
+    std::fs::write(
+        repo.join("in.jsonl"),
+        "{\"name\":\"one\",\"args\":[\"a\"]}\n{\"name\":\"two\",\"args\":[\"b\"]}\n",
+    )
+    .unwrap();
+    record(&repo, &[python.to_string(), "cli.py".to_string()], false);
+    let http_dir = app::cases_dir(&repo).join("http");
+    std::fs::create_dir_all(&http_dir).unwrap();
+    for file in ["two.toml", "two.body"] {
+        std::fs::copy(theirs.join(file), http_dir.join(file)).unwrap();
+    }
+    std::fs::remove_dir_all(&other).unwrap();
+
+    std::fs::write(
+        repo.join("in.jsonl"),
+        "{\"name\":\"one\",\"path\":\"/one\"}\n",
+    )
+    .unwrap();
+    let second = record(&repo, &server, true);
+    let left = files(&http_dir);
+    let again = replay(&repo);
+    std::fs::remove_dir_all(&repo).unwrap();
+
+    assert!(second.stale.is_empty(), "{second:?}");
+    assert_eq!(second.kept, ["two"], "{second:?}");
+    assert!(left.contains(&"two.toml".to_string()), "{left:?}");
+    assert_eq!((again.passed, again.total), (2, 2), "{:?}", again.failures);
+}
+
+#[test]
+fn a_recorded_case_whose_input_times_out_now_is_removed() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = repo("timeout-ours");
+    let flag = repo.join("slow.flag");
+    std::fs::write(
+        repo.join("cli.py"),
+        format!(
+            "import os, sys, time\nif sys.argv[1:] == ['slow'] and os.path.exists({:?}):\n    time.sleep(30)\nprint(sys.argv[1:])\n",
+            flag.display().to_string()
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("in.jsonl"),
+        "{\"name\":\"one\",\"args\":[\"a\"]}\n{\"name\":\"slow\",\"args\":[\"slow\"]}\n",
+    )
+    .unwrap();
+    let run = [python.to_string(), "cli.py".to_string()];
+    let first = record(&repo, &run, false);
+    assert_eq!(first.cases, 2, "{first:?}");
+    std::fs::write(&flag, "").unwrap();
+    let second = record_within(&repo, &run, false, Some(2));
+    let left = files(&app::cases_dir(&repo));
+    std::fs::remove_dir_all(&repo).unwrap();
+
+    assert_eq!(second.timed_out, ["slow"], "{second:?}");
+    assert_eq!(second.stale, ["slow"], "{second:?}");
+    assert!(
+        !left.iter().any(|f| f.starts_with("slow.")),
+        "slow's files are left: {left:?}"
+    );
 }
