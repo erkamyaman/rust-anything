@@ -239,11 +239,12 @@ Chaque langage sauf C, PHP, C# et PowerShell obtient également des classes de t
 traversent la frontière une seule fois et restent en Rust, et chaque appel s'exécute sur l'ensemble des
 éléments sur tous les cœurs.
 
-Le langage est détecté à partir du dépôt (`go.mod`, `pom.xml`, un `.csproj` ou `.sln`, `pyproject.toml`,
-`Gemfile`, `composer.json`, `package.json`, sinon les fichiers sources les plus courants) ; `--lang`
-permet de le forcer. Les types proviennent des sources : types TS, annotations Python, signatures C, Go,
-Java et C#, balises Ruby YARD, types PHP et phpdoc ; les paramètres non typés utilisés comme des nombres
-sont inférés comme nombres.
+Le langage est détecté à partir du dépôt (`go.mod`, `pom.xml`, `build.gradle`/`build.gradle.kts`, un `.csproj`
+ou `.sln`, `pyproject.toml`, `Gemfile`, `composer.json`, `package.json`, sinon les fichiers sources les plus
+courants) ; un module Gradle avec des sources `.kt` et sans source `.java` est du Kotlin, les modules mixtes
+restent en Java. `--lang` permet de le forcer. Les types proviennent des sources : types TS, annotations
+Python, signatures C, Go, Java, Kotlin et C#, balises Ruby YARD, types PHP et phpdoc ; les paramètres non
+typés utilisés comme des nombres sont inférés comme nombres.
 
 Pour PHP, `analyze` planifie une application PHP (paquets Composer et chargement automatique
 PSR-4, risques tels que la comparaison souple et le débordement d'entiers en flottants, paquets Composer
