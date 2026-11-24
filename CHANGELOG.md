@@ -6,8 +6,9 @@
   on an occupied port and check whether the child exited before treating the port as ready (#326).
 - `app record --db-reset` and `--db-dump` run in the folder a CLI case runs in, as they already did
   for servers, so a database the app keeps next to it is the one reset and dumped, and the
-  repository's own copy is left alone. Scripts they name by a relative path still come from the
-  repository (#324).
+  repository's own copy is left alone. Scripts they name by a relative path with a script
+  extension (`reset.py`, `"my scripts/seed.sh"`, `< schema.sql`) still come from the repository;
+  output redirects (`> dump.sql`) stay in the case's folder (#324).
 
 ## 4.0.0 (2026-11-24)
 

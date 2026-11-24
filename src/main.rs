@@ -551,7 +551,8 @@ enum AppCmd {
         effect_env: Vec<String>,
         /// A shell command run before each case (CLIs) or each start (servers) that resets the
         /// database to a known state. Cases then run one at a time. It runs in the folder the
-        /// case runs in; a script it names by a relative path (`reset.py`) is the repository's.
+        /// case runs in; a script it names by a relative path with a script extension (`reset.py`,
+        /// `seed.sh`, `schema.sql`) is the repository's, other relative paths the case folder's.
         #[arg(long, value_name = "COMMAND")]
         db_reset: Option<String>,
         /// A shell command that prints the database's state (e.g. `sqlite3 app.db .dump`), run

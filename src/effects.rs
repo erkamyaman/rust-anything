@@ -211,25 +211,104 @@ const SCRIPTS: [&str; 14] = [
 ];
 
 /// The command runs where the case runs, so a script it names by a relative path (`reset.py`,
-/// `scripts/reset-db.sh`, `schema.sql`) is pointed at the repository's copy. Other words, such as
-/// `app.db`, stay relative: they name the case's own files.
+/// `"my scripts/reset.py"`, `< schema.sql`) is pointed at the repository's copy. Other words, such
+/// as `app.db`, and the target of an output redirect (`> snapshot.sql`) stay relative: they name
+/// the case's own files. Everything else in the command is kept as written.
 fn with_repo_scripts(cmd: &str, repo: &Path) -> String {
-    cmd.split(' ')
-        .map(|word| {
-            let path = Path::new(word);
-            let script = path
-                .extension()
-                .and_then(|e| e.to_str())
-                .is_some_and(|e| SCRIPTS.contains(&e.to_ascii_lowercase().as_str()));
-            let in_repo = repo.join(word);
-            if script && path.is_relative() && in_repo.is_file() {
-                quoted(&in_repo)
-            } else {
-                word.to_string()
+    let mut out = String::with_capacity(cmd.len());
+    let mut kept = 0;
+    let mut output_next = false;
+    for word in shell_words(cmd) {
+        let output_target = std::mem::take(&mut output_next);
+        // A leading redirect (`<`, `>`, `>>`, `2>`) is part of the word when nothing separates it.
+        let digits = word.text.len()
+            - word
+                .text
+                .trim_start_matches(|c: char| c.is_ascii_digit())
+                .len();
+        let rest = &word.text[digits..];
+        let op_len = if rest.starts_with(">>") {
+            2
+        } else if rest.starts_with(['<', '>']) {
+            1
+        } else {
+            0
+        };
+        let (op, path) = if op_len > 0 {
+            (&word.text[..digits + op_len], &word.text[digits + op_len..])
+        } else {
+            ("", word.text.as_str())
+        };
+        if op.ends_with('>') {
+            output_next = path.is_empty();
+            continue;
+        }
+        if output_target || path.is_empty() {
+            continue;
+        }
+        let script = Path::new(path)
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| SCRIPTS.contains(&e.to_ascii_lowercase().as_str()));
+        let in_repo = repo.join(path);
+        if script && Path::new(path).is_relative() && in_repo.is_file() {
+            out.push_str(&cmd[kept..word.start]);
+            out.push_str(op);
+            out.push_str(&quoted(&in_repo));
+            kept = word.end;
+        }
+    }
+    out.push_str(&cmd[kept..]);
+    out
+}
+
+/// A word of a shell command: where it sits in the command and its text without quotes.
+struct ShellWord {
+    start: usize,
+    end: usize,
+    text: String,
+}
+
+/// Splits a command into words as the shell does: whitespace, `;`, `&` and `|` separate words
+/// outside quotes, and quotes group without being part of the text. cmd only quotes with `"`; sh also with `'`
+/// and a backslash escape.
+fn shell_words(cmd: &str) -> Vec<ShellWord> {
+    let unix = cfg!(not(windows));
+    let mut words = Vec::new();
+    let mut word: Option<ShellWord> = None;
+    let mut quote = None;
+    let mut chars = cmd.char_indices();
+    while let Some((i, c)) = chars.next() {
+        let w = word.get_or_insert_with(|| ShellWord {
+            start: i,
+            end: i,
+            text: String::new(),
+        });
+        match (quote, c) {
+            (Some(q), c) if c == q => quote = None,
+            (Some(_), c) => w.text.push(c),
+            // Whitespace and the operators that chain or pipe commands end a word.
+            (None, c) if c.is_whitespace() || matches!(c, ';' | '&' | '|') => {
+                if let Some(w) = word.take().filter(|w| w.end > w.start) {
+                    words.push(w);
+                }
+                continue;
             }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
+            (None, '"') => quote = Some('"'),
+            (None, '\'') if unix => quote = Some('\''),
+            (None, '\\') if unix => {
+                if let Some((j, next)) = chars.next() {
+                    w.text.push(next);
+                    w.end = j + next.len_utf8();
+                    continue;
+                }
+            }
+            (None, c) => w.text.push(c),
+        }
+        w.end = i + c.len_utf8();
+    }
+    words.extend(word.filter(|w| w.end > w.start));
+    words
 }
 
 #[cfg(windows)]
@@ -515,6 +594,53 @@ mod tests {
         assert_eq!(
             with_repo_scripts(&format!("python3 {absolute}"), &repo),
             format!("python3 {absolute}")
+        );
+        std::fs::remove_dir_all(&repo).unwrap();
+    }
+
+    #[test]
+    fn script_words_are_read_as_the_shell_reads_them() {
+        let repo = std::env::temp_dir().join(format!("ra-effects-words-{}", std::process::id()));
+        std::fs::create_dir_all(repo.join("my scripts")).unwrap();
+        for file in [
+            "reset.py",
+            "my scripts/seed.py",
+            "schema.sql",
+            "snapshot.sql",
+        ] {
+            std::fs::write(repo.join(file), "").unwrap();
+        }
+        let at = |file: &str| quoted(&repo.join(file));
+        // Quoted, and quoted with a space.
+        assert_eq!(
+            with_repo_scripts(r#"python3 "reset.py""#, &repo),
+            format!("python3 {}", at("reset.py"))
+        );
+        assert_eq!(
+            with_repo_scripts(r#"python3 "my scripts/seed.py" --all"#, &repo),
+            format!("python3 {} --all", at("my scripts/seed.py"))
+        );
+        // An input is the repository's; an output stays in the case's folder.
+        assert_eq!(
+            with_repo_scripts("sqlite3 app.db < schema.sql", &repo),
+            format!("sqlite3 app.db < {}", at("schema.sql"))
+        );
+        assert_eq!(
+            with_repo_scripts("sqlite3 app.db <schema.sql", &repo),
+            format!("sqlite3 app.db <{}", at("schema.sql"))
+        );
+        for cmd in [
+            "sqlite3 app.db .dump > snapshot.sql",
+            "sqlite3 app.db .dump >> snapshot.sql",
+            "sqlite3 app.db .dump >snapshot.sql",
+            "sqlite3 app.db .dump 2> snapshot.sql",
+        ] {
+            assert_eq!(with_repo_scripts(cmd, &repo), cmd);
+        }
+        // Spacing and operators around the words are kept as written.
+        assert_eq!(
+            with_repo_scripts("python3  reset.py;  echo  ok", &repo),
+            format!("python3  {};  echo  ok", at("reset.py"))
         );
         std::fs::remove_dir_all(&repo).unwrap();
     }
