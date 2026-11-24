@@ -144,6 +144,121 @@ fn pyo3_extension_builds_imports_and_matches() {
     );
 }
 
+#[test]
+fn pyo3_bytes_bridge_accepts_bytes_bytearray_memoryview_and_returns_bytes() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let root = project(
+        "pyo3-bytes",
+        &[
+            (
+                "pyproject.toml",
+                "[project]\nname = \"crc\"\nversion = \"0.1.0\"\n",
+            ),
+            (
+                "crc/__init__.py",
+                "def xor_bytes(data: bytes, mask: int) -> bytes:\n\
+                 \x20   return bytes((b ^ (mask & 0xFF)) for b in data)\n",
+            ),
+        ],
+    );
+    let dir = root.join("port");
+    bridge::bridge(&bridge::Options {
+        root: &root,
+        unit: "crc/",
+        kind: Some(Kind::Pyo3),
+        out: Some(dir.clone()),
+        name: None,
+        force: false,
+        keep: Vec::new(),
+        lang: None,
+        batch: Vec::new(),
+        as_json: Vec::new(),
+        allocator: Default::default(),
+    })
+    .unwrap();
+
+    let port_path = dir.join("src/port.rs");
+    let port = std::fs::read_to_string(&port_path).unwrap();
+    assert!(
+        port.contains("pub fn xor_bytes(data: Vec<u8>, mask: i64) -> Result<Vec<u8>, String>"),
+        "{port}"
+    );
+
+    let recorded = harness::record(&RecordOptions {
+        crate_dir: &dir,
+        count: 20,
+        inputs: None,
+        module: None,
+        resolve_from: None,
+        node_args: &[],
+    })
+    .unwrap();
+    assert!(recorded.cases > 0, "{recorded:?}");
+
+    let start = port.find("pub fn xor_bytes(").unwrap();
+    let open = start + port[start..].find('{').unwrap();
+    let close = open + port[open..].find("\n}").unwrap();
+    let ported = format!(
+        "{}{{\n    Ok(data.into_iter().map(|b| b ^ (mask as u8)).collect()){}",
+        &port[..open],
+        &port[close..]
+    );
+    std::fs::write(&port_path, ported).unwrap();
+
+    harness::build(&dir).unwrap();
+    let outcome = harness::diff(&DiffOptions {
+        crate_dir: &dir,
+        module: None,
+        ignore_key_order: false,
+        node_args: &[],
+        float_tolerance: None,
+    })
+    .unwrap();
+    assert_eq!(
+        (outcome.failed, outcome.passed),
+        (0, outcome.total),
+        "{:#?}",
+        outcome.mismatches
+    );
+
+    let check = Command::new(python)
+        .env("PYTHONPATH", dir.join("python"))
+        .args([
+            "-c",
+            "import crc_rs as m\n\
+             for inp in (b'abc', bytearray(b'abc'), memoryview(b'abc'), memoryview(b'axbxc')[::2]):\n\
+             \x20   out = m.xor_bytes(inp, 1)\n\
+             \x20   assert type(out) is bytes, type(out)\n\
+             \x20   assert out == bytes(b ^ 1 for b in b'abc'), out\n",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        check.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&check.stdout),
+        String::from_utf8_lossy(&check.stderr)
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn pyo3_float_param_with_integer_default_builds_and_matches() {
+    if common::python().is_none() {
+        return;
+    }
+    let root = project(
+        "pyo3-float-default",
+        &[(
+            "scale.py",
+            "def scale(x: float, factor: float = 2) -> float:\n    return float(x) * float(factor)\n",
+        )],
+    );
+    round_trip(&root, "scale.py", Kind::Pyo3, "scale", "Ok(x * factor)");
+}
+
 /// A freshly bridged crate is all `unimplemented!` stubs: replaying it must pass no case, even
 /// where the original throws the same kind of error a panic turns into.
 fn stubs_fail(root: &Path, unit: &str, kind: Option<Kind>, program: &str) {

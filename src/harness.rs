@@ -1125,6 +1125,12 @@ fn trap_values(t: &RType) -> Vec<Value> {
             .filter_map(|t| serde_json::from_str(t).ok())
             .chain([json!([3, 1, 2]), json!({})])
             .collect(),
+        RType::Bytes => vec![
+            json!({ "$bytes": [] }),
+            json!({ "$bytes": [0] }),
+            json!({ "$bytes": [0, 1, 255] }),
+            json!({ "$bytes": [104, 101, 108, 108, 111] }),
+        ],
         RType::Bool | RType::Unit => Vec::new(),
     }
 }
@@ -1456,6 +1462,7 @@ fn shaped(s: &Shape, types: &[LocalType], rng: &mut Rng, depth: usize) -> Value 
         Shape::Num => value(&RType::F64, rng),
         Shape::Int => value(&RType::Int, rng),
         Shape::Bool => value(&RType::Bool, rng),
+        Shape::Bytes => value(&RType::Bytes, rng),
         Shape::Null => Value::Null,
         Shape::Undefined => json!({ "$undefined": true }),
         Shape::LitStr(text) => Value::String(text.clone()),
@@ -1556,6 +1563,11 @@ fn value(t: &RType, rng: &mut Rng) -> Value {
             }
         }
         RType::Bool => Value::Bool(rng.below(2) == 0),
+        RType::Bytes => {
+            let len = rng.below(6);
+            let bytes: Vec<u64> = (0..len).map(|_| rng.below(256) as u64).collect();
+            json!({ "$bytes": bytes })
+        }
         RType::Unit => json!({ "$undefined": true }),
         RType::Vec(inner) => Value::Array((0..rng.below(4)).map(|_| value(inner, rng)).collect()),
         RType::Opt(inner) => {

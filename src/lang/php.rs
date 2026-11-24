@@ -573,6 +573,27 @@ pub fn php_to_ts(t: &str) -> String {
     }
 }
 
+/// A tag body split into its type and the rest: a type may hold a space (`array<string, int>`),
+/// so the split happens at the first space outside `<>`, `()`, `[]` and `{}`.
+fn type_and_rest(rest: &str) -> Option<(&str, &str)> {
+    let rest = rest.trim_start();
+    if rest.is_empty() {
+        return None;
+    }
+    let mut depth = 0i32;
+    for (i, c) in rest.char_indices() {
+        match c {
+            '<' | '(' | '[' | '{' => depth += 1,
+            '>' | ')' | ']' | '}' => depth -= 1,
+            c if c.is_whitespace() && depth == 0 => {
+                return Some((&rest[..i], rest[i..].trim_start()));
+            }
+            _ => {}
+        }
+    }
+    Some((rest.trim_end(), ""))
+}
+
 fn plain_type(t: &str) -> bool {
     t.trim()
         .trim_start_matches('?')
@@ -682,14 +703,13 @@ fn function_fn(
     let doc = phpdoc(node, source);
     let doc_param = |p: &str| {
         doc.iter().find_map(|tag| {
-            let rest = tag.strip_prefix("@param ")?;
-            let mut words = rest.split_whitespace();
-            let t = words.next()?;
-            (words.next()? == format!("${p}")).then(|| php_to_ts(t))
+            let (t, rest) = type_and_rest(tag.strip_prefix("@param ")?)?;
+            let name = rest.split_whitespace().next()?;
+            (name == format!("${p}")).then(|| php_to_ts(t))
         })
     };
     let doc_return = doc.iter().find_map(|tag| {
-        let t = tag.strip_prefix("@return ")?.split_whitespace().next()?;
+        let (t, _) = type_and_rest(tag.strip_prefix("@return ")?)?;
         Some(php_to_ts(t))
     });
     let returns = node
@@ -885,6 +905,23 @@ pub fn exports(path: &str, source: &str) -> Vec<ExportedFn> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn a_phpdoc_type_with_a_space_keeps_its_arguments() {
+        // `array<string, int>` holds a space: splitting the tag on whitespace cut it in half.
+        assert_eq!(
+            type_and_rest("array<string, int> $counts"),
+            Some(("array<string, int>", "$counts"))
+        );
+        assert_eq!(type_and_rest("?int $x"), Some(("?int", "$x")));
+        assert_eq!(
+            type_and_rest("array{a: int, b: string} $x"),
+            Some(("array{a: int, b: string}", "$x"))
+        );
+        assert_eq!(type_and_rest("string"), Some(("string", "")));
+        assert_eq!(type_and_rest("   "), None);
+        assert_eq!(php_to_ts("array<string, int>"), "Record<string, int>");
+    }
+
     const SRC: &str = r#"<?php
 declare(strict_types=1);
 namespace App\Text;
@@ -914,6 +951,18 @@ final class Words extends Base {
 }
 eval('1;');
 "#;
+
+    #[test]
+    fn a_phpdoc_param_or_return_with_a_space_in_its_type_is_read_whole() {
+        // `@param array<string, int> $counts` holds a space inside the type: splitting the tag on
+        // whitespace cut it to `array<string,` and the parameter came out `unknown`.
+        let src = "<?php\n/**\n * @param array<string, int> $counts\n * @return array<string, int>\n */\nfunction double_counts(array $counts): array { return $counts; }\n";
+        let fns = exports("src/counts.php", src);
+        assert_eq!(fns.len(), 1);
+        assert_eq!(fns[0].params[0].ts_type, "Record<string, int>");
+        assert_eq!(fns[0].returns, "Record<string, int>");
+        assert!(fns[0].blocker.is_none());
+    }
 
     #[test]
     fn maps_php_types() {
