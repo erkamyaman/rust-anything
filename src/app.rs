@@ -1538,12 +1538,13 @@ pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Re
         }
         for ext in CASE_FILES {
             let path = outcome.dir.join(format!("{name}.{ext}"));
-            // A folder a case that stays reads, or that holds one it reads, stays. Both are
-            // compared resolved, so `../app-cases/two.in/sub` counts as inside `two.in`.
-            if path
-                .canonicalize()
-                .is_ok_and(|path| read.iter().any(|base| base.starts_with(&path)))
-            {
+            // A folder a case that stays reads, holds one it reads, or is on the way to it as
+            // written: `two.in/sub`, `../app-cases/two.in/sub` (resolved) and `two.in/../shared`
+            // (on Unix only found while `two.in` exists) all keep `two.in`.
+            let resolved = path.canonicalize().ok();
+            if read.iter().any(|base| {
+                base.starts_with(&path) || resolved.as_ref().is_some_and(|r| base.starts_with(r))
+            }) {
                 continue;
             }
             if path.is_dir() {
@@ -1569,8 +1570,8 @@ pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Re
     Ok(())
 }
 
-/// The `fs.base` folders that the cases in `dir` other than `going` read, resolved (a base that
-/// does not exist reads nothing).
+/// The `fs.base` folders that the cases in `dir` other than `going` read, each as written (joined
+/// to `dir`) and, when it exists, resolved.
 fn bases_read(dir: &Path, going: &BTreeSet<&str>) -> BTreeSet<PathBuf> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return BTreeSet::new();
@@ -1591,7 +1592,11 @@ fn bases_read(dir: &Path, going: &BTreeSet<&str>) -> BTreeSet<PathBuf> {
             doc.get("fs")
                 .and_then(|f| f.get("base"))
                 .and_then(Item::as_str)
-                .and_then(|base| dir.join(base).canonicalize().ok())
+                .map(|base| dir.join(base))
+        })
+        .flat_map(|base| {
+            let resolved = base.canonicalize().ok();
+            std::iter::once(base).chain(resolved)
         })
         .collect()
 }

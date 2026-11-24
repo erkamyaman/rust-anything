@@ -371,3 +371,47 @@ fn a_kept_case_reads_inside_two_in(tag: &str, base: &str) {
     assert!(kept, "two.in/sub/x.txt was removed");
     assert_eq!((again.passed, again.total), (2, 2), "{:?}", again.failures);
 }
+
+#[test]
+fn a_removed_case_s_folder_that_a_kept_base_passes_through_stays() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = repo("through-base");
+    std::fs::write(
+        repo.join("cli.py"),
+        "import os\nprint(open('x.txt').read() if os.path.exists('x.txt') else 'none')\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("in.jsonl"),
+        "{\"name\":\"one\",\"args\":[]}\n{\"name\":\"two\",\"args\":[],\"files\":{\"x.txt\":\"from two\"}}\n",
+    )
+    .unwrap();
+    let run = [python.to_string(), "cli.py".to_string()];
+    record(&repo, &run, false);
+    let dir = app::cases_dir(&repo);
+    let two = std::fs::read_to_string(dir.join("two.toml")).unwrap();
+    assert!(two.contains("\"two.in\""), "{two}");
+    // Written by hand: files of its own, reached through `two.in` (on Unix, `two.in/..` only
+    // resolves while `two.in` exists).
+    std::fs::create_dir_all(dir.join("shared")).unwrap();
+    std::fs::write(dir.join("shared").join("x.txt"), "from shared").unwrap();
+    std::fs::write(
+        dir.join("mine.toml"),
+        two.replace("\"two.in\"", "\"two.in/../shared\""),
+    )
+    .unwrap();
+    std::fs::write(dir.join("mine.stdout"), "from shared\n").unwrap();
+    std::fs::copy(dir.join("two.stderr"), dir.join("mine.stderr")).unwrap();
+
+    std::fs::write(repo.join("in.jsonl"), "{\"name\":\"one\",\"args\":[]}\n").unwrap();
+    let second = record(&repo, &run, false);
+    let kept = dir.join("two.in").is_dir();
+    let again = replay(&repo);
+    std::fs::remove_dir_all(&repo).unwrap();
+
+    assert_eq!(second.stale, ["two"], "{second:?}");
+    assert!(kept, "two.in was removed, which mine's base goes through");
+    assert_eq!((again.passed, again.total), (2, 2), "{:?}", again.failures);
+}

@@ -92,7 +92,7 @@ rust-anything app replay . --build "target/release/mytool"
   was removed or renamed, or the original timed out on it) is deleted, in `http/` too. The names
   are kept in `rust-anything.json` as `recorded`, so a case you added by hand is left in place,
   and `app record` names it, even when an input of its name timed out. A removed case's `.in/`
-  folder stays while a case that is kept reads it, or a folder inside it, through `fs.base`.
+  folder stays while the `fs.base` of a case that is kept is in it or goes through it.
   The names count only in the folder they were recorded in: after switching between a CLI and
   `--http`, nothing is removed.
 - `app replay` runs any build against the cases, prints `passed/total`, writes
