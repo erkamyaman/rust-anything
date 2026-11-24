@@ -1268,24 +1268,29 @@ pub(crate) fn scan_examples<T>(repo: &Path, parse: impl Fn(&str, &Path) -> Optio
                     continue;
                 }
                 let Some(lang) = &fence else { continue };
-                // Continuation lines carry no `$ ` prompt.
+                // Continuation lines carry no `$ ` prompt, and keep their indentation: it is what
+                // separates them from the previous word, as the shell adds no space when joining.
                 if !pending.is_empty() {
-                    line
+                    raw
                 } else {
-                    match line.strip_prefix("$ ") {
+                    let start = raw.trim_start();
+                    match start.strip_prefix("$ ") {
                         Some(rest) => rest,
-                        None if matches!(lang.as_str(), "sh" | "bash" | "shell" | "zsh") => line,
+                        None if matches!(lang.as_str(), "sh" | "bash" | "shell" | "zsh") => start,
                         None => continue,
                     }
                 }
             } else if !pending.is_empty() {
-                line
+                raw
             } else {
-                line.strip_prefix("$ ").unwrap_or(line)
+                let start = raw.trim_start();
+                start.strip_prefix("$ ").unwrap_or(start)
             };
-            if let Some(head) = continued(candidate) {
+            // The line's end is untrimmed, so `\ ` (an escaped space) does not continue.
+            if !ends_in_comment(candidate)
+                && let Some(head) = continued(candidate)
+            {
                 pending.push_str(head);
-                pending.push(' ');
                 continue;
             }
             pending.push_str(candidate);
@@ -1296,6 +1301,28 @@ pub(crate) fn scan_examples<T>(repo: &Path, parse: impl Fn(&str, &Path) -> Optio
         }
     }
     out
+}
+
+/// Whether a shell line ends inside a comment: an unquoted `#` that starts a word. A `\` at the
+/// end of a comment is part of the comment, not a continuation.
+fn ends_in_comment(line: &str) -> bool {
+    let (mut single, mut double, mut escaped, mut word_start) = (false, false, false, true);
+    for c in line.chars() {
+        if escaped {
+            escaped = false;
+            word_start = false;
+            continue;
+        }
+        match c {
+            '\\' if !single => escaped = true,
+            '\'' if !double => single = !single,
+            '"' if !single => double = !double,
+            '#' if word_start && !single && !double => return true,
+            _ => {}
+        }
+        word_start = c.is_whitespace() && !single && !double;
+    }
+    false
 }
 
 /// The line without its trailing `\` when the shell would join it with the next line. An even
@@ -2872,24 +2899,33 @@ mod tests {
         let repo = temp_dir("continued-examples").unwrap();
         std::fs::write(
             repo.join("README.md"),
-            "```console\n$ tool upper \\\n    --loud \\\n    'x y'\n$ tool path C:\\\\\n$ tool count in.txt\n```\n",
+            "```console\n$ tool upper \\\n    --loud \\\n    'x y'\n$ tool path C:\\\\\n$ tool count in.txt\n$ tool upper --mode=lo\\\nud\n$ tool echo a\\ \n$ tool count b.txt\n```\n",
         )
         .unwrap();
-        std::fs::write(repo.join("demo.sh"), "tool sort \\\n  --reverse\n").unwrap();
+        std::fs::write(
+            repo.join("demo.sh"),
+            "tool sort \\\n  --reverse\n# tool hidden \\\ntool count c.txt\n",
+        )
+        .unwrap();
         let names = vec!["tool".to_string()];
         let args: Vec<Vec<String>> = find_examples(&repo, &names)
             .iter()
             .map(|c| c.args.clone())
             .collect();
         std::fs::remove_dir_all(&repo).unwrap();
-        // A doubled backslash is a literal one, not a continuation, so `count` stays its own case.
+        // Not continuations: a doubled backslash (a literal one), a backslash followed by a space,
+        // and a backslash at the end of a comment. Joining adds no space of its own (`--mode=loud`).
         assert_eq!(
             args,
             [
                 vec!["upper", "--loud", "x y"],
                 vec!["path", "C:\\"],
                 vec!["count", "in.txt"],
+                vec!["upper", "--mode=loud"],
+                vec!["echo", "a "],
+                vec!["count", "b.txt"],
                 vec!["sort", "--reverse"],
+                vec!["count", "c.txt"],
             ]
         );
     }
