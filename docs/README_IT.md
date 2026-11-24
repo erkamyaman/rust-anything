@@ -268,8 +268,9 @@ l'email due volte fallisce:
 | Kotlin | modulo Gradle di funzioni di primo livello e metodi `@JvmStatic` | il ponte Java: JNI tipizzato in classi wrapper Java che chiamano gli static Kotlin compilati | un driver di reflection generato, con i sorgenti Kotlin compilati da `kotlinc` |
 | PHP | file o cartella di funzioni di primo livello (i metodi `public static` restano in PHP) | un dispatcher JSON su `ext-ffi`, in un file che ridichiara le funzioni con i parametri originali | un driver PHP generato; applicazioni intere con `app record`, `app replay` e la front door, per CLI e server (`php -S`) |
 | C# | file o cartella di metodi `public static` | un dispatcher JSON su P/Invoke, in classi `<namespace>.Rust` con i metodi originali | un driver a reflection generato, compilato con le sorgenti del progetto da `dotnet build`; applicazioni intere con `app record`, `app replay` e la front door, per CLI e server ASP.NET (`dotnet <app>.dll`) |
+| PowerShell | modulo `.psm1` o script `.ps1` di funzioni con blocchi `param()` (esportate con `Export-ModuleMember`) | un dispatcher JSON su P/Invoke, dichiarato al caricamento con Reflection.Emit, in un `.ps1` che ridichiara ogni funzione con il suo blocco `param()` originale | un driver `pwsh` generato (PowerShell 7.4+) |
 
-Ogni linguaggio tranne C, PHP e C# riceve anche classi batch (`--batch`): gli elementi attraversano una
+Ogni linguaggio tranne C, PHP, C# e PowerShell riceve anche classi batch (`--batch`): gli elementi attraversano una
 volta sola e restano in Rust, e ogni chiamata li esegue tutti su tutti i core.
 
 Il linguaggio viene rilevato dal repository (`go.mod`, `pom.xml`, `build.gradle`/`build.gradle.kts`,
