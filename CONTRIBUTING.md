@@ -76,6 +76,8 @@ paths in what you commit. CI runs it on every file.
     bridged.
   - `tests/tools.rs`: the MCP tools and the CLI expose the same options, and `docs/tools.md`
     matches the tool list.
+  - `tests/types_doc.rs`: every row of `docs/types.md` matches what the type mappings give. Update
+    the table there when a mapping changes.
   - `tests/plugin.rs`: the plugin ships the same skill and MCP server, at the crate version.
   - `tests/recording.rs`, `tests/record_cwd.rs` and `tests/record_timeout.rs`: `record` flags a
     stale recording, leaves the working directory alone, and stops a case that never returns.

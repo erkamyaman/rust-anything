@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `docs/types.md` lists, for each language, what each source type becomes in `port.rs` and the
+  reason a type keeps a function in its language; a test checks every row against the code (#373).
+
 ## 4.1.0 (2026-11-24)
 
 - `enable --only <fn>` (repeatable) switches on just the named functions of a unit, and `--partial`
