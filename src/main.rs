@@ -367,7 +367,11 @@ enum Cmd {
         /// Crate folder made by `bridge`.
         #[arg(default_value = ".", value_parser = absolute)]
         crate_dir: PathBuf,
-        /// Where to write the module; defaults to `<crate>/shadow/<name>.shadow.ts`.
+        /// Where to write the module. The default depends on the language:
+        /// `<crate>/shadow/<name>.shadow.ts` (TypeScript), `<crate>/shadow/<name>_shadow.py`
+        /// (Python), `<crate>/shadow/<name>_shadow.c` (C), `<crate>/go/shadow/<pkg>.go` (Go),
+        /// `<crate>/ruby/<lib>_shadow.rb` (Ruby), and a folder, `<crate>/java/`, for Java and
+        /// Kotlin. PHP, C# and PowerShell have no shadow module yet and stop with an error.
         #[arg(long, short)]
         out: Option<PathBuf>,
     },
