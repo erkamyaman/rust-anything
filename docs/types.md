@@ -243,10 +243,11 @@ Generic and variadic methods are refused.
 | `Task<int>` | refused | is async |
 | `DateTime`, `Guid` | refused | uses the type |
 
-A record or plain class with public auto-properties declared in the project crosses as
-`serde_json::Value`, and so does a positional record such as `record Point(double X, double Y)`,
-whose parameters are its properties. One that is generic, inherits, declares a constructor that
-takes arguments or has public fields is refused. `ref`, `out` and `params` parameters and generic methods are refused.
+A public record or plain class with public auto-properties declared in the project crosses as
+`serde_json::Value`, and so does a positional record such as
+`public record Point(double X, double Y)`, whose parameters are its properties. Each property's
+type must cross as well (a `decimal` property refuses the class). One that is not `public`, is
+generic, inherits, declares a constructor that takes arguments or has public fields is refused. `ref`, `out` and `params` parameters and generic methods are refused.
 
 ## Ruby
 
