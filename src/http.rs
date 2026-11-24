@@ -389,13 +389,6 @@ impl Server {
             .stdin(Stdio::null())
             .stdout(std::fs::File::create(dir.join("stdout"))?)
             .stderr(std::fs::File::create(dir.join("stderr"))?);
-        // Its own process group, so `stop` reaches a server started through a wrapper
-        // (`npm start`, `sh -c`), as CLI cases already do.
-        #[cfg(unix)]
-        {
-            use std::os::unix::process::CommandExt as _;
-            cmd.process_group(0);
-        }
         let mut child = cmd
             .spawn()
             .with_context(|| format!("starting `{}`", command.join(" ")))?;
@@ -455,25 +448,35 @@ impl Server {
             return;
         }
         self.stopped = true;
-        // The whole process group (Unix) or tree (Windows): the real server can be a grandchild.
+        // The whole process tree: the real server can be a grandchild (`npm start`, `sh -c`).
+        // The server stays in our process group, so a Ctrl-C in the terminal still reaches it.
         #[cfg(unix)]
         {
-            let group = format!("-{}", self.child.id());
-            let _ = Command::new("kill")
-                .args(["-TERM", "--", &group])
-                .stderr(Stdio::null())
-                .status();
-            let deadline = Instant::now() + Duration::from_secs(5);
-            while Instant::now() < deadline {
-                if let Ok(Some(_)) = self.child.try_wait() {
-                    break;
+            let tree = processes()
+                .map(|ps| tree(&ps, self.child.id()))
+                .unwrap_or_else(|| vec![self.child.id()]);
+            'signals: for signal in ["-TERM", "-KILL"] {
+                let _ = Command::new("kill")
+                    .arg(signal)
+                    .arg("--")
+                    .args(tree.iter().map(u32::to_string))
+                    .stderr(Stdio::null())
+                    .status();
+                // Until every process of the tree is gone, not only the one we started, so
+                // nothing still holds the port when `stop` returns.
+                let deadline = Instant::now() + Duration::from_secs(5);
+                loop {
+                    // Reap the one we started, so it does not linger as a zombie.
+                    let _ = self.child.try_wait();
+                    if !processes().is_some_and(|ps| any_alive(&ps, &tree)) {
+                        break 'signals;
+                    }
+                    if Instant::now() > deadline {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(20));
                 }
-                std::thread::sleep(Duration::from_millis(20));
             }
-            let _ = Command::new("kill")
-                .args(["-KILL", "--", &group])
-                .stderr(Stdio::null())
-                .status();
         }
         #[cfg(windows)]
         {
@@ -493,6 +496,53 @@ impl Drop for Server {
     fn drop(&mut self) {
         self.stop();
     }
+}
+
+/// Every process as `pid ppid stat` lines, from `ps`.
+#[cfg(unix)]
+fn processes() -> Option<String> {
+    let out = Command::new("ps")
+        .args(["-A", "-o", "pid=", "-o", "ppid=", "-o", "stat="])
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// `root` and every process below it, from `ps` lines of `pid ppid stat`.
+#[cfg(any(unix, test))]
+fn tree(ps: &str, root: u32) -> Vec<u32> {
+    let parents: Vec<(u32, u32)> = ps
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.split_whitespace();
+            Some((fields.next()?.parse().ok()?, fields.next()?.parse().ok()?))
+        })
+        .collect();
+    let mut tree = vec![root];
+    let mut i = 0;
+    while let Some(&pid) = tree.get(i) {
+        for &(child, parent) in &parents {
+            if parent == pid && !tree.contains(&child) {
+                tree.push(child);
+            }
+        }
+        i += 1;
+    }
+    tree
+}
+
+/// Whether any of `pids` still runs: listed by `ps` and not a zombie, which holds no port.
+#[cfg(any(unix, test))]
+fn any_alive(ps: &str, pids: &[u32]) -> bool {
+    ps.lines().any(|line| {
+        let mut fields = line.split_whitespace();
+        let pid = fields.next().and_then(|p| p.parse::<u32>().ok());
+        let stat = fields.nth(1).unwrap_or("");
+        pid.is_some_and(|p| pids.contains(&p)) && !stat.starts_with('Z')
+    })
 }
 
 type Answer = (
@@ -1261,6 +1311,18 @@ pub(crate) fn replay(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_tree_of_a_server_is_found_and_zombies_are_not_alive() {
+        // pid ppid stat, as `ps -A -o pid= -o ppid= -o stat=` prints them.
+        let ps = "    1     0 Ss\n  100     1 S\n  200   100 Z\n  300   100 S\n  400   300 R\n  500     1 S\n  600   500 S\n";
+        assert_eq!(tree(ps, 100), [100, 200, 300, 400]);
+        assert_eq!(tree(ps, 400), [400]);
+        assert_eq!(tree(ps, 999), [999]);
+        assert!(any_alive(ps, &[200, 300]));
+        assert!(!any_alive(ps, &[200]), "a zombie holds no port");
+        assert!(!any_alive(ps, &[999]));
+    }
 
     #[test]
     fn curl_lines_become_requests() {

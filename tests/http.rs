@@ -840,3 +840,95 @@ fn a_server_started_through_a_wrapper_is_stopped_with_it() {
         "the wrapped server still listens on port {port} after record returned"
     );
 }
+
+/// A server that takes a minute to answer `/slow`, so `app record` is still running it when the
+/// test interrupts.
+#[cfg(unix)]
+const SLOW_SERVER: &str = r#"import http.server, os, time
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/slow":
+            time.sleep(60)
+        body = b"hi"
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *args):
+        pass
+http.server.HTTPServer(("127.0.0.1", int(os.environ["PORT"])), H).serve_forever()
+"#;
+
+/// A terminal sends Ctrl-C to its foreground process group. The server must be in that group,
+/// or an interrupted `app record` leaves it listening.
+#[cfg(unix)]
+#[test]
+fn an_interrupted_record_leaves_no_server_listening() {
+    use std::os::unix::process::CommandExt as _;
+    use std::time::{Duration, Instant};
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = std::env::temp_dir().join(format!(
+        "rust-anything-http-interrupt-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("server.py"), SLOW_SERVER).unwrap();
+    std::fs::write(
+        repo.join("inputs.jsonl"),
+        "{\"name\":\"slow\",\"path\":\"/slow\"}\n",
+    )
+    .unwrap();
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    let listening =
+        || std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_ok();
+    let mut cli = std::process::Command::new(env!("CARGO_BIN_EXE_rust-anything"))
+        .args(["app", "record"])
+        .arg(&repo)
+        .args(["--http", "--port", &port.to_string()])
+        .args(["--inputs", "inputs.jsonl", "--", python, "server.py"])
+        .current_dir(&repo)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        // As a shell runs a foreground job: a process group of its own.
+        .process_group(0)
+        .spawn()
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while !listening() {
+        assert!(Instant::now() < deadline, "the server never listened");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    std::thread::sleep(Duration::from_millis(500));
+    // Ctrl-C: SIGINT to the whole foreground group.
+    std::process::Command::new("kill")
+        .args(["-INT", "--", &format!("-{}", cli.id())])
+        .status()
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while cli.try_wait().unwrap().is_none() {
+        if Instant::now() > deadline {
+            let _ = cli.kill();
+            panic!("app record did not stop on SIGINT");
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while listening() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let still_listening = listening();
+    let _ = std::fs::remove_dir_all(&repo);
+    assert!(
+        !still_listening,
+        "the server still listens on port {port} after app record was interrupted"
+    );
+}
