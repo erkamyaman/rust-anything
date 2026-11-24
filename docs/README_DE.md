@@ -231,10 +231,12 @@ Dieselbe Ausgabe reicht nicht. Zeichne auch auf, was die App nach außen sendet,
 | Go | Paket | typisierte cgo-Aufrufe und ein generiertes binäres Wire-Format in einem Paket mit der Original-API | einen generierten Go-Treiber, gebaut als eigenes Modul |
 | Ruby | Datei oder Ordner mit Modulfunktionen | eine magnus-Erweiterung unter den ursprünglichen Modulen | einen generierten Ruby-Treiber |
 | Java | Paket mit `public static`-Methoden | typisiertes JNI und ein generiertes binäres Wire-Format in Wrapper-Klassen mit den Originalmethoden | einen generierten Reflection-Treiber |
+| Kotlin | Gradle-Modul mit Top-Level-Funktionen und `@JvmStatic`-Methoden | die Java-Bridge: typisiertes JNI in Java-Wrapper-Klassen, die die kompilierten Kotlin-Statics aufrufen | ein generierter Reflection-Treiber, mit den Kotlin-Quellen über `kotlinc` kompiliert |
 | PHP | Datei oder Ordner mit Top-Level-Funktionen (`public static`-Methoden bleiben in PHP) | ein JSON-Dispatcher über `ext-ffi`, in einer Datei, die die Funktionen mit den ursprünglichen Parametern neu deklariert | ein generierter PHP-Treiber; ganze Apps mit `app record`, `app replay` und der Front Door, für CLIs und Server (`php -S`) |
+| PowerShell | `.psm1`-Modul oder `.ps1`-Skript mit Funktionen und `param()`-Blöcken (exportiert über `Export-ModuleMember`) | ein JSON-Dispatcher über P/Invoke, beim Laden mit Reflection.Emit deklariert, in einem `.ps1`, das jede Funktion mit ihrem ursprünglichen `param()`-Block neu deklariert | ein generierter `pwsh`-Treiber (PowerShell 7.4+) |
 | C# | Datei oder Ordner mit `public static`-Methoden | ein JSON-Dispatcher über P/Invoke, in `<namespace>.Rust`-Klassen mit den ursprünglichen Methoden | ein generierter Reflection-Treiber, mit den Quellen des Projekts über `dotnet build` kompiliert; ganze Apps mit `app record`, `app replay` und der Front Door, für CLIs und ASP.NET-Server (`dotnet <app>.dll`) |
 
-Jede Sprache außer C, PHP und C# erhält außerdem Batch-Klassen (`--batch`): Die Elemente überqueren die Grenze
+Jede Sprache außer C, PHP, C# und PowerShell erhält außerdem Batch-Klassen (`--batch`): Die Elemente überqueren die Grenze
 einmalig und bleiben in Rust, und jeder Aufruf verarbeitet sie alle auf allen Kernen.
 
 Die Sprache wird anhand des Repositorys erkannt (`go.mod`, `pom.xml`, eine `.csproj` oder `.sln`,
