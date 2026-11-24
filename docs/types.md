@@ -13,8 +13,9 @@ How to read the tables:
 - **refused** means the function stays in its language. The note is the reason `bridge` prints,
   where it names the type.
 - A parameter with a default becomes `Option<T>`, unless the default is a literal Rust can write
-  (a number, `true`/`false` or a plain string), in Python, Ruby, PHP, C# and PowerShell. In TypeScript
-  and JavaScript every parameter with a default is `Option<T>`.
+  (a number, `true`/`false` or a plain string), in Python, Ruby, PHP and C#. In TypeScript and
+  JavaScript every parameter with a default is `Option<T>`. PowerShell has its own rule, under
+  [PowerShell](#powershell).
 - `cargo test --test types_doc` checks every row against the mapping, so a row that no longer
   matches the code fails the build.
 
@@ -243,8 +244,9 @@ Generic and variadic methods are refused.
 | `DateTime`, `Guid` | refused | uses the type |
 
 A record or plain class with public auto-properties declared in the project crosses as
-`serde_json::Value`; one that is generic, inherits, takes constructor arguments or has public
-fields is refused. `ref`, `out` and `params` parameters and generic methods are refused.
+`serde_json::Value`, and so does a positional record such as `record Point(double X, double Y)`,
+whose parameters are its properties. One that is generic, inherits, declares a constructor that
+takes arguments or has public fields is refused. `ref`, `out` and `params` parameters and generic methods are refused.
 
 ## Ruby
 
