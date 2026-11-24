@@ -257,9 +257,14 @@ struct ShellWord {
 /// Splits a command into words as the shell does: whitespace, `;`, `&` and `|` separate words
 /// outside quotes, an unquoted `<` or `>` starts a redirect operator of its own, and quotes group
 /// without being part of the text. The body of a here-document is input, so it gives no words.
-/// cmd only quotes with `"`; sh also with `'` and a backslash escape.
+/// cmd only quotes with `"`; sh also with `'` and a backslash escape, and skips a comment (`#` at
+/// the start of a word) to the end of the line.
 fn shell_words(cmd: &str) -> Vec<ShellWord> {
-    let unix = cfg!(not(windows));
+    shell_words_as(cmd, cfg!(not(windows)))
+}
+
+/// `shell_words` as sh (`unix`) or cmd reads the command.
+fn shell_words_as(cmd: &str, unix: bool) -> Vec<ShellWord> {
     let mut words = Vec::new();
     let mut word: Option<ShellWord> = None;
     let mut quote = None;
@@ -275,6 +280,11 @@ fn shell_words(cmd: &str) -> Vec<ShellWord> {
         let op_goes_on = redirect || (c == '-' && word.as_ref().is_some_and(|w| w.text == "<<"));
         if separator || (redirect && !in_op) || (in_op && !op_goes_on) {
             finish(&mut words, &mut heredocs, word.take());
+        }
+        // sh: an unquoted `#` that starts a word comments out the rest of the line.
+        if unix && c == '#' && quote.is_none() && word.is_none() {
+            i = cmd[i..].find('\n').map_or(cmd.len(), |n| i + n);
+            continue;
         }
         if separator {
             i += len;
@@ -679,6 +689,32 @@ mod tests {
             format!("python3  {};  echo  ok", at("reset.py"))
         );
         std::fs::remove_dir_all(&repo).unwrap();
+    }
+
+    #[test]
+    fn sh_comments_give_no_words() {
+        let words = |cmd: &str| -> Vec<String> {
+            shell_words_as(cmd, true)
+                .into_iter()
+                .map(|w| w.text)
+                .collect()
+        };
+        // A comment's `<<EOF` starts no here-document, so the next line is still read.
+        assert_eq!(words("# <<EOF\npython3 reset.py"), ["python3", "reset.py"]);
+        assert_eq!(
+            words("python3 reset.py # then <<EOF\necho ok"),
+            ["python3", "reset.py", "echo", "ok"]
+        );
+        // `#` inside a word or in quotes is text.
+        assert_eq!(words("echo a#b '#c' \"#d\""), ["echo", "a#b", "#c", "#d"]);
+        // cmd has no `#` comments.
+        assert_eq!(
+            shell_words_as("echo # x", false)
+                .into_iter()
+                .map(|w| w.text)
+                .collect::<Vec<_>>(),
+            ["echo", "#", "x"]
+        );
     }
 
     #[test]

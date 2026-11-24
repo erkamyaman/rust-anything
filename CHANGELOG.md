@@ -9,7 +9,7 @@
   repository's own copy is left alone. Scripts they name by a relative path with a script
   extension (`reset.py`, `"my scripts/seed.sh"`, `< schema.sql`) still come from the repository;
   output redirects (`> dump.sql`, also unspaced) stay in the case's folder, and here-document
-  bodies are left as written (#324).
+  bodies and `#` comments are left as written (#324).
 
 ## 4.0.0 (2026-11-24)
 
