@@ -276,7 +276,12 @@ fn shell_words_as(cmd: &str, unix: bool) -> Vec<ShellWord> {
         let len = c.len_utf8();
         let in_op = word.as_ref().is_some_and(|w| w.op);
         let redirect = quote.is_none() && matches!(c, '<' | '>');
-        let separator = quote.is_none() && (c.is_whitespace() || matches!(c, ';' | '&' | '|'));
+        // sh also groups commands with `(` and `)`; cmd keeps them in a word unless they open or
+        // close a block, which a script name never does.
+        let separator = quote.is_none()
+            && (c.is_whitespace()
+                || matches!(c, ';' | '&' | '|')
+                || (unix && matches!(c, '(' | ')')));
         let op_goes_on = redirect || (c == '-' && word.as_ref().is_some_and(|w| w.text == "<<"));
         if separator || (redirect && !in_op) || (in_op && !op_goes_on) {
             finish(&mut words, &mut heredocs, word.take());
@@ -301,12 +306,28 @@ fn shell_words_as(cmd: &str, unix: bool) -> Vec<ShellWord> {
         });
         match (quote, c) {
             (Some(q), c) if c == q => quote = None,
+            // sh: in double quotes a backslash escapes only these, and drops a newline.
+            (Some('"'), '\\') if unix => match cmd[i + len..].chars().next() {
+                Some(next @ ('$' | '`' | '"' | '\\' | '\n')) => {
+                    if next != '\n' {
+                        w.text.push(next);
+                    }
+                    i += len + next.len_utf8();
+                    w.end = i;
+                    continue;
+                }
+                _ => w.text.push('\\'),
+            },
             (Some(_), c) => w.text.push(c),
             (None, '"') => quote = Some('"'),
             (None, '\'') if unix => quote = Some('\''),
+            // sh: a backslash escapes the next character, and a backslash-newline is a line
+            // continuation, part of no word.
             (None, '\\') if unix => {
                 if let Some(next) = cmd[i + len..].chars().next() {
-                    w.text.push(next);
+                    if next != '\n' {
+                        w.text.push(next);
+                    }
                     i += len + next.len_utf8();
                     w.end = i;
                     continue;
@@ -689,6 +710,35 @@ mod tests {
             format!("python3  {};  echo  ok", at("reset.py"))
         );
         std::fs::remove_dir_all(&repo).unwrap();
+    }
+
+    #[test]
+    fn sh_continuations_escapes_and_parentheses_are_read_as_sh_reads_them() {
+        let words = |cmd: &str| -> Vec<String> {
+            shell_words_as(cmd, true)
+                .into_iter()
+                .map(|w| w.text)
+                .filter(|t| !t.is_empty())
+                .collect()
+        };
+        // A line continuation is no part of any word.
+        assert_eq!(words("python3 \\\nreset.py"), ["python3", "reset.py"]);
+        assert_eq!(words("python3 re\\\nset.py"), ["python3", "reset.py"]);
+        assert_eq!(words("python3 \"re\\\nset.py\""), ["python3", "reset.py"]);
+        // Unquoted parentheses group commands; quoted ones are part of a name.
+        assert_eq!(words("(python3 reset.py)"), ["python3", "reset.py"]);
+        assert_eq!(words("python3 '(x).py'"), ["python3", "(x).py"]);
+        // In double quotes a backslash escapes only `$`, `` ` ``, `"`, `\` and a newline.
+        assert_eq!(words(r#"echo "a\"b" "c\d""#), ["echo", "a\"b", "c\\d"]);
+        assert_eq!(words(r"echo 'a\b'"), ["echo", "a\\b"]);
+        // cmd: no continuations, and parentheses stay in the word.
+        assert_eq!(
+            shell_words_as("(python reset.py)", false)
+                .into_iter()
+                .map(|w| w.text)
+                .collect::<Vec<_>>(),
+            ["(python", "reset.py)"]
+        );
     }
 
     #[test]
