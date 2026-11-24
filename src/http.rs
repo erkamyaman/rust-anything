@@ -374,8 +374,8 @@ impl Server {
                 Ok(sinks)
             })
             .transpose()?;
-        let mut child = Command::new(program)
-            .args(rest)
+        let mut cmd = Command::new(program);
+        cmd.args(rest)
             .args(
                 launch
                     .args
@@ -388,7 +388,15 @@ impl Server {
             .env(app::FALLBACK_ENV, &log)
             .stdin(Stdio::null())
             .stdout(std::fs::File::create(dir.join("stdout"))?)
-            .stderr(std::fs::File::create(dir.join("stderr"))?)
+            .stderr(std::fs::File::create(dir.join("stderr"))?);
+        // Its own process group, so `stop` reaches a server started through a wrapper
+        // (`npm start`, `sh -c`), as CLI cases already do.
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt as _;
+            cmd.process_group(0);
+        }
+        let mut child = cmd
             .spawn()
             .with_context(|| format!("starting `{}`", command.join(" ")))?;
         let deadline = Instant::now() + READY;
@@ -447,10 +455,12 @@ impl Server {
             return;
         }
         self.stopped = true;
+        // The whole process group (Unix) or tree (Windows): the real server can be a grandchild.
         #[cfg(unix)]
         {
+            let group = format!("-{}", self.child.id());
             let _ = Command::new("kill")
-                .args(["-TERM", &self.child.id().to_string()])
+                .args(["-TERM", "--", &group])
                 .stderr(Stdio::null())
                 .status();
             let deadline = Instant::now() + Duration::from_secs(5);
@@ -460,6 +470,18 @@ impl Server {
                 }
                 std::thread::sleep(Duration::from_millis(20));
             }
+            let _ = Command::new("kill")
+                .args(["-KILL", "--", &group])
+                .stderr(Stdio::null())
+                .status();
+        }
+        #[cfg(windows)]
+        {
+            let _ = Command::new("taskkill")
+                .args(["/T", "/F", "/PID", &self.child.id().to_string()])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
         }
         let _ = self.child.kill();
         let _ = self.child.wait();

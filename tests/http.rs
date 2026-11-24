@@ -747,3 +747,96 @@ fn http_fixed_port_rejects_existing_listener_and_early_exit() {
 
     std::fs::remove_dir_all(repo).unwrap();
 }
+
+const PLAIN_SERVER: &str = r#"import http.server, os
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = b"hi"
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *args):
+        pass
+http.server.HTTPServer(("127.0.0.1", int(os.environ["PORT"])), H).serve_forever()
+"#;
+
+#[test]
+fn a_server_started_through_a_wrapper_is_stopped_with_it() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = std::env::temp_dir().join(format!("rust-anything-http-tree-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("server.py"), PLAIN_SERVER).unwrap();
+    std::fs::write(
+        repo.join("inputs.jsonl"),
+        "{\"name\":\"hi\",\"path\":\"/\"}\n",
+    )
+    .unwrap();
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    // The interpreter itself, not a launcher or alias that hands off and exits.
+    let python = String::from_utf8(
+        std::process::Command::new(python)
+            .args(["-c", "import sys; print(sys.executable)"])
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap()
+    .trim()
+    .to_string();
+    // The real server is a grandchild: the wrapper keeps running after it, so it does not exec it.
+    #[cfg(windows)]
+    let run = {
+        std::fs::write(
+            repo.join("wrapper.bat"),
+            format!("@\"{python}\" server.py\r\n@echo done\r\n"),
+        )
+        .unwrap();
+        vec!["wrapper.bat".to_string()]
+    };
+    #[cfg(not(windows))]
+    let run = {
+        std::fs::write(
+            repo.join("wrapper.sh"),
+            format!("'{python}' server.py\necho done\n"),
+        )
+        .unwrap();
+        vec!["sh".to_string(), "wrapper.sh".to_string()]
+    };
+    let out = app::record(&RecordOptions {
+        repo: &repo,
+        run: &run,
+        inputs: Some(&repo.join("inputs.jsonl")),
+        normalize: &[],
+        name: None,
+        traps: false,
+        timeout_secs: None,
+        http: true,
+        server_args: &[],
+        fresh: &[],
+        pace_ms: None,
+        port: Some(port),
+        float_tolerance: None,
+        float_files: &[],
+        effects: None,
+    });
+    let still_listening = std::net::TcpStream::connect_timeout(
+        &std::net::SocketAddr::from(([127, 0, 0, 1], port)),
+        std::time::Duration::from_secs(1),
+    )
+    .is_ok();
+    // A server left running keeps the folder open (it is its working directory).
+    let _ = std::fs::remove_dir_all(&repo);
+    assert_eq!(out.unwrap().cases, 1);
+    assert!(
+        !still_listening,
+        "the wrapped server still listens on port {port} after record returned"
+    );
+}

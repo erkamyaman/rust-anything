@@ -4,6 +4,10 @@
 
 - `app record` and `app replay` fail with `port <port> is already in use` before spawning a server
   on an occupied port and check whether the child exited before treating the port as ready (#326).
+- `app record --http` and `app replay` stop the whole server when it was started through a wrapper
+  (`npm start`, `sh -c`, a `.bat` file): its process group on Unix, its process tree on Windows.
+  The real server used to keep running, so the next run met it on the port and a replay could
+  pass against it (#325).
 
 ## 4.0.0 (2026-11-24)
 
