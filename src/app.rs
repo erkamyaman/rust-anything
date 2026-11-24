@@ -111,6 +111,10 @@ pub struct Config {
     /// before every case; a path ending in `/` gives its contents.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fresh: Vec<String>,
+    /// The cases the last `app record` wrote, so the next one can remove those it no longer
+    /// writes without touching cases written by hand.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recorded: Vec<String>,
 }
 
 pub(crate) fn default_timeout() -> u64 {
@@ -1491,6 +1495,66 @@ pub struct RecordOutcome {
     pub unstable: Vec<String>,
     /// Cases not written: the original timed out or did not answer.
     pub timed_out: Vec<String>,
+    /// The cases this recording wrote.
+    pub recorded: Vec<String>,
+    /// Cases the last recording wrote (or that timed out now) and this one did not: removed.
+    pub stale: Vec<String>,
+    /// Cases in the folder that no recording wrote (by hand, or before the list was kept):
+    /// left in place.
+    pub kept: Vec<String>,
+}
+
+/// What each case's files are called after its name.
+const CASE_FILES: [&str; 9] = [
+    "toml",
+    "stdin",
+    "stdout",
+    "stderr",
+    REMOVED_EXT,
+    crate::effects::EXT,
+    "body",
+    "in",
+    "out",
+];
+
+/// Removes the cases the last recording wrote, or this one planned, that it did not write now,
+/// and names the cases in the folder that did not come from a recording, which it keeps.
+pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Result<()> {
+    let written: BTreeSet<&str> = outcome.recorded.iter().map(String::as_str).collect();
+    let ours: BTreeSet<&str> = previous
+        .iter()
+        .chain(&outcome.timed_out)
+        .map(String::as_str)
+        .filter(|name| !written.contains(name))
+        .collect();
+    let mut stale = Vec::new();
+    for name in &ours {
+        if outcome.dir.join(format!("{name}.toml")).is_file() {
+            stale.push((*name).to_string());
+        }
+        for ext in CASE_FILES {
+            let path = outcome.dir.join(format!("{name}.{ext}"));
+            if path.is_dir() {
+                std::fs::remove_dir_all(&path)
+                    .with_context(|| format!("removing {}", path.display()))?;
+            } else if path.is_file() {
+                std::fs::remove_file(&path)
+                    .with_context(|| format!("removing {}", path.display()))?;
+            }
+        }
+    }
+    let mut kept: Vec<String> = std::fs::read_dir(&outcome.dir)?
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            name.strip_suffix(".toml").map(str::to_string)
+        })
+        .filter(|name| !written.contains(name.as_str()))
+        .collect();
+    kept.sort();
+    outcome.stale = stale;
+    outcome.kept = kept;
+    Ok(())
 }
 
 struct Recorded {
@@ -1725,6 +1789,10 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
         .canonical()
         .with_context(|| format!("no folder {}", opts.repo.display()))?;
     let existing = Config::load(&repo)?;
+    let previous = existing
+        .as_ref()
+        .map(|c| c.recorded.clone())
+        .unwrap_or_default();
     let run = if !opts.run.is_empty() {
         opts.run.to_vec()
     } else if let Some(c) = &existing {
@@ -1794,6 +1862,7 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
             opts.effects.clone(),
         ),
         fresh: Vec::new(),
+        recorded: Vec::new(),
     };
     if let Some(http) = config.http.as_mut() {
         if !opts.fresh.is_empty() {
@@ -1806,8 +1875,10 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
     }
     let norm = Normalizers::new(&config)?;
     if config.http.is_some() {
-        let outcome = crate::http::record(&repo, &config, &norm, opts)?;
+        let mut outcome = crate::http::record(&repo, &config, &norm, opts)?;
         config.unordered = unordered_of(&outcome.noise);
+        drop_stale(&mut outcome, &previous)?;
+        config.recorded = outcome.recorded.clone();
         std::fs::write(
             cases_dir(&repo).join(CONFIG_FILE),
             serde_json::to_string_pretty(&config)? + "\n",
@@ -1892,6 +1963,9 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
         noise: Vec::new(),
         unstable: Vec::new(),
         timed_out: Vec::new(),
+        recorded: Vec::new(),
+        stale: Vec::new(),
+        kept: Vec::new(),
     };
     for ((name, case), runs) in planned.iter().zip(runs) {
         let (one, two) = runs?;
@@ -1902,6 +1976,7 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
         let rec = settle(&norm, case, &one, &two);
         write_case(&dir, &config.name, name, case, &rec)?;
         outcome.cases += 1;
+        outcome.recorded.push(name.clone());
         if !rec.noise.is_empty() {
             outcome.noisy.push(name.clone());
         }
@@ -1917,6 +1992,8 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
         }
     }
     config.unordered = unordered_of(&outcome.noise);
+    drop_stale(&mut outcome, &previous)?;
+    config.recorded = outcome.recorded.clone();
     std::fs::write(
         dir.join(CONFIG_FILE),
         serde_json::to_string_pretty(&config)? + "\n",
@@ -2460,6 +2537,7 @@ pub fn replay(opts: &ReplayOptions) -> Result<ReplayOutcome> {
         unordered: BTreeMap::new(),
         effects: None,
         fresh: Vec::new(),
+        recorded: Vec::new(),
     });
     let norm = Normalizers::new(&config)?;
     let timeout = Duration::from_secs(opts.timeout_secs.unwrap_or(config.timeout_secs));
@@ -2597,6 +2675,7 @@ mod tests {
             unordered: BTreeMap::new(),
             effects: None,
             fresh: Vec::new(),
+            recorded: Vec::new(),
         })
         .unwrap()
     }
@@ -2770,6 +2849,7 @@ mod tests {
             unordered: BTreeMap::new(),
             effects: None,
             fresh: Vec::new(),
+            recorded: Vec::new(),
         })
         .unwrap();
         let kind = |a: &str, b: &str| settle_text(&norm, a.as_bytes(), b.as_bytes()).1;
@@ -2796,6 +2876,7 @@ mod tests {
             unordered: BTreeMap::from([("c".to_string(), vec!["stdout".to_string()])]),
             effects: None,
             fresh: Vec::new(),
+            recorded: Vec::new(),
         })
         .unwrap();
         assert!(norm.unordered("c", "stdout"));
@@ -2850,6 +2931,7 @@ mod tests {
             unordered: BTreeMap::new(),
             effects: None,
             fresh: Vec::new(),
+            recorded: Vec::new(),
         };
         let norm = Normalizers::new(&config).unwrap();
         assert_eq!(

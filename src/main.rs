@@ -1588,6 +1588,18 @@ fn run_app(command: AppCmd) -> Result<ExitCode> {
             if !outcome.timed_out.is_empty() {
                 say!("Timed out, not recorded: {}", outcome.timed_out.join(", "));
             }
+            if !outcome.stale.is_empty() {
+                say!(
+                    "Removed, recorded before but not now: {}",
+                    outcome.stale.join(", ")
+                );
+            }
+            if !outcome.kept.is_empty() {
+                say!(
+                    "Kept, not from a recording (written by hand, or recorded before rust-anything listed its cases; delete them if they no longer apply): {}",
+                    outcome.kept.join(", ")
+                );
+            }
         }
         AppCmd::Replay {
             repo,

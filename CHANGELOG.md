@@ -4,6 +4,9 @@
 
 - `app record` and `app replay` fail with `port <port> is already in use` before spawning a server
   on an occupied port and check whether the child exited before treating the port as ready (#326).
+- Recording again removes the cases the last recording wrote and this one did not (an input that
+  was removed or renamed, or a case that timed out), for CLIs and in `http/`, so replay no longer
+  compares against them. Cases added by hand are kept and named in the output (#329).
 
 ## 4.0.0 (2026-11-24)
 
