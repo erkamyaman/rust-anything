@@ -4,10 +4,10 @@
 
 use std::collections::HashMap;
 
-use rust_anything::bridge::{RType, js_only_reason};
+use rust_anything::bridge::{RType, js_only_reason, param_type};
 use rust_anything::codegen_go::unsigned_port_type;
 use rust_anything::lang::{c, csharp, go, java, kotlin, php, powershell, python, ruby};
-use rust_anything::ts::exports::ExportedFn;
+use rust_anything::ts::exports::{ExportedFn, Param};
 use rust_anything::ts::jsdoc;
 
 const DOC: &str = include_str!("../docs/types.md");
@@ -54,10 +54,22 @@ fn port(language: &str, source: &str) -> Port {
                 .strip_prefix('{')
                 .and_then(|s| s.strip_suffix('}'))
                 .expect("a JSDoc type is written in braces");
-            // A type the JSDoc reader cannot turn into a TS type leaves the parameter untyped.
-            bridged(Ok(
-                jsdoc::to_ts(jsdoc).map_or_else(|| "unknown".to_string(), |(t, _)| t)
-            ))
+            // Each row is a `@param` tag on an untyped parameter, made into a parameter as
+            // `exports.rs` does: `{T=}` makes it optional, and `{...T}` goes on a rest parameter
+            // (`...xs`), which is optional too. A type the JSDoc reader cannot turn into a TS type
+            // leaves the parameter untyped.
+            let (ts_type, optional) =
+                jsdoc::to_ts(jsdoc).unwrap_or_else(|| ("unknown".to_string(), false));
+            let rest = jsdoc.starts_with("...");
+            bridged(Ok(ts_type.clone())).map(|_| {
+                param_type(&Param {
+                    ts_type,
+                    optional: optional || rest,
+                    rest,
+                    ..Default::default()
+                })
+                .rust()
+            })
         }
         "Python" => bridged(Ok(python::to_ts_type(source))),
         "Go" => bridged(go::go_to_ts(source, &HashMap::new()))

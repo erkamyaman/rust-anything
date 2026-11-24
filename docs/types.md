@@ -39,7 +39,7 @@ Types are read from the annotations. Local type aliases are resolved first.
 | `Iterator<number>`, `Generator<number>` | refused | a lazy iterator |
 
 A parameter with no annotation takes its JSDoc type, else the type of its default, else
-`serde_json::Value`. A type whose members include a method, and a function's own type parameter
+`serde_json::Value`. A rest parameter (`...xs: string[]`) is `Option<Vec<String>>`. A type whose members include a method, and a function's own type parameter
 that is not limited to data, are refused too.
 
 ## JavaScript
@@ -54,8 +54,8 @@ source.
 | `{boolean}` | `bool` | |
 | `{string[]}`, `{Array<string>}`, `{Array.<string>}` | `Vec<String>` | |
 | `{?number}` | `Option<f64>` | |
-| `{number=}` | `f64` | an optional parameter: `Option<f64>` |
-| `{...string}` | `Vec<String>` | a rest parameter |
+| `{number=}` | `Option<f64>` | an optional parameter |
+| `{...string}` | `Option<Vec<String>>` | a rest parameter, which may be left out |
 | `{Object.<string, number>}`, `{Object}`, `{*}` | `serde_json::Value` | |
 | `{function(string): number}` | `serde_json::Value` | not read: the parameter counts as untyped |
 | `{RegExp}` | refused | takes or returns a RegExp |
@@ -308,5 +308,7 @@ Types are read from the `[type]` before each parameter in `param()`, and the res
 | `[datetime]`, `[guid]` | refused | takes a .NET object |
 | `[scriptblock]` | refused | takes a script block |
 
-An untyped parameter is `serde_json::Value`. A result type the table refuses is
+An untyped parameter is `serde_json::Value`. A parameter that is untyped or typed as an array,
+`[hashtable]`, `[ordered]`, `[pscustomobject]` or `[object]` is `Option<T>`, unless it is
+`Mandatory` or has a default other than `$null`. A result type the table refuses is
 `serde_json::Value`. Filters, workflows and functions that read the pipeline are refused.
