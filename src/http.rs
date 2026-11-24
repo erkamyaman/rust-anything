@@ -507,7 +507,8 @@ fn processes() -> Option<String> {
 /// none of them running (so nothing still holds the port), then KILL and the same wait. Every
 /// listing adds the processes forked since the last one below a process it tracks, and sends them
 /// the current signal too. A failed listing proves nothing: the wait goes on and KILL still
-/// follows, to `root` alone if the listing before it failed too. A process whose parent exited
+/// follows, to `root` alone if the listing before it failed too, and to the rest of the tree
+/// once a listing shows them running as they were. A process whose parent exited
 /// before any listing saw it is reparented and can no longer be traced to the server. Returns
 /// whether a listing showed the whole tree gone.
 ///
@@ -526,21 +527,19 @@ fn end_tree(
     let mut tree: Vec<(u32, Option<String>)> = vec![(root, None)];
     for sig in ["-TERM", "-KILL"] {
         // Each stage's targets come from a listing taken now: an older one may name a pid that
-        // went to another process since. Without a listing, only `root` is surely ours.
+        // went to another process since. Without a listing, only `root` is surely ours, and the
+        // others get the signal once a listing shows them again.
+        let mut sent: Vec<(u32, Option<String>)> = Vec::new();
         let fresh = list();
         if let Some(ps) = &fresh {
             grow(ps, &mut tree);
         }
-        signal(sig, &running(fresh.as_deref(), &tree));
-        let mut signalled = tree.len();
+        signal_due(sig, fresh.as_deref(), &tree, &mut sent, &mut signal);
         let deadline = Instant::now() + grace;
         loop {
             if let Some(ps) = list() {
                 grow(&ps, &mut tree);
-                if tree.len() > signalled {
-                    signal(sig, &running(Some(&ps), &tree[signalled..]));
-                    signalled = tree.len();
-                }
+                signal_due(sig, Some(&ps), &tree, &mut sent, &mut signal);
                 if running(Some(&ps), &tree).is_empty() {
                     return true;
                 }
@@ -552,6 +551,24 @@ fn end_tree(
         }
     }
     false
+}
+
+/// Sends `sig` to the processes in `tree` that `ps` shows running (see `running`) and that have
+/// not had it yet, and records them in `sent`.
+#[cfg(any(unix, test))]
+fn signal_due(
+    sig: &str,
+    ps: Option<&str>,
+    tree: &[(u32, Option<String>)],
+    sent: &mut Vec<(u32, Option<String>)>,
+    signal: &mut impl FnMut(&str, &[u32]),
+) {
+    let due: Vec<_> = tree.iter().filter(|t| !sent.contains(t)).cloned().collect();
+    let pids = running(ps, &due);
+    if !pids.is_empty() {
+        signal(sig, &pids);
+        sent.extend(due.into_iter().filter(|(pid, _)| pids.contains(pid)));
+    }
 }
 
 /// A process in a `ps` line of `pid ppid stat start`.
@@ -1497,6 +1514,43 @@ mod tests {
             [
                 ("-TERM".to_string(), vec![100, 300]),
                 ("-KILL".to_string(), vec![100])
+            ]
+        );
+    }
+
+    #[test]
+    fn a_process_the_listing_before_kill_missed_gets_kill_once_a_listing_shows_it() {
+        // 100 and 300 ignore TERM. `ps` fails through the TERM wait and right before KILL, so
+        // KILL first goes to 100 alone; the next listing shows 300 still running as it was.
+        let tree = "  100 1 S Tue Nov 24 14:00:00 2026\n  300 100 S Tue Nov 24 14:00:01 2026\n";
+        let sent = std::cell::RefCell::new(Vec::<(String, Vec<u32>)>::new());
+        let calls = std::cell::Cell::new(0);
+        let gone = end_tree(
+            100,
+            Duration::from_millis(60),
+            || {
+                calls.set(calls.get() + 1);
+                let sent = sent.borrow();
+                let killed = |pid| sent.iter().any(|(s, p)| s == "-KILL" && p.contains(&pid));
+                if calls.get() == 1 {
+                    Some(tree.to_string())
+                } else if !killed(100) {
+                    None
+                } else if !killed(300) {
+                    Some(tree.to_string())
+                } else {
+                    Some(String::new())
+                }
+            },
+            |signal, pids| sent.borrow_mut().push((signal.to_string(), pids.to_vec())),
+        );
+        assert!(gone);
+        assert_eq!(
+            sent.into_inner(),
+            [
+                ("-TERM".to_string(), vec![100, 300]),
+                ("-KILL".to_string(), vec![100]),
+                ("-KILL".to_string(), vec![300])
             ]
         );
     }
