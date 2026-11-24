@@ -78,6 +78,24 @@ impl Canonical for Path {
     }
 }
 
+/// The path a `file://` URL names, percent-decoded. On Windows the URL is `file:///C:/...`; when
+/// `root` is a drive path the slash before the drive letter is dropped so the path compares with
+/// it. Under a Unix root `/C:/repo` the slash is part of the path and stays.
+pub fn file_url_path(url: &str, root: &Path) -> Option<String> {
+    let path =
+        percent_encoding::percent_decode_str(url.strip_prefix("file://")?).decode_utf8_lossy();
+    Some(match path.strip_prefix('/') {
+        Some(rest) if has_drive(rest) && has_drive(&root.to_string_lossy()) => rest.to_string(),
+        _ => path.into_owned(),
+    })
+}
+
+/// Whether a path starts with a Windows drive: `C:/` or `C:\`.
+pub fn has_drive(path: &str) -> bool {
+    let b = path.as_bytes();
+    b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && matches!(b[2], b'/' | b'\\')
+}
+
 /// A crate `bridge` generated inside the project: its wrappers reuse the original's names, so a
 /// source walk that entered it would find every class or module twice.
 fn bridge_crate(entry: &DirEntry) -> bool {

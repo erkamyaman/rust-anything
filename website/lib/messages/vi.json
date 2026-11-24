@@ -1,0 +1,277 @@
+{
+  "meta": {
+    "title": "Viết lại toàn bộ ứng dụng của bạn bằng Rust, từng phần một",
+    "description": "Viết lại ứng dụng của bạn bằng Rust từng phần một, mỗi bước đều được kiểm chứng với bản gốc. CLI, máy chủ và thư viện bằng TypeScript/JavaScript, Python, C, Go, Ruby, Java, Kotlin, PHP, PowerShell và C#."
+  },
+  "ui": {
+    "docs": "Tài liệu",
+    "languages": "Ngôn ngữ",
+    "realWorld": "Các bản chuyển thực tế",
+    "searchButton": "Tìm trong tài liệu…",
+    "searchDocs": "Tìm trong tài liệu",
+    "searchPlaceholder": "Tìm: record, known-diffs, front door…",
+    "searchQuery": "Từ khóa tìm kiếm",
+    "searchEmpty": "Nhập để tìm trong mọi trang tài liệu.",
+    "searchNone": "Không có trang nào khớp.",
+    "openMenu": "Mở menu",
+    "closeMenu": "Đóng menu",
+    "menu": "Menu",
+    "language": "Ngôn ngữ",
+    "home": "Trang chủ rust-anything",
+    "github": "rust-anything trên GitHub",
+    "onThisPage": "Trên trang này",
+    "editPage": "Chỉnh sửa trang này trên GitHub",
+    "previous": "Trước",
+    "next": "Tiếp",
+    "pager": "Trang trước và trang sau",
+    "breadcrumb": "Đường dẫn trang",
+    "themeDark": "Tối",
+    "themeLight": "Sáng",
+    "themeSystem": "Hệ thống",
+    "theme": "Giao diện",
+    "themeSwitch": "Chuyển sang",
+    "copy": "Sao chép",
+    "copied": "Đã sao chép",
+    "copyInstall": "Sao chép lệnh cài đặt",
+    "installWith": "Cài đặt bằng",
+    "skip": "Chuyển đến nội dung",
+    "legal": "Giấy phép MIT. Các bản chuyển và mã được sinh ra trong kho mã của bạn thuộc về bạn. Đây là một dự án độc lập, không liên kết với hay được xác nhận bởi Rust Project hoặc Rust Foundation. \"Rust\" là nhãn hiệu của Rust Foundation.",
+    "quickStart": "Bắt đầu nhanh",
+    "cliReference": "Tham chiếu CLI",
+    "issues": "Issues",
+    "status": "Trạng thái",
+    "sponsor": "Tài trợ",
+    "madeBy": "Tạo bởi"
+  },
+  "nav": {
+    "groups": {
+      "introduction": "Giới thiệu",
+      "concepts": "Khái niệm",
+      "languages": "Ngôn ngữ",
+      "wholeApps": "Ứng dụng nguyên vẹn",
+      "reference": "Tham chiếu",
+      "realWorld": "Các bản chuyển thực tế",
+      "project": "Dự án"
+    },
+    "items": {
+      "/docs/introduction/what-is-rust-anything": "rust-anything là gì",
+      "/docs/introduction/quick-start": "Bắt đầu nhanh",
+      "/docs/introduction/install": "Cài đặt",
+      "/docs/introduction/agents": "Thiết lập agent",
+      "/docs/introduction/doctor": "Doctor",
+      "/docs/concepts/the-loop": "Vòng lặp",
+      "/docs/concepts/analyze": "Profile và phân tích",
+      "/docs/concepts/bridge": "Bridge",
+      "/docs/concepts/record": "Record",
+      "/docs/concepts/port": "Port",
+      "/docs/concepts/diff": "Diff và các khác biệt đã biết",
+      "/docs/concepts/bench": "Bench",
+      "/docs/concepts/shadow": "Shadow",
+      "/docs/concepts/gate": "Gate",
+      "/docs/concepts/coverage": "Độ phủ",
+      "/docs/concepts/batches": "Batch và hot path",
+      "/docs/concepts/float-tolerance": "Dung sai số thực",
+      "/docs/concepts/limits": "Những gì nó không bắt được",
+      "/docs/languages/overview": "Tổng quan",
+      "/docs/languages/typescript": "TypeScript/JavaScript",
+      "/docs/languages/python": "Python",
+      "/docs/languages/c": "C",
+      "/docs/languages/go": "Go",
+      "/docs/languages/ruby": "Ruby",
+      "/docs/languages/java": "Java",
+      "/docs/languages/php": "PHP",
+      "/docs/languages/csharp": "C#",
+      "/docs/whole-apps/overview": "Chuyển nguyên một ứng dụng",
+      "/docs/whole-apps/record-replay": "Ghi và phát lại",
+      "/docs/whole-apps/front-door": "Front door và wire",
+      "/docs/whole-apps/lift": "Lift",
+      "/docs/whole-apps/servers": "Máy chủ",
+      "/docs/whole-apps/libraries": "Thư viện",
+      "/docs/reference/cli": "CLI",
+      "/docs/reference/mcp-tools": "Công cụ MCP",
+      "/docs/real-world/overview": "Tổng quan",
+      "/docs/real-world/json-server": "json-server",
+      "/docs/real-world/fuse-js": "Fuse.js",
+      "/docs/real-world/vercel-ms": "vercel/ms",
+      "/docs/real-world/x18n": "x18n",
+      "/docs/real-world/six-languages": "Sáu ngôn ngữ",
+      "/docs/real-world/fixtures": "Fixture và chạy tĩnh",
+      "/docs/project/status": "Trạng thái",
+      "/docs/project/faq": "FAQ",
+      "/docs/project/contributing": "Đóng góp"
+    }
+  },
+  "hero": {
+    "title1": "Viết lại ứng dụng của bạn bằng Rust.",
+    "title2": "Chứng minh nó vẫn hoạt động y như cũ.",
+    "sub": "rust-anything ghi lại những gì mã của bạn làm, rồi phát lại từng trường hợp đã ghi trên bản chuyển sang Rust. Agent của bạn viết Rust. Không có gì được phát hành cho đến khi đầu ra khớp nhau.",
+    "cta": "Đọc phần bắt đầu nhanh",
+    "source": "Mã nguồn trên GitHub",
+    "sourceLanguage": "Ngôn ngữ nguồn",
+    "bridge": "Bridge",
+    "verified": "Bản chuyển {lang} đã kiểm chứng, {what}: {count} trường hợp đã ghi đều khớp",
+    "wholeApp": "Ứng dụng {lang} đã được ghi và phát lại với bản gốc từ front door ngay hôm nay."
+  },
+  "home": {
+    "stats": [
+      {
+        "v": "32",
+        "unit": "x",
+        "k": "Fuse.js tìm kiếm mỗi yêu cầu trên 50,000 chuỗi, Apple M4"
+      },
+      {
+        "v": "3.5",
+        "unit": "MB",
+        "k": "json-server bộ nhớ lúc rảnh sau khi lift, trước đó là 74 MB trên Node"
+      },
+      {
+        "v": "514/514",
+        "unit": "",
+        "k": "trường hợp HTTP của json-server khớp trên một tệp nhị phân Rust thuần"
+      },
+      {
+        "v": "10",
+        "unit": "",
+        "k": "ngôn ngữ: tám có bản chuyển đã kiểm chứng, Kotlin và PowerShell được kiểm thử từ đầu đến cuối"
+      }
+    ],
+    "installTitle": "Cài đặt",
+    "installDesc": "Cài CLI, sau đó đăng ký máy chủ MCP và skill quy trình làm việc với Claude Code, Codex, Cursor và Gemini CLI.",
+    "installNote": "Tệp nhị phân dựng sẵn cho macOS, Linux và Windows có trong mỗi [bản phát hành GitHub]({releases}).",
+    "agentPrompt": "Cài đặt rust-anything: chạy `cargo install rust-anything`, rồi `rust-anything setup`.",
+    "agentRestart": "Cho tôi biết khi nào cần khởi động lại bạn.",
+    "loopTitle": "Một bản chuyển được tạo ra như thế nào",
+    "loopDesc": "Bản gốc luôn là nguồn chuẩn. rust-anything không dịch mã: nó cung cấp những gì agent không thể đoán được, cùng một gate cho biết khi nào bản chuyển hoàn tất.",
+    "steps": [
+      {
+        "title": "Ghi",
+        "text": "`record` chạy bản gốc với các trường hợp biên được sinh ra, các bẫy ngữ nghĩa và đầu vào của chính bạn, rồi lưu lại những gì nó trả về hoặc ném ra."
+      },
+      {
+        "title": "Chuyển",
+        "text": "`bridge` sinh ra crate Rust và một lớp bao để bên gọi giữ nguyên API gốc. Bạn hoặc agent của bạn viết Rust."
+      },
+      {
+        "title": "Kiểm tra",
+        "text": "`diff` phát lại từng trường hợp đã ghi trên Rust, và không có gì được phát hành cho đến khi tất cả khớp và `gate` đạt."
+      },
+      {
+        "title": "Lift",
+        "text": "Khi phát lại đạt mà không phải quay về bản gốc và mọi unit đều đạt `gate`, `app lift` biến nó thành một ứng dụng Rust thuần. Bản gốc không bao giờ bị chạm vào."
+      }
+    ],
+    "vizSameApi": "cùng API",
+    "vizCheck": "các trường hợp Fuse.js khớp, lần build đầu tiên",
+    "vizGate": "gate đạt",
+    "vizLift": "json-server quay về bản gốc, đạt 514/514",
+    "vizLiftSteps": [
+      "Front door",
+      "Các lần đọc đã nối dây",
+      "mọi route"
+    ],
+    "demoTitle": "Những gì bản ghi tìm ra",
+    "demoDesc": "Một bản chuyển đầu tiên của `fuzzyScore` trong x18n, đánh chỉ mục theo `char` của Rust. Nó qua được các bài kiểm thử đơn giản và trượt ở `diff`.",
+    "demoComments": {
+      "profile": "# thời gian đi đâu và ai gọi nó",
+      "write": "# viết src/port.rs (hoặc để agent viết), rồi:",
+      "first": "# diff, bản chuyển đầu tiên",
+      "matchLine": "198/200 trường hợp khớp",
+      "why": "# indexOf của JS đếm đơn vị mã UTF-16,\n# nên một emoji chiếm hai vị trí.",
+      "fixed": "# với các hàm hỗ trợ utf16 được sinh ra:\n# 2000/2000 trường hợp, và gate đạt"
+    },
+    "portsTitle": "Đo trên các dự án thực",
+    "portsDesc": "Sau mỗi con số là một benchmark đã kiểm tra trước rằng kết quả giống hệt nhau. Các trường hợp chậm cũng có ở đây: gọi Rust cho từng hàm nhỏ thường chậm hơn JIT.",
+    "ports": [
+      {
+        "href": "/docs/real-world/json-server",
+        "kind": "json-server · một máy chủ Node nguyên vẹn",
+        "big": "514/514",
+        "text": "trường hợp HTTP khớp sau `app lift` trên một tệp nhị phân Rust thuần (5.3 MB), với 0% quay về bản gốc. Sáu unit đạt `gate`.",
+        "rows": [
+          {
+            "k": "Bộ nhớ lúc rảnh, cơ sở dữ liệu fixture",
+            "v": "74 MB → 3.5 MB"
+          },
+          {
+            "k": "Từ lúc khởi động đến phản hồi đầu tiên",
+            "v": "85 / 79 ms → 9.9 / 7.9 ms"
+          },
+          {
+            "k": "Toàn bộ danh sách 10,000 bài, 1 kết nối",
+            "v": "1.2x",
+            "slow": true
+          }
+        ]
+      },
+      {
+        "href": "/docs/real-world/fuse-js",
+        "kind": "Fuse.js · tìm kiếm trong danh sách chuỗi",
+        "big": "32x",
+        "text": "nhanh hơn mỗi yêu cầu trên 50,000 chuỗi (91.2 ms → 2.8 ms, Apple M4). 3,414/3,414 trường hợp đã ghi khớp; kết quả giống hệt Fuse từng byte trên 360 lần tìm kiếm.",
+        "rows": [
+          {
+            "k": "10,000 chuỗi",
+            "v": "27 đến 30x"
+          },
+          {
+            "k": "1,000 chuỗi",
+            "v": "18x"
+          },
+          {
+            "k": "50,000 chuỗi, một lõi",
+            "v": "5.3x",
+            "slow": true
+          }
+        ]
+      },
+      {
+        "href": "/docs/real-world/vercel-ms",
+        "kind": "vercel/ms · một thư viện nhỏ xíu",
+        "big": "975/975",
+        "text": "trường hợp khớp, 340 trong số đó được thu từ chính bài kiểm thử Jest của nó. Một bản chuyển tốt nhưng là mục tiêu tồi cho tốc độ, và `bench` cũng nói đúng như vậy.",
+        "rows": [
+          {
+            "k": "Mỗi lần gọi, trên các trường hợp đã ghi",
+            "v": "0.56x",
+            "slow": true
+          },
+          {
+            "k": "Batch, parse x100,000",
+            "v": "18x"
+          },
+          {
+            "k": "Batch, format x100,000",
+            "v": "0.8x",
+            "slow": true
+          }
+        ]
+      }
+    ],
+    "benchTitle": "Benchmark json-server · yêu cầu mỗi giây, lần chạy 1 / lần chạy 2 · Apple M4, Node 24.15.0",
+    "benchHead": [
+      "Yêu cầu (cơ sở dữ liệu fixture)",
+      "Node, 1 kết nối",
+      "Rust, 1 kết nối",
+      "Node, 50 kết nối",
+      "Rust, 50 kết nối"
+    ],
+    "benchPostRow": "POST /comments, 10 kết nối",
+    "benchNote": "Nơi mức chênh lệch nhỏ: một kết nối đọc toàn bộ danh sách 10,000 bài (1.2x), và các lần ghi vào cơ sở dữ liệu lớn (1.1 đến 1.2x), vì cả hai đều ghi lại toàn bộ tệp sau mỗi lần ghi. [Bảng đầy đủ](/docs/real-world/json-server)",
+    "langsTitle": "Ngôn ngữ",
+    "langsDesc": "Ngôn ngữ được nhận diện từ kho mã. Mọi ngôn ngữ trừ C đều có batch: các phần tử chỉ vượt biên một lần và ở lại trong Rust, trên mọi lõi.",
+    "verified": "Đã kiểm chứng",
+    "wholeApps": "Ứng dụng nguyên vẹn",
+    "langMeta": {
+      "typescript": "napi-rs hoặc wasm-bindgen. json-server, Fuse.js, vercel/ms, x18n",
+      "python": "PyO3. CPython colorsys: 2,400/2,400",
+      "c": "extern \"C\". Mặt tiền glibc: 1,859/1,859",
+      "go": "cgo và wire nhị phân. Go path: 2,642/2,642",
+      "ruby": "magnus. shellwords: 1,617/1,617",
+      "java": "JNI và wire nhị phân. Mặt tiền JDK: 4,492/4,492"
+    },
+    "sponsorsTitle": "Nhà tài trợ",
+    "sponsorsDesc": "rust-anything miễn phí và mã nguồn mở. Nếu nó giúp ích cho công việc của bạn, hãy cân nhắc tài trợ. Sự ủng hộ của bạn giúp việc phát triển được tiếp tục.",
+    "companySponsor": "Nhà tài trợ doanh nghiệp",
+    "becomeSponsor": "Trở thành nhà tài trợ"
+  }
+}

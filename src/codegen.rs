@@ -100,12 +100,17 @@ pub fn port_rs(m: &Manifest) -> String {
         let params = f
             .params
             .iter()
-            .map(|p| format!("{}: {}", snake_case(&p.name), port_param_type(m, p).rust()))
+            .map(|p| {
+                let ty = go_unsigned(m, p.native_type.as_deref())
+                    .unwrap_or_else(|| port_param_type(m, p).rust());
+                format!("{}: {ty}", snake_case(&p.name))
+            })
             .collect::<Vec<_>>()
             .join(", ");
-        let ret = match RType::from_ts(&f.returns) {
-            RType::Unit => "()".to_string(),
-            t => t.rust(),
+        let ret = match (go_unsigned_result(m, f), RType::from_ts(&f.returns)) {
+            (Some(unsigned), _) => unsigned,
+            (None, RType::Unit) => "()".to_string(),
+            (None, t) => t.rust(),
         };
         let names: Vec<String> = f.params.iter().map(|p| snake_case(&p.name)).collect();
         let asyncness = if is_async(f) { "async " } else { "" };
@@ -193,6 +198,22 @@ pub fn port_rs(m: &Manifest) -> String {
         out.push_str("}\n");
     }
     out
+}
+
+/// The port type of a Go `uint64`, `uint` or `uintptr`: the dialect calls every Go integer `int`,
+/// which is `i64` in the port and cannot hold the upper half of their range.
+fn go_unsigned(m: &Manifest, go_type: Option<&str>) -> Option<String> {
+    matches!(m.language, crate::lang::Lang::Go)
+        .then(|| go_type.and_then(crate::codegen_go::unsigned_port_type))
+        .flatten()
+}
+
+/// [`go_unsigned`] for a function with one result; several results cross as one JSON value.
+fn go_unsigned_result(m: &Manifest, f: &crate::ts::exports::ExportedFn) -> Option<String> {
+    match crate::codegen_go::results(f).0.as_slice() {
+        [result] => go_unsigned(m, Some(result)),
+        _ => None,
+    }
 }
 
 /// A parameter's type in the port. Python parameters with a literal default (`sep="-"`) are

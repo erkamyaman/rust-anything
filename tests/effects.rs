@@ -217,7 +217,7 @@ fn a_server_that_mails_twice_fails_only_on_that_request() {
 }
 
 const DB_APP: &str = r#"import os, sqlite3, sys
-db = sqlite3.connect(os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.db"))
+db = sqlite3.connect("app.db")
 name = sys.argv[1] if len(sys.argv) > 1 else "nobody"
 for _ in range(int(os.environ.get("ROWS", "1"))):
     db.execute("insert into users(name) values (?)", (name,))
@@ -290,6 +290,78 @@ fn rows_written_differently_fail_replay_through_the_db_dump() {
     let twice = replay(&repo, &format!("{python} add_twice.py"));
     let dave = twice.failures.iter().find(|f| f.case == "dave").unwrap();
     assert_eq!(dave.problems[0].field, "effects", "{dave:?}");
+
+    std::fs::remove_dir_all(&repo).unwrap();
+}
+
+#[test]
+fn db_reset_and_dump_run_where_the_case_runs() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo =
+        std::env::temp_dir().join(format!("rust-anything-effects-cwd-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(repo.join("scripts")).unwrap();
+    std::fs::write(
+        repo.join("notes.py"),
+        "import sys\nopen('notes.txt', 'a', newline='').write(sys.argv[1] + '\\n')\nprint('added')\n",
+    )
+    .unwrap();
+    // The repository's own notes.txt must be left alone by the reset and unseen by the dump.
+    std::fs::write(repo.join("notes.txt"), "repo copy\n").unwrap();
+    std::fs::write(
+        repo.join("reset.py"),
+        "import os\nif os.path.exists('notes.txt'):\n    os.remove('notes.txt')\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("scripts").join("dump.py"),
+        "import os, sys\nsys.stdout.buffer.write(open('notes.txt', 'rb').read() if os.path.exists('notes.txt') else b'(no notes.txt)\\n')\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("inputs.jsonl"),
+        "{\"name\": \"add\", \"args\": [\"hello\"]}\n",
+    )
+    .unwrap();
+    // Scripts named by a relative path still come from the repository.
+    let effects = EffectsConfig::from_args(
+        &[],
+        &[],
+        Some(&format!("{python} reset.py")),
+        Some(&format!("{python} scripts/dump.py")),
+    )
+    .unwrap();
+    let outcome = app::record(&RecordOptions {
+        repo: &repo,
+        run: &[python.to_string(), "notes.py".to_string()],
+        inputs: Some(&repo.join("inputs.jsonl")),
+        normalize: &[],
+        name: Some("notes"),
+        traps: false,
+        timeout_secs: None,
+        http: false,
+        server_args: &[],
+        fresh: &[],
+        pace_ms: None,
+        port: None,
+        float_tolerance: None,
+        float_files: &[],
+        effects,
+    })
+    .unwrap();
+    assert!(outcome.unstable.is_empty(), "{outcome:?}");
+    assert_eq!(
+        std::fs::read_to_string(app::cases_dir(&repo).join("add.effects")).unwrap(),
+        "db\nhello\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(repo.join("notes.txt")).unwrap(),
+        "repo copy\n"
+    );
+    let same = replay(&repo, &format!("{python} notes.py"));
+    assert_eq!(same.passed, same.total, "{:?}", same.failures);
 
     std::fs::remove_dir_all(&repo).unwrap();
 }

@@ -311,3 +311,62 @@ fn go_takes_the_root_as_profile_does() {
     let both = parse(&["go", "a", "--root", "b", "--", "true"]);
     assert!(both.contains("cannot be used with"), "{both}");
 }
+
+#[test]
+fn enable_only_rebinds_selected_functions_and_updates_when_expanded() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let root = scratch("python-partial", "go-fuzzy");
+    let crate_dir = bridged(&root, "fuzzy.py", "fuzzy-rs", &[]);
+    let package = crate_dir.join("python/fuzzy_rs");
+    std::fs::create_dir_all(&package).unwrap();
+    std::fs::write(
+        package.join("__init__.py"),
+        "def dedupe(names, limit):\n    return [[\"from rust\"]]\n\
+         def levenshtein(a, b):\n    return 999\n",
+    )
+    .unwrap();
+    let before = std::fs::read(root.join("fuzzy.py")).unwrap();
+    let call = |expr: &str| {
+        let mut cmd = Command::new(python);
+        cmd.args(["-c", expr])
+            .current_dir(&root)
+            .env("PYTHONDONTWRITEBYTECODE", "1")
+            .env_remove("RUST_ANYTHING_MODE");
+        run(&mut cmd)
+    };
+
+    // Enable only `dedupe`: `dedupe` runs Rust while `levenshtein` stays in Python.
+    let partial = enable::enable_only(&crate_dir, Some(&["dedupe".into()]), &[]).unwrap();
+    assert_eq!(partial.functions, ["dedupe"]);
+    assert!(
+        partial
+            .skipped
+            .iter()
+            .any(|s| s.contains("levenshtein") && s.contains("kept in the original")),
+        "{:?}",
+        partial.skipped
+    );
+    assert_eq!(
+        call("import fuzzy; print(fuzzy.dedupe(['ab', 'ac'], 1))"),
+        "[['from rust']]"
+    );
+    assert_eq!(
+        call("import fuzzy; print(fuzzy.levenshtein('ab', 'ac'))"),
+        "1"
+    );
+
+    // Expanding to all exports updates the existing block in place so `levenshtein` switches on too.
+    let full = enable::enable(&crate_dir).unwrap();
+    assert_eq!(full.functions.len(), 2);
+    assert_eq!(
+        call("import fuzzy; print(fuzzy.levenshtein('ab', 'ac'))"),
+        "999"
+    );
+
+    // Disabling removes the block and restores the original file byte for byte.
+    enable::disable(&crate_dir).unwrap();
+    assert_eq!(std::fs::read(root.join("fuzzy.py")).unwrap(), before);
+    std::fs::remove_dir_all(root).unwrap();
+}

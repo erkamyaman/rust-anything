@@ -1,0 +1,277 @@
+{
+  "meta": {
+    "title": "Tulis ulang seluruh aplikasimu dalam Rust, sepotong demi sepotong",
+    "description": "Tulis ulang aplikasimu dalam Rust sepotong demi sepotong, diverifikasi terhadap aslinya di setiap langkah. CLI, server, dan pustaka dalam TypeScript/JavaScript, Python, C, Go, Ruby, Java, Kotlin, PHP, PowerShell, dan C#."
+  },
+  "ui": {
+    "docs": "Dokumentasi",
+    "languages": "Bahasa",
+    "realWorld": "Port dunia nyata",
+    "searchButton": "Cari dokumentasi…",
+    "searchDocs": "Cari dokumentasi",
+    "searchPlaceholder": "Cari: record, known-diffs, front door…",
+    "searchQuery": "Kata pencarian",
+    "searchEmpty": "Ketik untuk mencari di semua halaman dokumentasi.",
+    "searchNone": "Tidak ada halaman yang cocok.",
+    "openMenu": "Buka menu",
+    "closeMenu": "Tutup menu",
+    "menu": "Menu",
+    "language": "Bahasa",
+    "home": "Beranda rust-anything",
+    "github": "rust-anything di GitHub",
+    "onThisPage": "Di halaman ini",
+    "editPage": "Edit halaman ini di GitHub",
+    "previous": "Sebelumnya",
+    "next": "Berikutnya",
+    "pager": "Halaman sebelumnya dan berikutnya",
+    "breadcrumb": "Navigasi jejak",
+    "themeDark": "Gelap",
+    "themeLight": "Terang",
+    "themeSystem": "Sistem",
+    "theme": "Tema",
+    "themeSwitch": "Ganti ke",
+    "copy": "Salin",
+    "copied": "Tersalin",
+    "copyInstall": "Salin perintah instal",
+    "installWith": "Instal dengan",
+    "skip": "Lompat ke konten",
+    "legal": "Berlisensi MIT. Port dan kode yang dihasilkan di repositorimu adalah milikmu. Proyek independen, tidak berafiliasi dengan atau didukung oleh Rust Project maupun Rust Foundation. \"Rust\" adalah merek dagang Rust Foundation.",
+    "quickStart": "Mulai cepat",
+    "cliReference": "Referensi CLI",
+    "issues": "Issue",
+    "status": "Status",
+    "sponsor": "Sponsor",
+    "madeBy": "Dibuat oleh"
+  },
+  "nav": {
+    "groups": {
+      "introduction": "Pengantar",
+      "concepts": "Konsep",
+      "languages": "Bahasa",
+      "wholeApps": "Aplikasi utuh",
+      "reference": "Referensi",
+      "realWorld": "Port dunia nyata",
+      "project": "Proyek"
+    },
+    "items": {
+      "/docs/introduction/what-is-rust-anything": "Apa itu rust-anything",
+      "/docs/introduction/quick-start": "Mulai cepat",
+      "/docs/introduction/install": "Instalasi",
+      "/docs/introduction/agents": "Menyiapkan agen",
+      "/docs/introduction/doctor": "Doctor",
+      "/docs/concepts/the-loop": "Alurnya",
+      "/docs/concepts/analyze": "Profil dan analisis",
+      "/docs/concepts/bridge": "Bridge",
+      "/docs/concepts/record": "Record",
+      "/docs/concepts/port": "Port",
+      "/docs/concepts/diff": "Diff dan perbedaan yang diketahui",
+      "/docs/concepts/bench": "Bench",
+      "/docs/concepts/shadow": "Shadow",
+      "/docs/concepts/gate": "Gate",
+      "/docs/concepts/coverage": "Cakupan",
+      "/docs/concepts/batches": "Batch dan jalur panas",
+      "/docs/concepts/float-tolerance": "Toleransi float",
+      "/docs/concepts/limits": "Yang tidak bisa ditangkap",
+      "/docs/languages/overview": "Ikhtisar",
+      "/docs/languages/typescript": "TypeScript/JavaScript",
+      "/docs/languages/python": "Python",
+      "/docs/languages/c": "C",
+      "/docs/languages/go": "Go",
+      "/docs/languages/ruby": "Ruby",
+      "/docs/languages/java": "Java",
+      "/docs/languages/php": "PHP",
+      "/docs/languages/csharp": "C#",
+      "/docs/whole-apps/overview": "Memporting aplikasi utuh",
+      "/docs/whole-apps/record-replay": "Rekam dan putar ulang",
+      "/docs/whole-apps/front-door": "Front door dan wire",
+      "/docs/whole-apps/lift": "Lift",
+      "/docs/whole-apps/servers": "Server",
+      "/docs/whole-apps/libraries": "Pustaka",
+      "/docs/reference/cli": "CLI",
+      "/docs/reference/mcp-tools": "Alat MCP",
+      "/docs/real-world/overview": "Ikhtisar",
+      "/docs/real-world/json-server": "json-server",
+      "/docs/real-world/fuse-js": "Fuse.js",
+      "/docs/real-world/vercel-ms": "vercel/ms",
+      "/docs/real-world/x18n": "x18n",
+      "/docs/real-world/six-languages": "Enam bahasa",
+      "/docs/real-world/fixtures": "Fixture dan eksekusi statis",
+      "/docs/project/status": "Status",
+      "/docs/project/faq": "FAQ",
+      "/docs/project/contributing": "Berkontribusi"
+    }
+  },
+  "hero": {
+    "title1": "Tulis ulang aplikasimu dalam Rust.",
+    "title2": "Buktikan perilakunya tetap sama.",
+    "sub": "rust-anything merekam apa yang dilakukan kodemu, lalu memutar ulang setiap kasus rekaman terhadap port Rust. Agenmu yang menulis Rust-nya. Tidak ada yang dirilis sebelum keluarannya cocok.",
+    "cta": "Baca mulai cepat",
+    "source": "Kode sumber di GitHub",
+    "sourceLanguage": "Bahasa sumber",
+    "bridge": "Bridge",
+    "verified": "Port {lang} terverifikasi, {what}: {count} kasus rekaman cocok",
+    "wholeApp": "Aplikasi {lang} sudah direkam dan diputar ulang terhadap aslinya hari ini, dari front door."
+  },
+  "home": {
+    "stats": [
+      {
+        "v": "32",
+        "unit": "x",
+        "k": "pencarian Fuse.js per permintaan atas 50,000 string, Apple M4"
+      },
+      {
+        "v": "3.5",
+        "unit": "MB",
+        "k": "memori idle json-server setelah lift, dari 74 MB di Node"
+      },
+      {
+        "v": "514/514",
+        "unit": "",
+        "k": "kasus HTTP json-server cocok pada biner Rust murni"
+      },
+      {
+        "v": "10",
+        "unit": "",
+        "k": "bahasa: delapan dengan port terverifikasi, Kotlin dan PowerShell diuji dari ujung ke ujung"
+      }
+    ],
+    "installTitle": "Instal",
+    "installDesc": "Instal CLI, lalu daftarkan server MCP dan skill alur kerja ke Claude Code, Codex, Cursor, dan Gemini CLI.",
+    "installNote": "Biner siap pakai untuk macOS, Linux, dan Windows tersedia di setiap [rilis GitHub]({releases}).",
+    "agentPrompt": "Instal rust-anything: jalankan `cargo install rust-anything`, lalu `rust-anything setup`.",
+    "agentRestart": "Beri tahu aku kapan harus memulai ulang kamu.",
+    "loopTitle": "Bagaimana sebuah port dibuat",
+    "loopDesc": "Aslinya tetap menjadi sumber kebenaran. rust-anything tidak menerjemahkan kode: ia menyediakan apa yang tidak bisa ditebak agen, dan gate yang menunjukkan kapan sebuah port selesai.",
+    "steps": [
+      {
+        "title": "Rekam",
+        "text": "`record` menjalankan aslinya dengan kasus tepi yang dihasilkan, jebakan semantik, dan masukanmu sendiri, lalu menyimpan apa yang dikembalikan atau dilemparkannya."
+      },
+      {
+        "title": "Port",
+        "text": "`bridge` menghasilkan crate Rust dan pembungkus agar pemanggil tetap memakai API aslinya. Kamu atau agenmu yang menulis Rust-nya."
+      },
+      {
+        "title": "Periksa",
+        "text": "`diff` memutar ulang setiap kasus rekaman terhadap Rust, dan tidak ada yang dirilis sebelum semuanya cocok dan `gate` lulus."
+      },
+      {
+        "title": "Lift",
+        "text": "Saat pemutaran ulang lulus tanpa fallback dan setiap unit lulus `gate`, `app lift` mengubahnya menjadi aplikasi Rust murni. Aslinya tidak pernah disentuh."
+      }
+    ],
+    "vizSameApi": "API yang sama",
+    "vizCheck": "kasus Fuse.js cocok, build pertama",
+    "vizGate": "gate lulus",
+    "vizLift": "fallback json-server, 514/514 lulus",
+    "vizLiftSteps": [
+      "Front door",
+      "Pembacaan terhubung",
+      "setiap rute"
+    ],
+    "demoTitle": "Apa yang ditemukan rekaman",
+    "demoDesc": "Port pertama `fuzzyScore` milik x18n, diindeks dengan `char` Rust. Lulus tes sederhana dan gagal di `diff`.",
+    "demoComments": {
+      "profile": "# ke mana waktu habis dan siapa yang memanggilnya",
+      "write": "# tulis src/port.rs (atau minta agen), lalu:",
+      "first": "# diff, port pertama",
+      "matchLine": "198/200 kasus cocok",
+      "why": "# indexOf di JS menghitung unit kode UTF-16,\n# jadi satu emoji memakai dua posisi.",
+      "fixed": "# dengan helper utf16 yang dihasilkan:\n# 2000/2000 kasus, dan gate lulus"
+    },
+    "portsTitle": "Diukur pada proyek nyata",
+    "portsDesc": "Di balik setiap angka ada benchmark yang lebih dulu memeriksa bahwa hasilnya identik. Kasus lambat juga tercantum di sini: memanggil Rust sekali per fungsi kecil biasanya lebih lambat daripada JIT.",
+    "ports": [
+      {
+        "href": "/docs/real-world/json-server",
+        "kind": "json-server · seluruh server Node",
+        "big": "514/514",
+        "text": "kasus HTTP cocok pada biner Rust murni (5.3 MB) setelah `app lift`, dengan fallback 0%. Enam unit lulus `gate`.",
+        "rows": [
+          {
+            "k": "Memori idle, basis data fixture",
+            "v": "74 MB → 3.5 MB"
+          },
+          {
+            "k": "Mulai hingga respons pertama",
+            "v": "85 / 79 ms → 9.9 / 7.9 ms"
+          },
+          {
+            "k": "Seluruh daftar 10,000 post, 1 koneksi",
+            "v": "1.2x",
+            "slow": true
+          }
+        ]
+      },
+      {
+        "href": "/docs/real-world/fuse-js",
+        "kind": "Fuse.js · pencarian daftar string",
+        "big": "32x",
+        "text": "Lebih cepat per permintaan atas 50,000 string (91.2 ms → 2.8 ms, Apple M4). 3,414/3,414 kasus rekaman cocok; hasil identik byte demi byte dengan Fuse pada 360 pencarian.",
+        "rows": [
+          {
+            "k": "10,000 string",
+            "v": "27 hingga 30x"
+          },
+          {
+            "k": "1,000 string",
+            "v": "18x"
+          },
+          {
+            "k": "50,000 string, satu inti",
+            "v": "5.3x",
+            "slow": true
+          }
+        ]
+      },
+      {
+        "href": "/docs/real-world/vercel-ms",
+        "kind": "vercel/ms · pustaka kecil",
+        "big": "975/975",
+        "text": "kasus cocok, 340 di antaranya ditangkap dari tes Jest miliknya sendiri. Port yang bagus dan target yang buruk untuk kecepatan, dan `bench` mengatakan demikian.",
+        "rows": [
+          {
+            "k": "Per panggilan, atas kasus rekaman",
+            "v": "0.56x",
+            "slow": true
+          },
+          {
+            "k": "Batch, parse x100,000",
+            "v": "18x"
+          },
+          {
+            "k": "Batch, format x100,000",
+            "v": "0.8x",
+            "slow": true
+          }
+        ]
+      }
+    ],
+    "benchTitle": "Benchmark json-server · permintaan per detik, eksekusi 1 / eksekusi 2 · Apple M4, Node 24.15.0",
+    "benchHead": [
+      "Permintaan (basis data fixture)",
+      "Node, 1 kon.",
+      "Rust, 1 kon.",
+      "Node, 50 kon.",
+      "Rust, 50 kon."
+    ],
+    "benchPostRow": "POST /comments, 10 koneksi",
+    "benchNote": "Di mana selisihnya kecil: satu koneksi yang membaca seluruh daftar 10,000 post (1.2x), dan penulisan ke basis data besar (1.1 hingga 1.2x), karena keduanya menulis ulang seluruh berkas pada setiap penulisan. [Tabel lengkap](/docs/real-world/json-server)",
+    "langsTitle": "Bahasa",
+    "langsDesc": "Bahasa dideteksi dari repositori. Setiap bahasa selain C juga mendapat batch: elemen menyeberang sekali dan tetap di Rust, di semua inti.",
+    "verified": "Terverifikasi",
+    "wholeApps": "Aplikasi utuh",
+    "langMeta": {
+      "typescript": "napi-rs atau wasm-bindgen. json-server, Fuse.js, vercel/ms, x18n",
+      "python": "PyO3. CPython colorsys: 2,400/2,400",
+      "c": "extern \"C\". Fasad glibc: 1,859/1,859",
+      "go": "cgo dan wire biner. Go path: 2,642/2,642",
+      "ruby": "magnus. shellwords: 1,617/1,617",
+      "java": "JNI dan wire biner. Fasad JDK: 4,492/4,492"
+    },
+    "sponsorsTitle": "Sponsor",
+    "sponsorsDesc": "rust-anything gratis dan sumber terbuka. Jika membantu pekerjaanmu, pertimbangkan untuk menjadi sponsor. Dukunganmu menjaga pengembangan tetap berjalan.",
+    "companySponsor": "Sponsor perusahaan",
+    "becomeSponsor": "Jadilah sponsor"
+  }
+}

@@ -1,0 +1,277 @@
+{
+  "meta": {
+    "title": "अपना पूरा ऐप टुकड़े-टुकड़े करके Rust में दोबारा लिखें",
+    "description": "अपने ऐप को टुकड़े-टुकड़े करके Rust में दोबारा लिखें, हर कदम पर मूल कोड से जाँचते हुए। TypeScript/JavaScript, Python, C, Go, Ruby, Java, Kotlin, PHP, PowerShell और C# में CLI, सर्वर और लाइब्रेरी।"
+  },
+  "ui": {
+    "docs": "दस्तावेज़",
+    "languages": "भाषाएँ",
+    "realWorld": "असली पोर्ट",
+    "searchButton": "दस्तावेज़ खोजें…",
+    "searchDocs": "दस्तावेज़ खोजें",
+    "searchPlaceholder": "खोजें: record, known-diffs, front door…",
+    "searchQuery": "खोज शब्द",
+    "searchEmpty": "सभी दस्तावेज़ पन्नों में खोजने के लिए टाइप करें।",
+    "searchNone": "कोई मेल खाता पन्ना नहीं।",
+    "openMenu": "मेन्यू खोलें",
+    "closeMenu": "मेन्यू बंद करें",
+    "menu": "मेन्यू",
+    "language": "भाषा",
+    "home": "rust-anything मुखपृष्ठ",
+    "github": "GitHub पर rust-anything",
+    "onThisPage": "इस पन्ने पर",
+    "editPage": "GitHub पर इस पन्ने को संपादित करें",
+    "previous": "पिछला",
+    "next": "अगला",
+    "pager": "पिछला और अगला पन्ना",
+    "breadcrumb": "ब्रेडक्रम्ब नेविगेशन",
+    "themeDark": "डार्क",
+    "themeLight": "लाइट",
+    "themeSystem": "सिस्टम",
+    "theme": "थीम",
+    "themeSwitch": "बदलें:",
+    "copy": "कॉपी करें",
+    "copied": "कॉपी हो गया",
+    "copyInstall": "इंस्टॉल कमांड कॉपी करें",
+    "installWith": "इससे इंस्टॉल करें",
+    "skip": "सामग्री पर जाएँ",
+    "legal": "MIT लाइसेंस के अंतर्गत। आपकी रिपॉज़िटरी में पोर्ट और जनरेट किया गया कोड आपका है। एक स्वतंत्र प्रोजेक्ट, जो Rust Project या Rust Foundation से जुड़ा नहीं है और न ही उनके द्वारा समर्थित है। \"Rust\" Rust Foundation का ट्रेडमार्क है।",
+    "quickStart": "त्वरित शुरुआत",
+    "cliReference": "CLI संदर्भ",
+    "issues": "Issues",
+    "status": "स्थिति",
+    "sponsor": "स्पॉन्सर करें",
+    "madeBy": "निर्माता"
+  },
+  "nav": {
+    "groups": {
+      "introduction": "परिचय",
+      "concepts": "अवधारणाएँ",
+      "languages": "भाषाएँ",
+      "wholeApps": "पूरे ऐप",
+      "reference": "संदर्भ",
+      "realWorld": "असली पोर्ट",
+      "project": "प्रोजेक्ट"
+    },
+    "items": {
+      "/docs/introduction/what-is-rust-anything": "rust-anything क्या है",
+      "/docs/introduction/quick-start": "त्वरित शुरुआत",
+      "/docs/introduction/install": "इंस्टॉल",
+      "/docs/introduction/agents": "एजेंट सेट करें",
+      "/docs/introduction/doctor": "Doctor",
+      "/docs/concepts/the-loop": "लूप",
+      "/docs/concepts/analyze": "प्रोफ़ाइल और विश्लेषण",
+      "/docs/concepts/bridge": "Bridge",
+      "/docs/concepts/record": "Record",
+      "/docs/concepts/port": "Port",
+      "/docs/concepts/diff": "Diff और ज्ञात अंतर",
+      "/docs/concepts/bench": "Bench",
+      "/docs/concepts/shadow": "Shadow",
+      "/docs/concepts/gate": "Gate",
+      "/docs/concepts/coverage": "कवरेज",
+      "/docs/concepts/batches": "बैच और हॉट पाथ",
+      "/docs/concepts/float-tolerance": "फ़्लोट सहनशीलता",
+      "/docs/concepts/limits": "यह क्या नहीं पकड़ता",
+      "/docs/languages/overview": "अवलोकन",
+      "/docs/languages/typescript": "TypeScript/JavaScript",
+      "/docs/languages/python": "Python",
+      "/docs/languages/c": "C",
+      "/docs/languages/go": "Go",
+      "/docs/languages/ruby": "Ruby",
+      "/docs/languages/java": "Java",
+      "/docs/languages/php": "PHP",
+      "/docs/languages/csharp": "C#",
+      "/docs/whole-apps/overview": "पूरा ऐप पोर्ट करना",
+      "/docs/whole-apps/record-replay": "रिकॉर्ड और रीप्ले",
+      "/docs/whole-apps/front-door": "Front door और वायर",
+      "/docs/whole-apps/lift": "Lift",
+      "/docs/whole-apps/servers": "सर्वर",
+      "/docs/whole-apps/libraries": "लाइब्रेरी",
+      "/docs/reference/cli": "CLI",
+      "/docs/reference/mcp-tools": "MCP टूल",
+      "/docs/real-world/overview": "अवलोकन",
+      "/docs/real-world/json-server": "json-server",
+      "/docs/real-world/fuse-js": "Fuse.js",
+      "/docs/real-world/vercel-ms": "vercel/ms",
+      "/docs/real-world/x18n": "x18n",
+      "/docs/real-world/six-languages": "छह भाषाएँ",
+      "/docs/real-world/fixtures": "फ़िक्स्चर और स्टैटिक रन",
+      "/docs/project/status": "स्थिति",
+      "/docs/project/faq": "अक्सर पूछे जाने वाले प्रश्न",
+      "/docs/project/contributing": "योगदान"
+    }
+  },
+  "hero": {
+    "title1": "अपना ऐप Rust में दोबारा लिखें।",
+    "title2": "साबित करें कि वह वैसे ही चलता है।",
+    "sub": "rust-anything रिकॉर्ड करता है कि आपका कोड क्या करता है, फिर हर रिकॉर्ड किए गए मामले को Rust पोर्ट पर दोबारा चलाता है। Rust आपका एजेंट लिखता है। जब तक आउटपुट मेल न खाएँ, कुछ भी शिप नहीं होता।",
+    "cta": "त्वरित शुरुआत पढ़ें",
+    "source": "GitHub पर सोर्स",
+    "sourceLanguage": "सोर्स भाषा",
+    "bridge": "Bridge",
+    "verified": "जाँचा हुआ {lang} पोर्ट, {what}: {count} रिकॉर्ड किए गए मामले मेल खाते हैं",
+    "wholeApp": "{lang} ऐप आज ही मूल कोड के विरुद्ध रिकॉर्ड और रीप्ले होते हैं, front door से शुरू करके।"
+  },
+  "home": {
+    "stats": [
+      {
+        "v": "32",
+        "unit": "x",
+        "k": "Fuse.js खोज प्रति अनुरोध, 50,000 स्ट्रिंग पर, Apple M4"
+      },
+      {
+        "v": "3.5",
+        "unit": "MB",
+        "k": "json-server की निष्क्रिय मेमोरी लिफ़्ट के बाद, Node में 74 MB थी"
+      },
+      {
+        "v": "514/514",
+        "unit": "",
+        "k": "json-server के HTTP मामले शुद्ध Rust बाइनरी पर मेल खाते हैं"
+      },
+      {
+        "v": "10",
+        "unit": "",
+        "k": "भाषाएँ: आठ में जाँचे हुए पोर्ट, Kotlin और PowerShell शुरू से अंत तक परखे गए"
+      }
+    ],
+    "installTitle": "इंस्टॉल",
+    "installDesc": "CLI इंस्टॉल करें, फिर MCP सर्वर और वर्कफ़्लो स्किल को Claude Code, Codex, Cursor और Gemini CLI में दर्ज करें।",
+    "installNote": "macOS, Linux और Windows के पहले से बने बाइनरी हर [GitHub रिलीज़]({releases}) के साथ मिलते हैं।",
+    "agentPrompt": "rust-anything इंस्टॉल करो: `cargo install rust-anything` चलाओ, फिर `rust-anything setup`।",
+    "agentRestart": "बताओ कि मुझे तुम्हें कब रीस्टार्ट करना है।",
+    "loopTitle": "एक पोर्ट कैसे बनता है",
+    "loopDesc": "मूल कोड ही प्रामाणिक रहता है। rust-anything कोड का अनुवाद नहीं करता: यह वह देता है जो एजेंट अंदाज़े से नहीं जान सकता, और एक gate जो बताता है कि पोर्ट कब पूरा हुआ।",
+    "steps": [
+      {
+        "title": "रिकॉर्ड",
+        "text": "`record` मूल कोड को जनरेट किए गए किनारे के मामलों, अर्थ-संबंधी जालों और आपके अपने इनपुट के साथ चलाता है, और जो वह लौटाता या फेंकता है उसे सहेज लेता है।"
+      },
+      {
+        "title": "पोर्ट",
+        "text": "`bridge` Rust क्रेट और एक रैपर बनाता है ताकि कॉल करने वाले मूल API ही इस्तेमाल करते रहें। Rust आप या आपका एजेंट लिखता है।"
+      },
+      {
+        "title": "जाँच",
+        "text": "`diff` हर रिकॉर्ड किए गए मामले को Rust पर दोबारा चलाता है, और जब तक सब मेल न खाएँ और `gate` पास न हो, कुछ भी शिप नहीं होता।"
+      },
+      {
+        "title": "लिफ़्ट",
+        "text": "जब रीप्ले बिना फ़ॉलबैक के पास हो और हर यूनिट `gate` पास कर ले, तो `app lift` उसे शुद्ध Rust ऐप में बदल देता है। मूल कोड को कभी छुआ नहीं जाता।"
+      }
+    ],
+    "vizSameApi": "वही API",
+    "vizCheck": "Fuse.js के मामले मेल खाते हैं, पहला बिल्ड",
+    "vizGate": "gate पास",
+    "vizLift": "json-server फ़ॉलबैक, 514/514 पास",
+    "vizLiftSteps": [
+      "Front door",
+      "पढ़ने वाले रूट जुड़े",
+      "हर रूट"
+    ],
+    "demoTitle": "रिकॉर्डिंग क्या पकड़ती है",
+    "demoDesc": "x18n के `fuzzyScore` का पहला पोर्ट, जो Rust के `char` से इंडेक्स करता था। यह सादे टेस्ट पास कर गया और `diff` में फ़ेल हुआ।",
+    "demoComments": {
+      "profile": "# समय कहाँ जाता है और उसे कौन बुलाता है",
+      "write": "# src/port.rs लिखें (या एजेंट से लिखवाएँ), फिर:",
+      "first": "# diff, पहला पोर्ट",
+      "matchLine": "200 में से 198 मामले मेल खाते हैं",
+      "why": "# JS का indexOf UTF-16 कोड यूनिट गिनता है,\n# इसलिए एक इमोजी दो स्थान लेता है।",
+      "fixed": "# जनरेट किए गए utf16 हेल्पर के साथ:\n# 2000/2000 मामले, और gate पास"
+    },
+    "portsTitle": "असली प्रोजेक्ट पर नापा गया",
+    "portsDesc": "हर संख्या के पीछे एक बेंचमार्क है जो पहले जाँचता है कि नतीजे एक जैसे हैं। धीमे मामले भी यहीं हैं: हर छोटे फ़ंक्शन के लिए अलग से Rust को बुलाना अक्सर JIT से धीमा होता है।",
+    "ports": [
+      {
+        "href": "/docs/real-world/json-server",
+        "kind": "json-server · पूरा Node सर्वर",
+        "big": "514/514",
+        "text": "`app lift` के बाद शुद्ध Rust बाइनरी (5.3 MB) पर HTTP मामले मेल खाते हैं, 0% फ़ॉलबैक के साथ। छह यूनिट `gate` पास करती हैं।",
+        "rows": [
+          {
+            "k": "निष्क्रिय मेमोरी, फ़िक्स्चर डेटाबेस",
+            "v": "74 MB → 3.5 MB"
+          },
+          {
+            "k": "शुरू से पहले जवाब तक",
+            "v": "85 / 79 ms → 9.9 / 7.9 ms"
+          },
+          {
+            "k": "10,000 पोस्ट की पूरी सूची, 1 कनेक्शन",
+            "v": "1.2x",
+            "slow": true
+          }
+        ]
+      },
+      {
+        "href": "/docs/real-world/fuse-js",
+        "kind": "Fuse.js · स्ट्रिंग सूचियों में खोज",
+        "big": "32x",
+        "text": "50,000 स्ट्रिंग पर प्रति अनुरोध तेज़ (91.2 ms → 2.8 ms, Apple M4)। 3,414/3,414 रिकॉर्ड किए गए मामले मेल खाते हैं; 360 खोजों पर नतीजे Fuse से बाइट-दर-बाइट एक जैसे।",
+        "rows": [
+          {
+            "k": "10,000 स्ट्रिंग",
+            "v": "27 से 30x"
+          },
+          {
+            "k": "1,000 स्ट्रिंग",
+            "v": "18x"
+          },
+          {
+            "k": "50,000 स्ट्रिंग, एक कोर",
+            "v": "5.3x",
+            "slow": true
+          }
+        ]
+      },
+      {
+        "href": "/docs/real-world/vercel-ms",
+        "kind": "vercel/ms · एक छोटी लाइब्रेरी",
+        "big": "975/975",
+        "text": "मामले मेल खाते हैं, जिनमें 340 इसके अपने Jest टेस्ट से लिए गए। एक अच्छा पोर्ट पर गति के लिए बुरा लक्ष्य, और `bench` यही बताता है।",
+        "rows": [
+          {
+            "k": "प्रति कॉल, रिकॉर्ड किए गए मामलों पर",
+            "v": "0.56x",
+            "slow": true
+          },
+          {
+            "k": "बैच, parse x100,000",
+            "v": "18x"
+          },
+          {
+            "k": "बैच, format x100,000",
+            "v": "0.8x",
+            "slow": true
+          }
+        ]
+      }
+    ],
+    "benchTitle": "json-server बेंचमार्क · प्रति सेकंड अनुरोध, रन 1 / रन 2 · Apple M4, Node 24.15.0",
+    "benchHead": [
+      "अनुरोध (फ़िक्स्चर डेटाबेस)",
+      "Node, 1 कनेक्शन",
+      "Rust, 1 कनेक्शन",
+      "Node, 50 कनेक्शन",
+      "Rust, 50 कनेक्शन"
+    ],
+    "benchPostRow": "POST /comments, 10 कनेक्शन",
+    "benchNote": "जहाँ अंतर छोटा है: एक कनेक्शन जो 10,000 पोस्ट की पूरी सूची पढ़ता है (1.2x), और बड़े डेटाबेस पर लिखना (1.1 से 1.2x), क्योंकि दोनों हर लिखने पर पूरी फ़ाइल दोबारा लिखते हैं। [पूरी तालिकाएँ](/docs/real-world/json-server)",
+    "langsTitle": "भाषाएँ",
+    "langsDesc": "भाषा रिपॉज़िटरी से पहचानी जाती है। C को छोड़कर हर भाषा को बैच भी मिलते हैं: तत्व एक बार सीमा पार करते हैं और सभी कोर पर Rust में रहते हैं।",
+    "verified": "जाँचा हुआ",
+    "wholeApps": "पूरे ऐप",
+    "langMeta": {
+      "typescript": "napi-rs या wasm-bindgen। json-server, Fuse.js, vercel/ms, x18n",
+      "python": "PyO3। CPython colorsys: 2,400/2,400",
+      "c": "extern \"C\"। glibc फ़साड: 1,859/1,859",
+      "go": "cgo और बाइनरी वायर। Go path: 2,642/2,642",
+      "ruby": "magnus। shellwords: 1,617/1,617",
+      "java": "JNI और बाइनरी वायर। JDK फ़साड: 4,492/4,492"
+    },
+    "sponsorsTitle": "प्रायोजक",
+    "sponsorsDesc": "rust-anything मुफ़्त और ओपन सोर्स है। अगर यह आपके काम में मदद करता है, तो कृपया स्पॉन्सर करने पर विचार करें। आपका सहयोग विकास को चालू रखता है।",
+    "companySponsor": "कंपनी प्रायोजक",
+    "becomeSponsor": "स्पॉन्सर बनें"
+  }
+}
