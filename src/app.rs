@@ -1521,7 +1521,8 @@ const CASE_FILES: [&str; 9] = [
 /// Removes the cases the last recording in this folder wrote (`previous`) that this one did not
 /// write, and names the cases in the folder that did not come from a recording, which it keeps.
 /// Only `previous` marks a case as a recording's: a case written by hand stays even when an input
-/// of its name timed out now. Files a case that stays reads through `fs.base` stay too.
+/// of its name timed out now. Files a case that stays reads through `fs.base` (that folder, or one
+/// inside it) stay too.
 pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Result<()> {
     let written: BTreeSet<&str> = outcome.recorded.iter().map(String::as_str).collect();
     let ours: BTreeSet<&str> = previous
@@ -1537,7 +1538,8 @@ pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Re
         }
         for ext in CASE_FILES {
             let path = outcome.dir.join(format!("{name}.{ext}"));
-            if read.contains(&path) {
+            // A folder a case that stays reads, or that holds one it reads, stays.
+            if read.iter().any(|base| base.starts_with(&path)) {
                 continue;
             }
             if path.is_dir() {

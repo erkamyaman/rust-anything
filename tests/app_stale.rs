@@ -319,3 +319,44 @@ fn a_recorded_case_whose_input_times_out_now_is_removed() {
         "slow's files are left: {left:?}"
     );
 }
+
+#[test]
+fn a_folder_inside_a_removed_case_s_files_that_a_kept_case_reads_stays() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = repo("nested-base");
+    std::fs::write(
+        repo.join("cli.py"),
+        "import os\nprint(open('x.txt').read() if os.path.exists('x.txt') else 'none')\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("in.jsonl"),
+        "{\"name\":\"one\",\"args\":[]}\n{\"name\":\"two\",\"args\":[],\"files\":{\"sub/x.txt\":\"from two\"}}\n",
+    )
+    .unwrap();
+    let run = [python.to_string(), "cli.py".to_string()];
+    record(&repo, &run, false);
+    let dir = app::cases_dir(&repo);
+    let two = std::fs::read_to_string(dir.join("two.toml")).unwrap();
+    assert!(two.contains("\"two.in\""), "{two}");
+    // Written by hand, reading a folder inside the files `two` was recorded with.
+    std::fs::write(
+        dir.join("mine.toml"),
+        two.replace("\"two.in\"", "\"two.in/sub\""),
+    )
+    .unwrap();
+    std::fs::write(dir.join("mine.stdout"), "from two\n").unwrap();
+    std::fs::copy(dir.join("two.stderr"), dir.join("mine.stderr")).unwrap();
+
+    std::fs::write(repo.join("in.jsonl"), "{\"name\":\"one\",\"args\":[]}\n").unwrap();
+    let second = record(&repo, &run, false);
+    let kept = dir.join("two.in").join("sub").join("x.txt").is_file();
+    let again = replay(&repo);
+    std::fs::remove_dir_all(&repo).unwrap();
+
+    assert_eq!(second.stale, ["two"], "{second:?}");
+    assert!(kept, "two.in/sub/x.txt was removed");
+    assert_eq!((again.passed, again.total), (2, 2), "{:?}", again.failures);
+}
