@@ -212,40 +212,24 @@ const SCRIPTS: [&str; 14] = [
 
 /// The command runs where the case runs, so a script it names by a relative path (`reset.py`,
 /// `"my scripts/reset.py"`, `< schema.sql`) is pointed at the repository's copy. Other words, such
-/// as `app.db`, and the target of an output redirect (`> snapshot.sql`) stay relative: they name
-/// the case's own files. Everything else in the command is kept as written.
+/// as `app.db`, the target of an output redirect (`> snapshot.sql`), a here-string and the body of a
+/// here-document stay as written: they name the case's own files or are input. Everything else in
+/// the command is kept as written.
 fn with_repo_scripts(cmd: &str, repo: &Path) -> String {
     let mut out = String::with_capacity(cmd.len());
     let mut kept = 0;
-    let mut output_next = false;
+    let mut skip_next = false;
     for word in shell_words(cmd) {
-        let output_target = std::mem::take(&mut output_next);
-        // A leading redirect (`<`, `>`, `>>`, `2>`) is part of the word when nothing separates it.
-        let digits = word.text.len()
-            - word
-                .text
-                .trim_start_matches(|c: char| c.is_ascii_digit())
-                .len();
-        let rest = &word.text[digits..];
-        let op_len = if rest.starts_with(">>") {
-            2
-        } else if rest.starts_with(['<', '>']) {
-            1
-        } else {
-            0
-        };
-        let (op, path) = if op_len > 0 {
-            (&word.text[..digits + op_len], &word.text[digits + op_len..])
-        } else {
-            ("", word.text.as_str())
-        };
-        if op.ends_with('>') {
-            output_next = path.is_empty();
+        if word.op {
+            // The word after `>`, `>>` or `2>` is an output, after `<<` a here-document's
+            // delimiter, after `<<<` a here-string: none is a file to read.
+            skip_next = word.text.contains('>') || word.text.starts_with("<<");
             continue;
         }
-        if output_target || path.is_empty() {
+        if std::mem::take(&mut skip_next) {
             continue;
         }
+        let path = word.text.as_str();
         let script = Path::new(path)
             .extension()
             .and_then(|e| e.to_str())
@@ -253,7 +237,6 @@ fn with_repo_scripts(cmd: &str, repo: &Path) -> String {
         let in_repo = repo.join(path);
         if script && Path::new(path).is_relative() && in_repo.is_file() {
             out.push_str(&cmd[kept..word.start]);
-            out.push_str(op);
             out.push_str(&quoted(&in_repo));
             kept = word.end;
         }
@@ -262,53 +245,106 @@ fn with_repo_scripts(cmd: &str, repo: &Path) -> String {
     out
 }
 
-/// A word of a shell command: where it sits in the command and its text without quotes.
+/// A word of a shell command: where it sits in the command, its text without quotes, and whether
+/// it is a redirect operator (`<`, `>`, `>>`, `<<`, `<<-`, `<<<`) rather than a word.
 struct ShellWord {
     start: usize,
     end: usize,
     text: String,
+    op: bool,
 }
 
 /// Splits a command into words as the shell does: whitespace, `;`, `&` and `|` separate words
-/// outside quotes, and quotes group without being part of the text. cmd only quotes with `"`; sh also with `'`
-/// and a backslash escape.
+/// outside quotes, an unquoted `<` or `>` starts a redirect operator of its own, and quotes group
+/// without being part of the text. The body of a here-document is input, so it gives no words.
+/// cmd only quotes with `"`; sh also with `'` and a backslash escape.
 fn shell_words(cmd: &str) -> Vec<ShellWord> {
     let unix = cfg!(not(windows));
     let mut words = Vec::new();
     let mut word: Option<ShellWord> = None;
     let mut quote = None;
-    let mut chars = cmd.char_indices();
-    while let Some((i, c)) = chars.next() {
+    // Here-documents whose bodies start on the next line: the delimiter, and whether it is `<<-`,
+    // which strips leading tabs.
+    let mut heredocs = Vec::new();
+    let mut i = 0;
+    while let Some(c) = cmd[i..].chars().next() {
+        let len = c.len_utf8();
+        let in_op = word.as_ref().is_some_and(|w| w.op);
+        let redirect = quote.is_none() && matches!(c, '<' | '>');
+        let separator = quote.is_none() && (c.is_whitespace() || matches!(c, ';' | '&' | '|'));
+        let op_goes_on = redirect || (c == '-' && word.as_ref().is_some_and(|w| w.text == "<<"));
+        if separator || (redirect && !in_op) || (in_op && !op_goes_on) {
+            finish(&mut words, &mut heredocs, word.take());
+        }
+        if separator {
+            i += len;
+            if c == '\n' && !heredocs.is_empty() {
+                i = past_heredocs(cmd, i, &mut heredocs);
+            }
+            continue;
+        }
         let w = word.get_or_insert_with(|| ShellWord {
             start: i,
             end: i,
             text: String::new(),
+            op: redirect,
         });
         match (quote, c) {
             (Some(q), c) if c == q => quote = None,
             (Some(_), c) => w.text.push(c),
-            // Whitespace and the operators that chain or pipe commands end a word.
-            (None, c) if c.is_whitespace() || matches!(c, ';' | '&' | '|') => {
-                if let Some(w) = word.take().filter(|w| w.end > w.start) {
-                    words.push(w);
-                }
-                continue;
-            }
             (None, '"') => quote = Some('"'),
             (None, '\'') if unix => quote = Some('\''),
             (None, '\\') if unix => {
-                if let Some((j, next)) = chars.next() {
+                if let Some(next) = cmd[i + len..].chars().next() {
                     w.text.push(next);
-                    w.end = j + next.len_utf8();
+                    i += len + next.len_utf8();
+                    w.end = i;
                     continue;
                 }
             }
             (None, c) => w.text.push(c),
         }
-        w.end = i + c.len_utf8();
+        i += len;
+        w.end = i;
     }
-    words.extend(word.filter(|w| w.end > w.start));
+    finish(&mut words, &mut heredocs, word);
     words
+}
+
+/// Ends a word; a word right after `<<` or `<<-` is the delimiter of a here-document.
+fn finish(words: &mut Vec<ShellWord>, heredocs: &mut Vec<(String, bool)>, word: Option<ShellWord>) {
+    let Some(w) = word.filter(|w| w.end > w.start) else {
+        return;
+    };
+    let after = words
+        .last()
+        .filter(|p| p.op && !w.op)
+        .map(|p| p.text.as_str());
+    if let Some(op @ ("<<" | "<<-")) = after {
+        heredocs.push((w.text.clone(), op == "<<-"));
+    }
+    words.push(w);
+}
+
+/// Skips the bodies of the pending here-documents, which start at `from`, through each closing
+/// delimiter line, and returns where the command goes on.
+fn past_heredocs(cmd: &str, mut from: usize, heredocs: &mut Vec<(String, bool)>) -> usize {
+    for (delimiter, tabs) in heredocs.drain(..) {
+        while from < cmd.len() {
+            let end = cmd[from..].find('\n').map_or(cmd.len(), |n| from + n);
+            let line = cmd[from..end].trim_end_matches('\r');
+            let line = if tabs {
+                line.trim_start_matches('\t')
+            } else {
+                line
+            };
+            from = (end + 1).min(cmd.len());
+            if line == delimiter {
+                break;
+            }
+        }
+    }
+    from
 }
 
 #[cfg(windows)]
@@ -642,6 +678,59 @@ mod tests {
             with_repo_scripts("python3  reset.py;  echo  ok", &repo),
             format!("python3  {};  echo  ok", at("reset.py"))
         );
+        std::fs::remove_dir_all(&repo).unwrap();
+    }
+
+    #[test]
+    fn redirects_and_here_documents_are_read_as_the_shell_reads_them() {
+        let repo = std::env::temp_dir().join(format!("ra-effects-heredoc-{}", std::process::id()));
+        std::fs::create_dir_all(&repo).unwrap();
+        for file in ["reset.py", "schema.sql", "snapshot.sql"] {
+            std::fs::write(repo.join(file), "").unwrap();
+        }
+        let at = |file: &str| quoted(&repo.join(file));
+        // A redirect needs no space before it.
+        assert_eq!(
+            with_repo_scripts("sqlite3 app.db<schema.sql", &repo),
+            format!("sqlite3 app.db<{}", at("schema.sql"))
+        );
+        for cmd in [
+            "echo result> snapshot.sql",
+            "echo result>snapshot.sql",
+            "echo result>>snapshot.sql",
+            "python3 check.py 2>&1 >snapshot.sql",
+        ] {
+            assert_eq!(with_repo_scripts(cmd, &repo), cmd);
+        }
+        // A here-document's body and a here-string are input, not words; the command goes on
+        // after the delimiter.
+        let heredoc = "cat <<EOF > notes.txt\nschema.sql\nEOF\npython3 reset.py";
+        assert_eq!(
+            with_repo_scripts(heredoc, &repo),
+            format!(
+                "cat <<EOF > notes.txt\nschema.sql\nEOF\npython3 {}",
+                at("reset.py")
+            )
+        );
+        let tabs = "cat <<-END\n\tschema.sql\n\tEND\npython3 reset.py";
+        assert_eq!(
+            with_repo_scripts(tabs, &repo),
+            format!(
+                "cat <<-END\n\tschema.sql\n\tEND\npython3 {}",
+                at("reset.py")
+            )
+        );
+        assert_eq!(
+            with_repo_scripts("sqlite3 app.db <<< schema.sql", &repo),
+            "sqlite3 app.db <<< schema.sql"
+        );
+        if cfg!(not(windows)) {
+            let quoted_delim = "cat <<'EOF'\nschema.sql\nEOF\npython3 reset.py";
+            assert_eq!(
+                with_repo_scripts(quoted_delim, &repo),
+                format!("cat <<'EOF'\nschema.sql\nEOF\npython3 {}", at("reset.py"))
+            );
+        }
         std::fs::remove_dir_all(&repo).unwrap();
     }
 
