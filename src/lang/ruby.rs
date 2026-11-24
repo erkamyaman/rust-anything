@@ -581,11 +581,22 @@ fn method_fn(
     let yard_param = |p: &str| {
         doc.iter().find_map(|l| {
             let rest = l.strip_prefix("@param ")?;
-            let (pname, rest) = rest.split_once(' ')?;
+            // YARD takes the name and the type in either order: `@param name [Type]` and
+            // `@param [Type] name`.
+            let (pname, types) = if rest.trim_start().starts_with('[') {
+                let close = rest.trim_start().find(']')?;
+                let types = &rest.trim_start()[1..close];
+                let after = rest.trim_start()[close + 1..].trim_start();
+                let pname = after.split_whitespace().next()?;
+                (pname, types)
+            } else {
+                let (pname, rest) = rest.split_once(' ')?;
+                let types = rest.trim().strip_prefix('[')?.split(']').next()?;
+                (pname, types)
+            };
             if pname.trim_start_matches(':').trim_end_matches(':') != p {
                 return None;
             }
-            let types = rest.trim().strip_prefix('[')?.split(']').next()?;
             Some(yard_to_ts(types))
         })
     };
@@ -844,6 +855,18 @@ pub fn signature(f: &ExportedFn) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn yard_takes_the_name_and_the_type_in_either_order() {
+        let src = "module Pad\n  # @param text [String] the text\n  # @param width [Integer] the width\n  # @return [String]\n  def self.left(text, width) = text.rjust(width)\n\n  # @param [String] text the text\n  # @param [Integer] width the width\n  # @return [String]\n  def self.right(text, width) = text.ljust(width)\nend\n";
+        let fns = exports("pad.rb", src);
+        assert_eq!(fns.len(), 2, "{fns:?}");
+        for f in &fns {
+            let types: Vec<&str> = f.params.iter().map(|p| p.ts_type.as_str()).collect();
+            assert_eq!(types, ["string", "int"], "{}: {:?}", f.name, f.params);
+            assert_eq!(f.returns, "string", "{}", f.name);
+        }
+    }
 
     #[test]
     fn maps_yard_types() {

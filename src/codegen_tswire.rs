@@ -25,7 +25,7 @@ fn shape_ty(s: &Shape, types: &[LocalType], depth: usize) -> Ty {
         Shape::Str | Shape::LitStr(_) => Ty::Str16,
         Shape::Num | Shape::Int | Shape::LitNum(_) => Ty::Num,
         Shape::Bool | Shape::LitBool(_) => Ty::Bool,
-        Shape::Null | Shape::Undefined | Shape::Any | Shape::Tuple(_) => Ty::Dyn,
+        Shape::Null | Shape::Undefined | Shape::Any | Shape::Bytes | Shape::Tuple(_) => Ty::Dyn,
         Shape::Array(item) => Ty::List {
             item: Box::new(shape_ty(item, types, depth + 1)),
             native: "ts".into(),

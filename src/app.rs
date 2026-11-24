@@ -1248,10 +1248,13 @@ pub(crate) fn scan_examples<T>(repo: &Path, parse: impl Fn(&str, &Path) -> Optio
         };
         let doc_dir = path.parent().unwrap_or(repo);
         let mut fence: Option<String> = None;
+        // A command wrapped with trailing backslashes, joined so far.
+        let mut pending = String::new();
         for raw in text.lines() {
             let line = raw.trim();
-            if markdown {
+            let candidate = if markdown {
                 if line.starts_with("```") || line.starts_with("~~~") {
+                    pending.clear();
                     fence = match fence {
                         Some(_) => None,
                         None => Some(
@@ -1265,23 +1268,69 @@ pub(crate) fn scan_examples<T>(repo: &Path, parse: impl Fn(&str, &Path) -> Optio
                     continue;
                 }
                 let Some(lang) = &fence else { continue };
-                let candidate = match line.strip_prefix("$ ") {
-                    Some(rest) => rest,
-                    None if matches!(lang.as_str(), "sh" | "bash" | "shell" | "zsh") => line,
-                    None => continue,
-                };
-                if let Some(case) = parse(candidate, doc_dir) {
-                    out.push(case);
+                // Continuation lines carry no `$ ` prompt, and keep their indentation: it is what
+                // separates them from the previous word, as the shell adds no space when joining.
+                if !pending.is_empty() {
+                    raw
+                } else {
+                    let start = raw.trim_start();
+                    match start.strip_prefix("$ ") {
+                        Some(rest) => rest,
+                        None if matches!(lang.as_str(), "sh" | "bash" | "shell" | "zsh") => start,
+                        None => continue,
+                    }
                 }
+            } else if !pending.is_empty() {
+                raw
             } else {
-                let candidate = line.strip_prefix("$ ").unwrap_or(line);
-                if let Some(case) = parse(candidate, doc_dir) {
-                    out.push(case);
-                }
+                let start = raw.trim_start();
+                start.strip_prefix("$ ").unwrap_or(start)
+            };
+            // The line's end is untrimmed, so `\ ` (an escaped space) does not continue.
+            if !ends_in_comment(candidate)
+                && let Some(head) = continued(candidate)
+            {
+                pending.push_str(head);
+                continue;
+            }
+            pending.push_str(candidate);
+            let command = std::mem::take(&mut pending);
+            if let Some(case) = parse(&command, doc_dir) {
+                out.push(case);
             }
         }
     }
     out
+}
+
+/// Whether a shell line ends inside a comment: an unquoted `#` that starts a word. A `\` at the
+/// end of a comment is part of the comment, not a continuation.
+fn ends_in_comment(line: &str) -> bool {
+    let (mut single, mut double, mut escaped, mut word_start) = (false, false, false, true);
+    for c in line.chars() {
+        if escaped {
+            escaped = false;
+            word_start = false;
+            continue;
+        }
+        match c {
+            '\\' if !single => escaped = true,
+            '\'' if !double => single = !single,
+            '"' if !single => double = !double,
+            '#' if word_start && !single && !double => return true,
+            _ => {}
+        }
+        word_start = c.is_whitespace() && !single && !double;
+    }
+    false
+}
+
+/// The line without its trailing `\` when the shell would join it with the next line. An even
+/// number of trailing backslashes ends in a literal one (`C:\\`), not a continuation.
+fn continued(line: &str) -> Option<&str> {
+    let head = line.strip_suffix('\\')?;
+    let escaped = (head.len() - head.trim_end_matches('\\').len()) % 2 == 1;
+    (!escaped).then_some(head)
 }
 
 fn read_inputs(path: &Path) -> Result<Vec<(Option<String>, Case)>> {
@@ -2843,6 +2892,42 @@ mod tests {
         assert_eq!(cases[2].env["LANG"], "C");
         assert_eq!(cases[3].stdin.as_deref(), Some(&b"hello\n"[..]));
         std::fs::remove_dir_all(&repo).unwrap();
+    }
+
+    #[test]
+    fn examples_continued_with_a_backslash_are_joined() {
+        let repo = temp_dir("continued-examples").unwrap();
+        std::fs::write(
+            repo.join("README.md"),
+            "```console\n$ tool upper \\\n    --loud \\\n    'x y'\n$ tool path C:\\\\\n$ tool count in.txt\n$ tool upper --mode=lo\\\nud\n$ tool echo a\\ \n$ tool count b.txt\n```\n",
+        )
+        .unwrap();
+        std::fs::write(
+            repo.join("demo.sh"),
+            "tool sort \\\n  --reverse\n# tool hidden \\\ntool count c.txt\n",
+        )
+        .unwrap();
+        let names = vec!["tool".to_string()];
+        let args: Vec<Vec<String>> = find_examples(&repo, &names)
+            .iter()
+            .map(|c| c.args.clone())
+            .collect();
+        std::fs::remove_dir_all(&repo).unwrap();
+        // Not continuations: a doubled backslash (a literal one), a backslash followed by a space,
+        // and a backslash at the end of a comment. Joining adds no space of its own (`--mode=loud`).
+        assert_eq!(
+            args,
+            [
+                vec!["upper", "--loud", "x y"],
+                vec!["path", "C:\\"],
+                vec!["count", "in.txt"],
+                vec!["upper", "--mode=loud"],
+                vec!["echo", "a "],
+                vec!["count", "b.txt"],
+                vec!["sort", "--reverse"],
+                vec!["count", "c.txt"],
+            ]
+        );
     }
 
     #[test]

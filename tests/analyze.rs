@@ -82,6 +82,38 @@ fn finds_risks_with_locations() {
 }
 
 #[test]
+fn risk_samples_are_distinct_lines() {
+    let root = std::env::temp_dir().join(format!("ra-distinct-samples-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    std::fs::write(
+        root.join("src/f.ts"),
+        "export function f(s: string): string {\n\
+         \x20 return s.slice(1) + s.slice(2) + s.substring(3)\n\
+         }\n\
+         export function g(s: string): number {\n\
+         \x20 return s.indexOf(\"x\")\n\
+         }\n",
+    )
+    .unwrap();
+    let report = analyze(&root).unwrap();
+    std::fs::remove_dir_all(&root).unwrap();
+    let f = report
+        .units
+        .iter()
+        .find(|u| u.id.ends_with("f.ts"))
+        .unwrap();
+    let offsets = f
+        .risks
+        .iter()
+        .find(|r| r.risk == Risk::StringOffsets)
+        .unwrap();
+    // Three hits on line 2 must not use up every sample slot and hide line 5.
+    assert_eq!(offsets.count, 4);
+    assert_eq!(offsets.samples, ["src/f.ts:2", "src/f.ts:5"]);
+}
+
+#[test]
 fn picks_status_and_bridge() {
     let report = mini();
     let fs = unit(&report, "packages/a/src/fs.ts");
@@ -934,6 +966,25 @@ fn map_names_a_path_that_does_not_exist() {
     assert!(!out.status.success());
     let err = String::from_utf8_lossy(&out.stderr);
     assert!(err.contains("/no/such/rust-anything-path"), "{err}");
+}
+
+#[test]
+fn map_refuses_write_and_json_together() {
+    let root = std::env::temp_dir().join(format!("ra-map-write-json-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_rust-anything"))
+        .args(["map", "--write", "--json"])
+        .arg(&root)
+        .output()
+        .unwrap();
+    let wrote = root.join("rust/PORT_MAP.md").exists();
+    std::fs::remove_dir_all(&root).unwrap();
+    // `--json` used to win silently: exit 0, JSON printed, nothing written.
+    assert!(!out.status.success());
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("cannot be used with"), "{err}");
+    assert!(!wrote);
 }
 
 #[test]

@@ -1388,6 +1388,7 @@ pub fn to_ts_type(hint: &str) -> String {
         "int" => "int".into(),
         "float" => "number".into(),
         "bool" => "boolean".into(),
+        "bytes" | "bytearray" | "memoryview" => "pybytes".into(),
         "None" | "NoneType" => "undefined".into(),
         "list" | "List" | "Sequence" | "Iterable" | "MutableSequence" | "Collection" => {
             format!("{}[]", wrap(&arg(0)))
@@ -1408,7 +1409,7 @@ pub fn to_ts_type(hint: &str) -> String {
             .join(" | "),
         "Callable" => "(...args: unknown[]) => unknown".into(),
         "Any" | "object" => "unknown".into(),
-        // Tuples, sets, bytes, other dicts and named classes cross as JSON.
+        // Tuples, sets, other dicts and named classes cross as JSON.
         other => other.to_string(),
     }
 }
@@ -1653,5 +1654,15 @@ mod tests {
         let types: Vec<&str> = fns[0].params.iter().map(|p| p.ts_type.as_str()).collect();
         assert_eq!(types, ["number", "number", "number"]);
         assert_eq!(fns[1].params[0].ts_type, "unknown");
+    }
+
+    #[test]
+    fn maps_bytes_hints_to_bytes_dialect_type() {
+        assert_eq!(to_ts_type("bytes"), "pybytes");
+        assert_eq!(to_ts_type("bytearray"), "pybytes");
+        assert_eq!(to_ts_type("memoryview"), "pybytes");
+        assert_eq!(to_ts_type("Optional[bytes]"), "pybytes | undefined");
+        assert_eq!(to_ts_type("list[bytes]"), "pybytes[]");
+        assert_eq!(to_ts_type("bytes | None"), "pybytes | undefined");
     }
 }
