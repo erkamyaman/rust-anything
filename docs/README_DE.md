@@ -239,11 +239,12 @@ Dieselbe Ausgabe reicht nicht. Zeichne auch auf, was die App nach außen sendet,
 Jede Sprache außer C, PHP, C# und PowerShell erhält außerdem Batch-Klassen (`--batch`): Die Elemente überqueren die Grenze
 einmalig und bleiben in Rust, und jeder Aufruf verarbeitet sie alle auf allen Kernen.
 
-Die Sprache wird anhand des Repositorys erkannt (`go.mod`, `pom.xml`, eine `.csproj` oder `.sln`,
-`pyproject.toml`, `Gemfile`, `composer.json`, `package.json`, sonst die häufigsten Quelldateien);
-`--lang` überschreibt dies. Typen stammen aus dem Quellcode: TS-Typen, Python-Type-Hints, C-, Go-,
-Java- und C#-Signaturen, Ruby-YARD-Tags, PHP-Typen und phpdoc; untypisierte Parameter, die als Zahlen
-verwendet werden, werden als Zahlen abgeleitet.
+Die Sprache wird anhand des Repositorys erkannt (`go.mod`, `pom.xml`, `build.gradle`/`build.gradle.kts`,
+eine `.csproj` oder `.sln`, `pyproject.toml`, `Gemfile`, `composer.json`, `package.json`, sonst die
+häufigsten Quelldateien); ein Gradle-Modul mit `.kt`-Quellen und keinen `.java`-Quellen ist Kotlin,
+gemischte Module bleiben Java. `--lang` überschreibt dies. Typen stammen aus dem Quellcode: TS-Typen,
+Python-Type-Hints, C-, Go-, Java-, Kotlin- und C#-Signaturen, Ruby-YARD-Tags, PHP-Typen und phpdoc;
+untypisierte Parameter, die als Zahlen verwendet werden, werden als Zahlen abgeleitet.
 
 Für PHP plant `analyze` eine PHP-App (Composer-Pakete und PSR-4-Autoloading, Risiken
 wie lose Vergleiche und Integer-Überläufe in Floats, Zuordnung von Composer-Paketen zu Crates), und ein
