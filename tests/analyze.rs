@@ -205,6 +205,28 @@ fn a_language_the_folder_lacks_is_an_error_not_an_empty_plan() {
     let plan = analyze(&empty);
     std::fs::remove_dir_all(&empty).unwrap();
     assert_eq!(plan.unwrap().summary.source_files, 0);
+
+    let root = std::env::temp_dir().join(format!("ra-lang-cases-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let write = |path: &str, text: &str| {
+        let path = root.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    };
+    // UI files are the language too: a Go module whose TypeScript is only a React frontend.
+    write("go.mod", "module example.com/app\n\ngo 1.22\n");
+    write("web/App.tsx", "export function App() { return <div />; }\n");
+    assert_eq!(Lang::detect(&root), Lang::Go);
+    let frontend = analyze_lang(&root, Lang::Ts);
+    // Python files hidden by ignore rules: the error keeps analyze's reason for the empty plan.
+    write(".ignore", "py/\n");
+    write("py/tool.py", "def tool():\n    return 1\n");
+    let hidden = analyze_lang(&root, Lang::Python);
+    std::fs::remove_dir_all(&root).unwrap();
+    assert_eq!(frontend.unwrap().summary.ui_files, 1);
+    let err = hidden.unwrap_err().to_string();
+    assert!(err.contains("no Python source files"), "{err}");
+    assert!(err.contains("excluded by ignore rules"), "{err}");
 }
 
 #[test]

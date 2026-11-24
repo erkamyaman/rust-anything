@@ -296,12 +296,14 @@ pub fn analyze_lang(root: &Path, lang: Lang) -> Result<Report> {
         .collect();
     let mut report = build(root, &ws, &facts, lang);
     // A language the folder does not hold (a typo, or code in a subfolder) would read like a
-    // finished plan with nothing to do.
-    if report.summary.source_files == 0 {
+    // finished plan with nothing to do. Any file of the language counts, UI and tests included,
+    // and the warnings (files hidden by ignore rules) say why the plan would have been empty.
+    if ws.files.is_empty() {
         let detected = Lang::detect(root);
         if detected != lang {
+            let reasons: String = report.warnings.iter().map(|w| format!(". {w}")).collect();
             bail!(
-                "no {} source files found; the code here looks like {}",
+                "no {} source files found; the code here looks like {}{reasons}",
                 lang.name(),
                 detected.name()
             );
