@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `analyze` prefers a matching sibling source file over a directory index for extensionless
+  TypeScript and JavaScript imports.
+
 - Ruby ports turn `Err("Mod::Error: message")` into that namespaced exception, and Java, Ruby and
   PHP replays load the project's own classes, so a port that returns a project-defined exception
   matches the recorded `error_type`. The Ruby wrapper reopens each receiver with `class << Mod`,
