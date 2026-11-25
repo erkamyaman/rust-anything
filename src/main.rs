@@ -522,6 +522,10 @@ enum AppCmd {
         /// cases are requests (curl lines in its docs, `--inputs`, traps), kept in `http/`.
         #[arg(long)]
         http: bool,
+        /// Record the app as a CLI again: remove the server setting an earlier --http saved, with
+        /// its --arg and --fresh lists.
+        #[arg(long, conflicts_with_all = ["http", "port", "server_args", "pace"])]
+        no_http: bool,
         /// A port the server always listens on (implies --http).
         #[arg(long)]
         port: Option<u16>,
@@ -530,6 +534,9 @@ enum AppCmd {
         /// Repeatable; implies --http; saved with the cases.
         #[arg(long = "arg", value_name = "ARG", allow_hyphen_values = true)]
         server_args: Vec<String>,
+        /// Remove the saved --arg list, so server starts get no extra arguments.
+        #[arg(long, conflicts_with = "server_args")]
+        no_args: bool,
         /// A file or folder of the repository the app reads or writes (a project tree, a
         /// database file, a public folder): snapshotted into `files/` (`http/files/` for a
         /// server) and copied into a fresh working directory before every case (CLIs) or start
@@ -537,6 +544,9 @@ enum AppCmd {
         /// it removed are compared too. Repeatable; saved with the cases.
         #[arg(long)]
         fresh: Vec<String>,
+        /// Remove the saved --fresh list: cases (or server starts) run in the repository again.
+        #[arg(long, conflicts_with = "fresh")]
+        no_fresh: bool,
         /// Milliseconds to wait after each response before the next request, for work a server
         /// does after answering (a file watcher reloading what it just wrote). Implies --http;
         /// saved with the cases and used by replay; 0 removes it.
@@ -1563,9 +1573,12 @@ fn run_app(command: AppCmd) -> Result<ExitCode> {
             no_traps,
             timeout,
             http,
+            no_http,
             port,
             server_args,
+            no_args,
             fresh,
+            no_fresh,
             pace,
             float_tolerance,
             float_files,
@@ -1598,6 +1611,11 @@ fn run_app(command: AppCmd) -> Result<ExitCode> {
                 server_args: &server_args,
                 fresh: &fresh,
                 pace_ms: pace,
+                clear: app::Clear {
+                    http: no_http,
+                    server_args: no_args,
+                    fresh: no_fresh,
+                },
                 float_tolerance,
                 float_files: &float_files,
                 effects,

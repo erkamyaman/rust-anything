@@ -55,19 +55,39 @@ pub struct HttpConfig {
     pub pace_ms: Option<u64>,
 }
 
+/// Whether this record was given a server setting (`--http`, `--port`, `--arg`, `--pace`).
+pub(crate) fn asked(opts: &RecordOptions) -> bool {
+    opts.http || opts.port.is_some() || !opts.server_args.is_empty() || opts.pace_ms.is_some()
+}
+
 /// The `http` config of a recording: the saved one, changed by what this record was given.
-pub(crate) fn merge_config(saved: Option<HttpConfig>, opts: &RecordOptions) -> Option<HttpConfig> {
-    let asked =
-        opts.http || opts.port.is_some() || !opts.server_args.is_empty() || opts.pace_ms.is_some();
+pub(crate) fn merge_config(
+    saved: Option<HttpConfig>,
+    opts: &RecordOptions,
+) -> Result<Option<HttpConfig>> {
+    let asked = asked(opts);
+    if opts.clear.http {
+        ensure!(
+            !asked,
+            "--no-http cannot go with --http, --port, --arg or --pace"
+        );
+        return Ok(None);
+    }
+    ensure!(
+        !(opts.clear.server_args && !opts.server_args.is_empty()),
+        "--no-args cannot go with --arg"
+    );
     let mut config = match (saved, asked) {
         (Some(c), _) => c,
         (None, true) => HttpConfig::default(),
-        (None, false) => return None,
+        (None, false) => return Ok(None),
     };
     if opts.port.is_some() {
         config.port = opts.port;
     }
-    if !opts.server_args.is_empty() {
+    if opts.clear.server_args {
+        config.args.clear();
+    } else if !opts.server_args.is_empty() {
         config.args = opts.server_args.to_vec();
     }
     if !opts.fresh.is_empty() {
@@ -76,7 +96,7 @@ pub(crate) fn merge_config(saved: Option<HttpConfig>, opts: &RecordOptions) -> O
     if let Some(pace) = opts.pace_ms {
         config.pace_ms = (pace > 0).then_some(pace);
     }
-    Some(config)
+    Ok(Some(config))
 }
 
 pub(crate) const FILES_DIR: &str = "files";

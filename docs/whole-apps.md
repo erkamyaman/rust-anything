@@ -182,6 +182,9 @@ rust-anything app lift .
   argument every start gets after its command, so the Rust binary is started as the original is.
   `--pace 50` waits 50 ms after each response, for work a server does after answering (a file
   watcher reloading what it just wrote).
+- These settings are saved and kept by the next `app record`. `--no-http` records the app as a
+  CLI again (it removes the server setting with its `--arg` and `--fresh` lists), and `--no-args`
+  and `--no-fresh` remove one list.
 - Cases are `rust/app-cases/http/<case>.toml` (the request, the status and the headers that matter)
   and `<case>.body` (the response body, with `[..]` where two runs differed). Date, server and
   other per-response headers are left out; delete any header line you do not care about.
@@ -233,11 +236,11 @@ rebuild, since `app front-door` never overwrites an existing `rust/app`.
 | `timeout_secs` | `--timeout` | Replaces if passed; keeps saved (default `30`) otherwise |
 | `normalize` | `--normalize NAME` | Merges (appends new built-in normalizer names) |
 | `normalizers` | `--normalize NAME=REGEX` | Merges (inserts or updates by `NAME`) |
-| `http` | `--http`, `--port`, `--arg`, `--pace` | Sticky once set; cannot be cleared via CLI flags |
+| `http` | `--http`, `--port`, `--arg`, `--pace` | Kept once set; `--no-http` removes it (with its `args` and `fresh`) |
 | `http.port` | `--port` | Replaces if passed; keeps saved otherwise |
-| `http.args` | `--arg` | Replaces if passed; keeps saved (cannot be cleared via CLI) |
+| `http.args` | `--arg` | Replaces if passed; `--no-args` clears it; keeps saved otherwise |
 | `http.pace_ms` | `--pace` | Replaces if passed; `--pace 0` clears it |
-| `http.fresh` / `fresh` | `--fresh` | Replaces if passed; keeps saved (cannot be cleared via CLI) |
+| `http.fresh` / `fresh` | `--fresh` | Replaces if passed; `--no-fresh` clears it; keeps saved otherwise |
 | `effects` | `--effects`, `--effect-env`, `--effect-response`, `--db-reset`, `--db-dump` | Merges with saved sink and database settings; `--effect-response` replaces the saved rules |
 | `float_tolerance` | `--float-tolerance` | Replaces if passed; `--float-tolerance 0` clears it |
 | `float_files` | `--float-file` | Replaces if passed; keeps saved otherwise |

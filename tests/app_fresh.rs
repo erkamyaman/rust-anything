@@ -60,6 +60,7 @@ fn record(repo: &Path) -> app::RecordOutcome {
         server_args: &[],
         fresh: &["fixtures/project/".to_string()],
         pace_ms: None,
+        clear: Default::default(),
         port: None,
         float_tolerance: None,
         float_files: &[],

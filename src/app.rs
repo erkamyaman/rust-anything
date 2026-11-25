@@ -1561,6 +1561,20 @@ pub struct RecordOptions<'a> {
     /// when empty.
     pub float_files: &'a [String],
     pub effects: Option<crate::effects::EffectsConfig>,
+    /// Saved settings to remove instead of keep.
+    pub clear: Clear,
+}
+
+/// Saved settings `app record` removes (`--no-http`, `--no-args`, `--no-fresh`): without them a
+/// setting from an earlier recording is kept, and a list can only be replaced.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Clear {
+    /// Record the app as a CLI again: drop the saved `http` block, with its `args` and `fresh`.
+    pub http: bool,
+    /// Servers: drop the saved `--arg` list.
+    pub server_args: bool,
+    /// Drop the saved `--fresh` list (a server's or a CLI's).
+    pub fresh: bool,
 }
 
 fn is_zero(n: &usize) -> bool {
@@ -1972,7 +1986,7 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
             .timeout_secs
             .or(existing.as_ref().map(|c| c.timeout_secs))
             .unwrap_or_else(default_timeout),
-        http: crate::http::merge_config(existing.as_ref().and_then(|c| c.http.clone()), opts),
+        http: crate::http::merge_config(existing.as_ref().and_then(|c| c.http.clone()), opts)?,
         float_tolerance: match opts.float_tolerance {
             Some(t) => (crate::tolerance::check(t)? > 0.0).then_some(t),
             None => existing.as_ref().and_then(|c| c.float_tolerance),
@@ -2002,18 +2016,38 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
         fresh: Vec::new(),
         recorded: Vec::new(),
     };
+    ensure!(
+        !(opts.clear.fresh && !opts.fresh.is_empty()),
+        "--no-fresh cannot go with --fresh"
+    );
     if let Some(http) = config.http.as_mut() {
-        if !opts.fresh.is_empty() {
+        if opts.clear.fresh {
+            http.fresh.clear();
+        } else if !opts.fresh.is_empty() {
             http.fresh = opts.fresh.to_vec();
         }
     } else if !opts.fresh.is_empty() {
         config.fresh = opts.fresh.to_vec();
-    } else if let Some(c) = &existing {
+    } else if let Some(c) = existing.as_ref().filter(|_| !opts.clear.fresh) {
         config.fresh = c.fresh.clone();
     }
     let norm = Normalizers::new(&config)?;
     if config.http.is_some() {
-        let mut outcome = crate::http::record(&repo, &config, &norm, opts)?;
+        // Only the saved config says this is a server, for a command it did not record: say so
+        // when it fails to start, since the new command may be a CLI.
+        let new_run = existing
+            .as_ref()
+            .is_some_and(|c| !opts.run.is_empty() && c.run != opts.run);
+        let kept = previous_http && new_run && !crate::http::asked(opts);
+        let mut outcome = crate::http::record(&repo, &config, &norm, opts).map_err(|e| {
+            if kept {
+                e.context(format!(
+                    "{CONFIG_FILE} records this app as a server (pass --no-http to record it as a CLI)"
+                ))
+            } else {
+                e
+            }
+        })?;
         config.unordered = unordered_of(&outcome.noise);
         drop_stale(&mut outcome, if previous_http { &previous } else { &[] })?;
         config.recorded = outcome.recorded.clone();
@@ -2952,6 +2986,7 @@ mod tests {
             server_args: &[],
             fresh: &[],
             pace_ms: None,
+            clear: Default::default(),
             port: None,
             float_tolerance: None,
             float_files: &[],
@@ -3239,6 +3274,7 @@ mod tests {
             server_args: &[],
             fresh: &[],
             pace_ms: None,
+            clear: Default::default(),
             port: None,
             float_tolerance: None,
             float_files: &[],

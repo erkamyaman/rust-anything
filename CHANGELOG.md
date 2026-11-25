@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `app record --no-http` records an app as a CLI again after an earlier `--http` recording, and
+  `--no-args` and `--no-fresh` clear the saved `--arg` and `--fresh` lists (MCP `app_record`:
+  `no_http`, `no_args`, `no_fresh`). A recording that only the saved config makes a server now
+  says so when the command fails to start, and names `--no-http` (#330).
 - Ruby ports turn `Err("Mod::Error: message")` into that namespaced exception, and Java, Ruby and
   PHP replays load the project's own classes, so a port that returns a project-defined exception
   matches the recorded `error_type`. The Ruby wrapper reopens each receiver with `class << Mod`,

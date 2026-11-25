@@ -37,6 +37,7 @@ fn record_within(
         server_args: &[],
         fresh: &[],
         pace_ms: None,
+        clear: Default::default(),
         port: None,
         float_tolerance: None,
         float_files: &[],
