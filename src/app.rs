@@ -2177,9 +2177,15 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
     }
     config.unordered = unordered_of(&outcome.noise);
     drop_stale(&mut outcome, if previous_http { &[] } else { &previous })?;
+    config.recorded = outcome.recorded.clone();
+    std::fs::write(
+        dir.join(CONFIG_FILE),
+        serde_json::to_string_pretty(&config)? + "\n",
+    )?;
     if previous_http {
         // A server recorded as a CLI (`--no-http`): remove the requests its last recording wrote,
-        // or a later `--http` would replay them; requests written by hand stay.
+        // or a later `--http` would replay them; requests written by hand stay. The CLI config is
+        // saved first, so a removal cut short never leaves a server config with half its cases.
         let http_dir = cases_dir(&repo).join(crate::http::HTTP_DIR);
         if http_dir.is_dir() {
             let removed = remove_stale(&http_dir, &[], &previous)?;
@@ -2188,11 +2194,6 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
                 .extend(removed.into_iter().map(|name| format!("http/{name}")));
         }
     }
-    config.recorded = outcome.recorded.clone();
-    std::fs::write(
-        dir.join(CONFIG_FILE),
-        serde_json::to_string_pretty(&config)? + "\n",
-    )?;
     Ok(outcome)
 }
 
