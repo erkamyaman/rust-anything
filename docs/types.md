@@ -245,7 +245,8 @@ Generic and variadic methods are refused.
 
 A record, class or struct declared in the project crosses as `serde_json::Value` when:
 
-- it is `public`, and not `static`, `abstract`, generic or derived from another type;
+- it is `public`, and not `static`, `abstract` or generic, and has no base list (it neither
+  derives from a class nor implements an interface);
 - its name is declared once in the project (two classes named `Point` in different namespaces
   refuse both);
 - it has no constructor that takes arguments and no public instance fields (static fields are
