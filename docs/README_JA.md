@@ -199,7 +199,7 @@ rust-anything 自体はコードを自動翻訳しません。Rust コードを�
 
 C、PHP、C#、PowerShell を除くすべての言語でバッチクラス（`--batch`）も生成されます。要素は一度だけ境界を越えて Rust 側に保持され、呼び出しのたびに全コアを使って全要素を一括処理します。
 
-言語はリポジトリから自動検出されます（`go.mod`、`pom.xml`、`.csproj` または `.sln`、`pyproject.toml`、`Gemfile`、`composer.json`、`package.json`、該当しない場合は最も多いソースファイルから判断）。`--lang` で上書きもできます。型情報はソースから取得します: TS の型、Python の型ヒント、C/Go/Java/C# のシグネチャ、Ruby の YARD タグ、PHP の型および phpdoc。型注釈がなく数値として使われている引数は数値型と推論されます。
+言語はリポジトリから自動検出されます（`go.mod`、`pom.xml`、`build.gradle`/`build.gradle.kts`、`.csproj` または `.sln`、`pyproject.toml`、`Gemfile`、`composer.json`、`package.json`、該当しない場合は最も多いソースファイルから判断）。`.kt` ソースのみで `.java` ソースがない Gradle モジュールは Kotlin、混在するモジュールは Java のままです。`--lang` で上書きもできます。型情報はソースから取得します: TS の型、Python の型ヒント、C/Go/Java/Kotlin/C# のシグネチャ、Ruby の YARD タグ、PHP の型および phpdoc。型注釈がなく数値として使われている引数は数値型と推論されます。
 
 PHP については、`analyze` で PHP アプリの移行計画を立てられ（Composer パッケージと PSR-4 オートローディング、緩い比較や整数オーバーフローによる float 化などのリスク、Composer パッケージからクレートへのマッピング）、PHP の CLI やサーバーを記録・リプレイして Rust 製フロントドアの背後に配置できます。PHP の FFI を通じたユニット単位の Rust 移植は次のステップです（[issue #2](https://github.com/erkamyaman/rust-anything/issues/2)）。
 
