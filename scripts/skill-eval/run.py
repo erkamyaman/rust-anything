@@ -82,15 +82,19 @@ def main():
         return
     if not args.bin:
         sys.exit("rust-anything is not on PATH; pass --bin")
+    args.bin = str(Path(args.bin).resolve())
     results = [run_one(t, n, variants[n], args.agent.split(), args.bin, args.timeout) for t, n in plan]
     print(json.dumps(results, indent=1))
-    print(f"\n{'task':<12}{'variant':<12}{'gate':>6}{'turns':>8}{'cost $':>8}{'secs':>8}", file=sys.stderr)
+    print("\nmeans over the runs that reported the number; n is how many", file=sys.stderr)
     for t in tasks:
         for n in variants:
             rs = [r for r in results if r["task"] == t["id"] and r["variant"] == n]
             ok = sum(r["gate"] for r in rs)
-            avg = lambda k: sum(r.get(k) or 0 for r in rs) / len(rs)
-            print(f"{t['id']:<12}{n:<12}{ok}/{len(rs):>3}{avg('turns'):>8.1f}{avg('cost_usd'):>8.2f}{avg('seconds'):>8.0f}", file=sys.stderr)
+            def avg(key, rs=rs):
+                got = [r[key] for r in rs if r.get(key) is not None]
+                return f"{sum(got) / len(got):.2f} (n={len(got)})" if got else "n/a"
+
+            print(f"{t['id']:<12}{n:<12}{ok}/{len(rs):<4}turns {avg('turns'):<14}cost $ {avg('cost_usd'):<16}secs {avg('seconds')}", file=sys.stderr)
 
 
 if __name__ == "__main__":

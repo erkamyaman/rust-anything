@@ -94,8 +94,12 @@ fn every_command_the_skill_names_exists() {
         "{top:?} {app:?}"
     );
     let word = |w: Option<&&str>| {
-        w.filter(|c| c.chars().all(|ch| ch.is_ascii_lowercase() || ch == '-'))
-            .map(|c| c.to_string())
+        w.filter(|c| {
+            !c.starts_with(['-', '<'])
+                && c.chars()
+                    .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+        })
+        .map(|c| c.to_string())
     };
     let mut missing = Vec::new();
     for (file, text) in skill_files() {
