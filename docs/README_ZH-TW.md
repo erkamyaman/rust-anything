@@ -227,9 +227,10 @@ rust-anything 並不直接翻譯程式碼：Rust 程式碼是由你的程式開�
 除了 C、PHP、C# 與 PowerShell 之外，每種語言皆可產生批次處理類別（`--batch`）：所有資料只需跨邊界傳入一次並留在
 Rust 中，每次呼叫便會在所有 CPU 核心上平行運算全部項目。
 
-系統會根據儲存庫內容自動偵測語言（依序檢查 `go.mod`、`pom.xml`、`.csproj` 或 `.sln`、
+系統會根據儲存庫內容自動偵測語言（依序檢查 `go.mod`、`pom.xml`、`build.gradle`/`build.gradle.kts`、`.csproj` 或 `.sln`、
 `pyproject.toml`、`Gemfile`、`composer.json`、`package.json`，否則依最常見的原始碼檔案判斷）；
-也可以透過 `--lang` 手動覆寫。型別資訊直接來自原始碼：TS 型別、Python 型別提示、C、Go、Java 與 C#
+只有 `.kt` 原始碼而沒有 `.java` 原始碼的 Gradle 模組視為 Kotlin，混合模組仍視為 Java；
+也可以透過 `--lang` 手動覆寫。型別資訊直接來自原始碼：TS 型別、Python 型別提示、C、Go、Java、Kotlin 與 C#
 函式簽章、Ruby YARD 標籤、PHP 型別與 phpdoc；未標註型別但當作數值使用的參數，會被自動推斷
 為數值型別。
 
