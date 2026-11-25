@@ -611,7 +611,7 @@ fn tool_schemas() -> Value {
                 "args": { "type": "array", "items": { "type": "string" }, "description": "Servers: arguments every start gets after its command, the original's and every build's ([\"db.json\"]). Implies http; saved." },
                 "no_args": { "type": "boolean", "description": "Servers: remove the saved args list. Cannot go with args." },
                 "fresh": { "type": "array", "items": { "type": "string" }, "description": "Repository files or folders the app reads or writes (a project tree, a database file), snapshotted and copied into a fresh working directory before every case (CLIs) or start (servers); a CLI's removed files are compared too. Saved." },
-                "no_fresh": { "type": "boolean", "description": "Remove the saved fresh list: cases (or server starts) run in the repository again. Cannot go with fresh." },
+                "no_fresh": { "type": "boolean", "description": "Remove the saved fresh list: a CLI's cases start in an empty folder again, and a server starts in the repository. Cannot go with fresh." },
                 "pace": { "type": "integer", "description": "Servers: milliseconds to wait after each response, for work the server does after answering (a file watcher). Implies http; saved and used by replay; 0 removes it." },
                 "float_tolerance": { "type": "number", "description": "Numeric output: numbers match when they differ by at most this times the larger magnitude (absolute below 1), e.g. 1e-9. Saved with the cases; 0 removes it." },
                 "float_file": { "type": "array", "items": { "type": "string" }, "description": "Written files of raw floats, compared value by value within float_tolerance: `PATH=f32le` or `PATH=f64le`. Saved with the cases." },

@@ -544,7 +544,8 @@ enum AppCmd {
         /// it removed are compared too. Repeatable; saved with the cases.
         #[arg(long)]
         fresh: Vec<String>,
-        /// Remove the saved --fresh list: cases (or server starts) run in the repository again.
+        /// Remove the saved --fresh list: a CLI's cases start in an empty folder again, and a
+        /// server starts in the repository.
         #[arg(long, conflicts_with = "fresh")]
         no_fresh: bool,
         /// Milliseconds to wait after each response before the next request, for work a server

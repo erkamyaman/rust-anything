@@ -1630,20 +1630,39 @@ const CASE_FILES: [&str; 9] = [
 /// of its name timed out now. Files a case that stays reads through `fs.base` (that folder, or one
 /// inside it) stay too.
 pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Result<()> {
+    let stale = remove_stale(&outcome.dir, &outcome.recorded, previous)?;
     let written: BTreeSet<&str> = outcome.recorded.iter().map(String::as_str).collect();
+    let mut kept: Vec<String> = std::fs::read_dir(&outcome.dir)?
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            name.strip_suffix(".toml").map(str::to_string)
+        })
+        .filter(|name| !written.contains(name.as_str()))
+        .collect();
+    kept.sort();
+    outcome.stale = stale;
+    outcome.kept = kept;
+    Ok(())
+}
+
+/// Removes the cases in `dir` that `previous` lists and `written` does not, and returns the names
+/// of those it removed (see `drop_stale`).
+fn remove_stale(dir: &Path, written: &[String], previous: &[String]) -> Result<Vec<String>> {
+    let written: BTreeSet<&str> = written.iter().map(String::as_str).collect();
     let ours: BTreeSet<&str> = previous
         .iter()
         .map(String::as_str)
         .filter(|name| !written.contains(name))
         .collect();
-    let read = bases_read(&outcome.dir, &ours);
+    let read = bases_read(dir, &ours);
     let mut stale = Vec::new();
     for name in &ours {
-        if outcome.dir.join(format!("{name}.toml")).is_file() {
+        if dir.join(format!("{name}.toml")).is_file() {
             stale.push((*name).to_string());
         }
         for ext in CASE_FILES {
-            let path = outcome.dir.join(format!("{name}.{ext}"));
+            let path = dir.join(format!("{name}.{ext}"));
             // A folder a case that stays reads, holds one it reads, or is on the way to it as
             // written: `two.in/sub`, `../app-cases/two.in/sub` (resolved) and `two.in/../shared`
             // (on Unix only found while `two.in` exists) all keep `two.in`.
@@ -1662,18 +1681,7 @@ pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Re
             }
         }
     }
-    let mut kept: Vec<String> = std::fs::read_dir(&outcome.dir)?
-        .flatten()
-        .filter_map(|entry| {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            name.strip_suffix(".toml").map(str::to_string)
-        })
-        .filter(|name| !written.contains(name.as_str()))
-        .collect();
-    kept.sort();
-    outcome.stale = stale;
-    outcome.kept = kept;
-    Ok(())
+    Ok(stale)
 }
 
 /// The `fs.base` folders that the cases in `dir` other than `going` read, each as written (joined
@@ -2169,6 +2177,17 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
     }
     config.unordered = unordered_of(&outcome.noise);
     drop_stale(&mut outcome, if previous_http { &[] } else { &previous })?;
+    if previous_http {
+        // A server recorded as a CLI (`--no-http`): remove the requests its last recording wrote,
+        // or a later `--http` would replay them; requests written by hand stay.
+        let http_dir = cases_dir(&repo).join(crate::http::HTTP_DIR);
+        if http_dir.is_dir() {
+            let removed = remove_stale(&http_dir, &[], &previous)?;
+            outcome
+                .stale
+                .extend(removed.into_iter().map(|name| format!("http/{name}")));
+        }
+    }
     config.recorded = outcome.recorded.clone();
     std::fs::write(
         dir.join(CONFIG_FILE),

@@ -88,7 +88,19 @@ fn an_app_recorded_as_a_server_can_be_recorded_as_a_cli_again() {
         },
     )
     .unwrap();
+    let server_cases = config(&repo).recorded;
+    assert!(!server_cases.is_empty());
     assert!(config(&repo).http.is_some());
+    // A request written by hand next to the recorded ones.
+    let http_dir = app::cases_dir(&repo).join("http");
+    std::fs::write(
+        http_dir.join("by-hand.toml"),
+        "[request]
+method = \"GET\"
+path = \"/hello\"
+",
+    )
+    .unwrap();
 
     // A server that breaks under its own saved command gets no advice to become a CLI.
     std::fs::write(repo.join("server.py"), "import sys\nsys.exit(3)\n").unwrap();
@@ -138,6 +150,17 @@ fn an_app_recorded_as_a_server_can_be_recorded_as_a_cli_again() {
     )
     .unwrap();
     assert_eq!(outcome.cases, 1);
+    // The server recording's requests are gone, so a later --http cannot replay them; the one
+    // written by hand stays.
+    for name in &server_cases {
+        assert!(!http_dir.join(format!("{name}.toml")).exists(), "{name}");
+        assert!(
+            outcome.stale.contains(&format!("http/{name}")),
+            "{:?}",
+            outcome.stale
+        );
+    }
+    assert!(http_dir.join("by-hand.toml").is_file());
     let saved = config(&repo);
     assert!(saved.http.is_none());
     assert_eq!(saved.run, cli);

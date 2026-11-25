@@ -183,8 +183,9 @@ rust-anything app lift .
   `--pace 50` waits 50 ms after each response, for work a server does after answering (a file
   watcher reloading what it just wrote).
 - These settings are saved and kept by the next `app record`. `--no-http` records the app as a
-  CLI again (it removes the server setting with its `--arg` and `--fresh` lists), and `--no-args`
-  and `--no-fresh` remove one list.
+  CLI again: it removes the server setting with its `--arg` and `--fresh` lists, and the requests
+  the last server recording wrote in `http/` (requests written by hand stay). `--no-args` and
+  `--no-fresh` remove one list.
 - Cases are `rust/app-cases/http/<case>.toml` (the request, the status and the headers that matter)
   and `<case>.body` (the response body, with `[..]` where two runs differed). Date, server and
   other per-response headers are left out; delete any header line you do not care about.
