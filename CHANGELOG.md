@@ -3,7 +3,8 @@
 ## Unreleased
 
 - `docs/types.md` lists, for each language, what each source type becomes in `port.rs` and the
-  reason a type keeps a function in its language; a test checks every row against the code (#373).
+  reason a type keeps a function in its language; a test checks every row against the code
+  (#373, #456 by @puretechteam).
 
 ## 4.1.0 (2026-11-24)
 
