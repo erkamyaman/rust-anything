@@ -563,6 +563,13 @@ enum AppCmd {
         /// VAR=smtp-port or VAR=smtp-url (e.g. WEBHOOK_URL=http-url). Implies that effect.
         #[arg(long, value_name = "VAR=KIND")]
         effect_env: Vec<String>,
+        /// Canned response for the HTTP effect sink: `METHOD /path=STATUS [BODY|@FILE]`
+        /// (e.g. `POST /v1/charges=201 @fixtures/charge.json` or `POST /hooks/*=500`).
+        /// Matched in order with `*` wildcards; unmatched requests get `200 {}`. Enables the
+        /// outbound HTTP effect (`--effects http`, not `--http` server mode); saved with the cases
+        /// so replay sees identical replies. Repeatable.
+        #[arg(long, value_name = "SPEC")]
+        effect_response: Vec<String>,
         /// A shell command run before each case (CLIs) or each start (servers) that resets the
         /// database to a known state. Cases then run one at a time. It runs in the folder the
         /// case runs in; a script it names by a relative path with a script extension (`reset.py`,
@@ -1154,8 +1161,13 @@ fn run() -> Result<ExitCode> {
                     "speedup"
                 );
                 for r in &rows {
+                    let mark = if r.failing {
+                        "  cases do not match"
+                    } else {
+                        ""
+                    };
                     say!(
-                        "{:<24} {:>6} {:>12.0} {:>12.0} {:>8.2}x",
+                        "{:<24} {:>6} {:>12.0} {:>12.0} {:>8.2}x{mark}",
                         r.name,
                         r.cases,
                         r.original_ns,
@@ -1171,8 +1183,14 @@ fn run() -> Result<ExitCode> {
                     "\nTimed as callers call it, crossing included. Overall {:.2}x (geometric mean); {} of {} functions at least 1.1x faster.",
                     v.speedup,
                     v.faster.len(),
-                    rows.len()
+                    rows.len() - v.left_out.len()
                 );
+                if !v.left_out.is_empty() {
+                    say!(
+                        "Left out of the overall: {} (their recorded cases do not all match, so their time is the cost of failing, not of the work; run `diff`).",
+                        v.left_out.join(", ")
+                    );
+                }
                 say!("{}", v.advice);
             }
         }
@@ -1553,14 +1571,17 @@ fn run_app(command: AppCmd) -> Result<ExitCode> {
             float_files,
             effects,
             effect_env,
+            effect_response,
             db_reset,
             db_dump,
             json,
             run,
         } => {
-            let effects = rust_anything::effects::EffectsConfig::from_args(
+            let effects = rust_anything::effects::EffectsConfig::from_args_with_responses(
                 &effects,
                 &effect_env,
+                &effect_response,
+                &repo,
                 db_reset.as_deref(),
                 db_dump.as_deref(),
             )?;
@@ -1585,14 +1606,26 @@ fn run_app(command: AppCmd) -> Result<ExitCode> {
                 say!("{}", serde_json::to_string_pretty(&outcome)?);
                 return Ok(ExitCode::SUCCESS);
             }
-            say!(
-                "Recorded {} in {} ({} from examples, {} from inputs, {} traps)",
-                counted(outcome.cases, "case"),
-                outcome.dir.display(),
-                outcome.examples,
-                outcome.inputs,
-                outcome.traps
-            );
+            if outcome.traps_dropped > 0 {
+                say!(
+                    "Recorded {} in {} ({} from examples, {} from inputs, {} traps, {} dropped)",
+                    counted(outcome.cases, "case"),
+                    outcome.dir.display(),
+                    outcome.examples,
+                    outcome.inputs,
+                    outcome.traps,
+                    counted(outcome.traps_dropped, "trap")
+                );
+            } else {
+                say!(
+                    "Recorded {} in {} ({} from examples, {} from inputs, {} traps)",
+                    counted(outcome.cases, "case"),
+                    outcome.dir.display(),
+                    outcome.examples,
+                    outcome.inputs,
+                    outcome.traps
+                );
+            }
             for (kind, what) in [
                 (
                     app::NoiseKind::Lines,

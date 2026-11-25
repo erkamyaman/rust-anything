@@ -823,6 +823,48 @@ fn function_fn(
     })
 }
 
+pub(crate) fn declared_types(source: &str) -> Vec<String> {
+    let Some(tree) = syntax::parse(&language(), source) else {
+        return Vec::new();
+    };
+    let mut namespace = "";
+    let mut types = Vec::new();
+    for item in named_children(tree.root_node()) {
+        let mut items = if item.kind() == "namespace_definition" {
+            namespace = item
+                .child_by_field_name("name")
+                .map_or("", |name| text(name, source));
+            item.child_by_field_name("body")
+                .map_or_else(Vec::new, named_children)
+        } else {
+            vec![item]
+        };
+        while let Some(node) = items.pop() {
+            match node.kind() {
+                "class_declaration"
+                | "interface_declaration"
+                | "trait_declaration"
+                | "enum_declaration" => {
+                    if let Some(name) = node.child_by_field_name("name") {
+                        let name = text(name, source);
+                        types.push(if namespace.is_empty() {
+                            name.to_owned()
+                        } else {
+                            format!("{namespace}\\{name}")
+                        });
+                    }
+                }
+                "function_definition"
+                | "anonymous_function"
+                | "arrow_function"
+                | "anonymous_class" => {}
+                _ => items.extend(named_children(node)),
+            }
+        }
+    }
+    types
+}
+
 /// Functions (`Ns\name(...)`) and public static methods of classes (`Ns\Class::name(...)`).
 pub fn exports(path: &str, source: &str) -> Vec<ExportedFn> {
     if !path.ends_with(".php") {

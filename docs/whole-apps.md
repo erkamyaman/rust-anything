@@ -54,6 +54,10 @@ rust-anything app record . --effects http,smtp --effect-env WEBHOOK_URL=http-url
 - **`--effect-env VAR=KIND`** points one of the app's own settings at a sink: `http-url`,
   `smtp-host`, `smtp-port` or `smtp-url`. Most apps read their webhook URL or mail host from a
   setting like this.
+- **`--effect-response 'METHOD /path=STATUS [BODY|@FILE]'`** (repeatable) makes the HTTP sink
+  answer matching requests with that status and body instead of `200 {}`: the first rule that
+  matches wins, `*` is a wildcard in the method and path, and `@FILE` is read once and saved with
+  the cases, so replay gets the same replies. Giving the flag again replaces the saved rules.
 - **`--db-reset` and `--db-dump`** are shell commands: reset puts the database in a known state
   before each case (each start, for servers), and dump prints its state after each case (each
   request, for servers). Cases then run one at a time. Both run in the folder the case runs in
@@ -74,7 +78,7 @@ the port order as pieces (units that import each other move together), and numbe
 with a recommended answer: keep units, blocked units, dependencies with no or a partial crate.
 
 Then prove the whole program from the outside. `record` and `diff` prove one unit; `app record`
-and `app replay` prove the app, for CLIs and servers in any of the six languages (the app is a
+and `app replay` prove the app, for any program, in any language (the app is a
 black box):
 
 ```sh
@@ -165,8 +169,10 @@ rust-anything app wire . api --route 'GET /users/{id}' --route '*'
 rust-anything app lift .
 ```
 
-- Requests come from `curl` lines in the app's docs (`curl -X POST -d ... http://localhost:8080/x`),
-  `--inputs` (`{"name", "method", "path", "headers", "body"}`) and traps: path segments and query
+- Requests come from `curl` lines in the app's docs (`curl -X POST -d ... http://localhost:8080/x`,
+  `--data-binary @file` sent as raw bytes, `-F`/`--form` as a `multipart/form-data` upload),
+  `--inputs` (`{"name", "method", "path", "headers", "body" | "body_base64" | "body_file"}`, a
+  `body_file` relative to the inputs file or the repository) and traps: path segments and query
   values swapped for the same traps as CLI arguments, bodies for text and JSON traps, and an
   unknown route. Each run starts the server fresh and sends the requests in name order, so state
   between requests is kept.
@@ -211,6 +217,32 @@ rust-anything app lift .
   shadows from the units and leaves `rust/app` as one pure Rust library. It does not touch any
   `port.rs`, so the cases that matched through the bindings still describe it; the checklist
   warns about files of the original that still import the shadows.
+
+### Saved settings (`rust/app-cases/rust-anything.json`)
+
+`app record` saves its configuration in `rust/app-cases/rust-anything.json`, and `app replay` and
+`app lift` read it on every run. Editing this file by hand is supported (for example to remove a
+sticky setting or clear `unordered`). `app front-door` reads it once, when it scaffolds `rust/app`,
+and copies `run` into `rust/app/src/original.rs`: after changing `run`, edit that file too and
+rebuild, since `app front-door` never overwrites an existing `rust/app`.
+
+| Field | Flag | On re-record |
+| --- | --- | --- |
+| `name` | `--name` | Replaces if passed; keeps saved otherwise |
+| `run` | `-- <cmd>` | Replaces if passed; keeps saved otherwise |
+| `timeout_secs` | `--timeout` | Replaces if passed; keeps saved (default `30`) otherwise |
+| `normalize` | `--normalize NAME` | Merges (appends new built-in normalizer names) |
+| `normalizers` | `--normalize NAME=REGEX` | Merges (inserts or updates by `NAME`) |
+| `http` | `--http`, `--port`, `--arg`, `--pace` | Sticky once set; cannot be cleared via CLI flags |
+| `http.port` | `--port` | Replaces if passed; keeps saved otherwise |
+| `http.args` | `--arg` | Replaces if passed; keeps saved (cannot be cleared via CLI) |
+| `http.pace_ms` | `--pace` | Replaces if passed; `--pace 0` clears it |
+| `http.fresh` / `fresh` | `--fresh` | Replaces if passed; keeps saved (cannot be cleared via CLI) |
+| `effects` | `--effects`, `--effect-env`, `--effect-response`, `--db-reset`, `--db-dump` | Merges with saved sink and database settings; `--effect-response` replaces the saved rules |
+| `float_tolerance` | `--float-tolerance` | Replaces if passed; `--float-tolerance 0` clears it |
+| `float_files` | `--float-file` | Replaces if passed; keeps saved otherwise |
+| `unordered` | *(written by `app record`)* | Recomputed from `order` noise; tells `replay` to compare those lines in any order |
+| `recorded` | *(written by `app record`)* | Tracks generated case names so stale cases are cleaned up on the next `app record` |
 
 All five are MCP tools too: `app_record`, `app_replay`, `app_front_door`, `app_wire` and
 `app_lift`.

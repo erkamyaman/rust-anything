@@ -269,7 +269,7 @@ Runs the original's code or commands.
 
 Tool `app_record` · CLI `rust-anything app record`
 
-Record the whole CLI app's behavior: run the original on its own documented examples, an inputs file and semantic traps (non-ASCII and emoji, negative division, overflow, float extremes, map order), twice each. What differs between runs is reported by kind in `noise`: values (now [..] wildcards), order (lines compared in any order) and lines (a ... that matches anything): show every one to the user. Cases are trycmd files in <repo>/rust/app-cases/ (argv, stdin, env, files in; stdout, stderr, exit code, files out).
+Record a whole CLI or server's behavior (with optional HTTP, SMTP and database effects): run the original on its own documented examples, an inputs file and semantic traps (non-ASCII and emoji, negative division, overflow, float extremes, map order), twice each. What differs between runs is reported by kind in `noise`: values (now [..] wildcards), order (lines compared in any order) and lines (a ... that matches anything): show every one to the user. Cases are trycmd files in <repo>/rust/app-cases/ for CLIs (argv, stdin, env, files in; stdout, stderr, exit code, files out) or HTTP cases in <repo>/rust/app-cases/http/, with recorded effects alongside.
 
 Runs the original's code or commands.
 
@@ -282,10 +282,11 @@ Runs the original's code or commands.
 | `name` | string |  | Name the app is invoked by in its docs. |
 | `timeout` | integer |  | Seconds before a run is killed (default 30). |
 | `traps` | boolean |  | Add semantic-trap cases (default true). |
-| `http` | boolean |  | The app is a server: `run` starts it (it takes its port from PORT or {port}); cases are requests from curl lines in its docs, `inputs` ({"name", "method", "path", "headers", "body"}) and traps. |
+| `http` | boolean |  | The app is a server: `run` starts it (it takes its port from PORT or {port}); cases are requests from curl lines in its docs, `inputs` ({"name", "method", "path", "headers", "body" \| "body_base64" \| "body_file"}) and traps. |
 | `port` | integer |  | A port the server always listens on (implies http). |
 | `effects` | string[] |  | Record what leaves the process: "http" (a local sink set as HTTP_PROXY, http_proxy and RUST_ANYTHING_HTTP_SINK), "smtp" (a local mail server, SMTP_HOST and SMTP_PORT, recording decoded headers and MIME parts) and "smtp-raw" (raw MIME DATA). Each case stores what reached them, in order, and replay compares it. |
 | `effect_env` | string[] |  | Point the app's own settings at a sink: VAR=http-url, VAR=smtp-host, VAR=smtp-port or VAR=smtp-url. |
+| `effect_response` | string[] |  | Canned responses for the HTTP effect sink: "METHOD /path=STATUS [BODY\|@FILE]" (e.g. "POST /v1/charges=201 @fixtures/charge.json", "POST /hooks/*=500"). Matched in order with `*` wildcards, falling back to `200 {}`. Enables the outbound HTTP effect (`effects: ["http"]`, not server mode); saved for replay. |
 | `db_reset` | string |  | Shell command that resets the database before each case (each start for servers), run in the folder the case runs in; a script it names by a relative path with a script extension (.py, .sh, .js, .ts, .rb, .php, .pl, .ps1, .bat, .cmd, .sql and similar) is the repository's, while other relative paths, extensionless scripts included, are the case folder's. Cases then run one at a time. |
 | `db_dump` | string |  | Shell command that prints the database's state (e.g. `sqlite3 app.db .dump`), run after each case or request in the folder the case runs in, and recorded with the effects. |
 | `args` | string[] |  | Servers: arguments every start gets after its command, the original's and every build's (["db.json"]). Implies http; saved. |
@@ -314,7 +315,7 @@ Runs the original's code or commands.
 
 Tool `app_front_door` · CLI `rust-anything app front-door`
 
-Scaffold <repo>/rust/app, the Rust binary that owns the CLI's entry point: a clap parser for the recorded commands and flags, every command running the original with the same argv, stdin and env (each fallback counted). For a server: an axum app that starts the original on a port of its own and proxies every route no unit answers. Builds it and replays the cases: 100% passed at 100% fallback. Needs app_record first; never overwrites rust/app.
+Scaffold <repo>/rust/app, the Rust entry point for a CLI, server or library (wiring recorded effects too): for a CLI, a clap parser for the recorded commands and flags, every command running the original with the same argv, stdin and env (each fallback counted); for a server, an axum app that starts the original on a port of its own and proxies every route no unit answers; for a library, a Rust crate re-exporting each wired unit's port. Builds it and replays the cases: 100% passed at 100% fallback. Needs app_record first; never overwrites rust/app.
 
 Runs the original's code or commands.
 

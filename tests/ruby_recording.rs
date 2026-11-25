@@ -1,6 +1,6 @@
 mod common;
 
-use rust_anything::{bridge, harness};
+use rust_anything::{bridge, codegen_ruby, harness};
 
 #[test]
 fn ruby_recording_fails_on_unencodable_results_and_preserves_cases() {
@@ -61,4 +61,48 @@ fn ruby_recording_fails_on_unencodable_results_and_preserves_cases() {
         "{err:#}"
     );
     assert_eq!(retained, original);
+}
+
+#[test]
+fn ruby_diff_reports_missing_wrapper_target_even_if_the_error_type_matches() {
+    if !common::have("ruby") {
+        return;
+    }
+
+    let root = std::env::temp_dir().join(format!("rust-anything-ruby-diff-{}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    let targets = root.join("targets.json");
+    let cases = root.join("cases.jsonl");
+    let summary = root.join("diff.json");
+    std::fs::write(&targets, "{}").unwrap();
+    std::fs::write(
+        &cases,
+        r#"{"fn":"removed","args":[],"error":"missing key","error_type":"KeyError"}"#,
+    )
+    .unwrap();
+
+    let output = std::process::Command::new("ruby")
+        .arg("-e")
+        .arg(codegen_ruby::driver())
+        .arg("diff")
+        .arg(targets)
+        .arg(cases)
+        .arg(&summary)
+        .arg("0")
+        .env("RUST_ANYTHING_WRAPPER", root.join("wrapper.rb"))
+        .output()
+        .unwrap();
+    let report = std::fs::read(&summary);
+    std::fs::remove_dir_all(root).unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&report.unwrap()).unwrap();
+    assert_eq!(report["total"], 1);
+    assert_eq!(report["passed"], 0);
+    assert_eq!(report["failed"], 1);
+    assert_eq!(report["mismatches"][0]["fn"], "removed");
+    assert_eq!(report["mismatches"][0]["actual"]["error_type"], "KeyError");
 }

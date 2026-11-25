@@ -465,6 +465,68 @@ fn benchmark_awaits_async_typescript_calls_and_counts_rejections() {
 }
 
 #[test]
+fn benchmark_marks_functions_whose_cases_do_not_match() {
+    // #341: a function the port does not match (here: wrong, as `unimplemented!` would panic) was
+    // timed with the rest, and the cost of its failure set the overall verdict.
+    if !common::have("node") {
+        return;
+    }
+    let root = std::env::temp_dir().join(format!(
+        "rust-anything-ts-bench-failing-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(
+        root.join("main.mts"),
+        "export function double(n: number): number { return n * 2; }\n\
+         export function triple(n: number): number { return n * 3; }\n",
+    )
+    .unwrap();
+    let dir = root.join("bridge");
+    bridge::bridge(&bridge::Options {
+        root: &root,
+        unit: "main.mts",
+        kind: Some(Kind::Napi),
+        out: Some(dir.clone()),
+        name: None,
+        force: false,
+        keep: Vec::new(),
+        lang: None,
+        batch: Vec::new(),
+        as_json: Vec::new(),
+        allocator: Default::default(),
+    })
+    .unwrap();
+    std::fs::write(
+        dir.join(harness::CASES),
+        "{\"fn\":\"double\",\"args\":[2],\"ok\":4}\n{\"fn\":\"triple\",\"args\":[2],\"ok\":6}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("index.cjs"),
+        "exports.double = (n) => n * 2\nexports.triple = (n) => { throw new Error('not implemented') }\n",
+    )
+    .unwrap();
+    let result = harness::bench(&harness::BenchOptions {
+        crate_dir: &dir,
+        min_ms: 1,
+        resolve_from: None,
+        node_args: &[],
+    });
+    std::fs::remove_dir_all(root).unwrap();
+    let rows = result.unwrap();
+    let failing: Vec<(&str, bool)> = rows.iter().map(|r| (r.name.as_str(), r.failing)).collect();
+    assert_eq!(failing, [("double", false), ("triple", true)], "{rows:?}");
+    let verdict = harness::verdict(&rows, rust_anything::lang::Lang::Ts);
+    assert_eq!(verdict.left_out, ["triple"]);
+    assert!(
+        (verdict.speedup - rows[0].speedup).abs() < 1e-9,
+        "{verdict:?}"
+    );
+}
+
+#[test]
 fn classes_are_bridged_recorded_and_replayed() {
     if !common::have("node") {
         return;
@@ -1112,13 +1174,16 @@ fn ruby_modules_bridge_record_and_diff() {
     );
     let wrapper = std::fs::read_to_string(dir.join("ruby/textkit_rs.rb")).unwrap();
     assert!(
-        wrapper.contains("def self.slugify(text, sep = \"-\", max: nil)"),
+        wrapper.contains("class << Textkit::Words\n  def slugify(text, sep = \"-\", max: nil)"),
         "{wrapper}"
     );
     // Batches keep the original's other parameters, defaults and keywords.
     bridge::add_batches(&dir, &["slugify:text".into(), "page_count:total".into()]).unwrap();
     let wrapper = std::fs::read_to_string(dir.join("ruby/textkit_rs.rb")).unwrap();
-    assert!(wrapper.contains("class SlugifyBatch"), "{wrapper}");
+    assert!(
+        wrapper.contains("class Textkit::Words::SlugifyBatch"),
+        "{wrapper}"
+    );
     assert!(
         wrapper.contains("def run(sep = \"-\", max: nil)"),
         "{wrapper}"
@@ -1130,21 +1195,57 @@ fn ruby_modules_bridge_record_and_diff() {
     if !common::have_ruby_3() {
         return;
     }
+    let inputs = dir.join("inputs.jsonl");
+    std::fs::write(
+        &inputs,
+        "{\"fn\": \"digit\", \"args\": [\"7\"]}\n\
+         {\"fn\": \"digit\", \"args\": [\"abc\"]}\n",
+    )
+    .unwrap();
     let recorded = harness::record(&RecordOptions {
         crate_dir: &dir,
         count: 30,
-        inputs: None,
+        inputs: Some(&inputs),
         module: None,
         resolve_from: None,
         node_args: &[],
     })
     .unwrap();
     assert!(recorded.cases > 100, "{recorded:?}");
-    // `page_count` raises ArgumentError for a non-positive page size.
+    // `page_count` raises ArgumentError; `digit` raises Textkit::ParseError.
     assert!(recorded.errors > 0);
+    let cases = std::fs::read_to_string(dir.join("cases.jsonl")).unwrap();
+    assert!(
+        cases.contains(r#"{"fn":"digit","args":["7"],"ok":7}"#),
+        "{cases}"
+    );
+    assert!(
+        cases.contains(r#""error_type":"Textkit::ParseError""#),
+        "{cases}"
+    );
     assert!(error_checks(&dir, "the fixture")[1].passed);
+    let mut port = port;
+    for (name, body) in [
+        (
+            "page_count",
+            "if per_page <= 0 { return Err(\"ArgumentError: per_page must be positive\".into()); } \
+             let q = total.div_euclid(per_page); let r = total.rem_euclid(per_page); \
+             Ok(q + i64::from(r > 0))",
+        ),
+        (
+            "digit",
+            "if text.len() == 1 && text.as_bytes()[0].is_ascii_digit() { \
+             Ok(i64::from(text.as_bytes()[0] - b'0')) } else { \
+             Err(\"Textkit::ParseError: not a digit\".into()) }",
+        ),
+    ] {
+        let stub = format!("unimplemented!(\"port `{name}` from lib/textkit/nums.rb\")");
+        assert!(port.contains(&stub), "{stub}");
+        port = port.replace(&stub, body);
+    }
+    std::fs::write(dir.join("src/port.rs"), &port).unwrap();
     harness::build(&dir).unwrap();
-    let diff = harness::diff(&DiffOptions {
+    let (diff, counts) = harness::diff_full_with_counts(&DiffOptions {
         crate_dir: &dir,
         module: None,
         ignore_key_order: false,
@@ -1152,9 +1253,89 @@ fn ruby_modules_bridge_record_and_diff() {
         node_args: &[],
     })
     .unwrap();
-    // Unported functions panic, which Ruby sees as a RuntimeError: nothing can match.
-    assert_eq!(diff.passed, 0, "{diff:?}");
     assert_eq!(diff.total, recorded.cases);
+    assert!(diff.passed > 0, "{diff:?}");
+    for f in ["digit", "page_count"] {
+        let (p, t) = counts[f];
+        assert!(t > 0 && p == t, "{f}: {p}/{t}");
+    }
+    assert!(
+        !diff
+            .mismatches
+            .iter()
+            .any(|m| matches!(m["fn"].as_str(), Some("digit" | "page_count"))),
+        "{:?}",
+        diff.mismatches
+    );
+    // Unported functions panic, which Ruby sees as a RuntimeError.
+    assert!(
+        diff.failed > 0
+            && diff.mismatches.iter().all(|m| {
+                !matches!(m["fn"].as_str(), Some("digit" | "page_count"))
+                    && m["actual"]["error"]
+                        .as_str()
+                        .is_some_and(|e| e.contains("Rust panic:"))
+            }),
+        "{:?}",
+        diff.mismatches
+    );
+
+    let echo_port = port.replace(
+        "if text.len() == 1 && text.as_bytes()[0].is_ascii_digit() { \
+         Ok(i64::from(text.as_bytes()[0] - b'0')) } else { \
+         Err(\"Textkit::ParseError: not a digit\".into()) }",
+        "Err(text)",
+    );
+    assert_ne!(echo_port, port);
+    std::fs::write(dir.join("src/port.rs"), echo_port).unwrap();
+    harness::build(&dir).unwrap();
+    let check_rb = dir.join("check_errors.rb");
+    std::fs::write(
+        &check_rb,
+        format!(
+            r#"require {:?}
+module Textkit
+  class ParseError < StandardError; end
+end
+
+cases = [
+  ["ArgumentError: bad", "ArgumentError", "bad"],
+  ["Textkit::ParseError: bad", "Textkit::ParseError", "bad"],
+  ["::ArgumentError: bad", "RuntimeError", "::ArgumentError: bad"],
+  ["Textkit::ArgumentError: bad", "RuntimeError", "Textkit::ArgumentError: bad"],
+  ["Textkit::Nums: bad", "RuntimeError", "Textkit::Nums: bad"],
+  ["String: bad", "RuntimeError", "String: bad"],
+  ["Textkit::Missing: bad", "RuntimeError", "Textkit::Missing: bad"],
+  ["Textkit::ParseError::: bad", "RuntimeError", "Textkit::ParseError::: bad"],
+  ["bad_name: bad", "RuntimeError", "bad_name: bad"],
+  ["plain error", "RuntimeError", "plain error"],
+]
+cases.each do |input, expected_type, expected_msg|
+  begin
+    Textkit::Nums.digit(input)
+    raise "expected exception for #{{input.inspect}}"
+  rescue Exception => e
+    unless e.class.name == expected_type && e.message == expected_msg
+      abort "mismatch for #{{input.inspect}}: got #{{e.class.name}} (#{{e.message.inspect}}), expected #{{expected_type}} (#{{expected_msg.inspect}})"
+    end
+  end
+end
+"#,
+            dir.join("ruby/textkit_rs.rb")
+        ),
+    )
+    .unwrap();
+    let out = Command::new("ruby")
+        .args(["-E", "UTF-8:UTF-8"])
+        .arg(&check_rb)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -1216,21 +1397,62 @@ fn java_classes_bridge_record_and_diff() {
     if !common::have("javac") {
         return;
     }
+    let inputs = dir.join("inputs.jsonl");
+    std::fs::write(
+        &inputs,
+        "{\"fn\": \"digit\", \"args\": [\"7\"]}\n\
+         {\"fn\": \"digit\", \"args\": [\"x\"]}\n\
+         {\"fn\": \"parsePort\", \"args\": [\"8080\"]}\n\
+         {\"fn\": \"parsePort\", \"args\": [\"0\"]}\n",
+    )
+    .unwrap();
     let recorded = harness::record(&RecordOptions {
         crate_dir: &dir,
         count: 30,
-        inputs: None,
+        inputs: Some(&inputs),
         module: None,
         resolve_from: None,
         node_args: &[],
     })
     .unwrap();
     assert!(recorded.cases > 100, "{recorded:?}");
-    // `parsePort` throws NumberFormatException for text.
+    // `parsePort` throws NumberFormatException/IllegalArgumentException; `digit` throws ParseException.
     assert!(recorded.errors > 0);
+    let cases = std::fs::read_to_string(dir.join("cases.jsonl")).unwrap();
+    assert!(
+        cases.contains(r#"{"fn":"digit","args":["7"],"ok":7}"#),
+        "{cases}"
+    );
+    assert!(
+        cases.contains(r#""error_type":"ParseException""#),
+        "{cases}"
+    );
     assert!(error_checks(&dir, "the fixture")[1].passed);
+    let mut port = port;
+    for (name, body) in [
+        (
+            "parsePort",
+            "let trimmed = text.trim(); \
+             let port: i32 = trimmed.parse().map_err(|_| format!(\"NumberFormatException: For input string: \\\"{trimmed}\\\"\"))?; \
+             if !(1..=65535).contains(&port) { return Err(format!(\"IllegalArgumentException: port out of range: {port}\")); } \
+             Ok(i64::from(port))",
+        ),
+        (
+            "digit",
+            "if text.len() == 1 && text.as_bytes()[0].is_ascii_digit() { \
+             Ok(i64::from(text.as_bytes()[0] - b'0')) } else { \
+             Err(\"com.example.text.ParseException: not a digit\".into()) }",
+        ),
+    ] {
+        let stub = format!(
+            "unimplemented!(\"port `{name}` from src/main/java/com/example/text/Strings.java\")"
+        );
+        assert!(port.contains(&stub), "{stub}");
+        port = port.replace(&stub, body);
+    }
+    std::fs::write(dir.join("src/port.rs"), port).unwrap();
     harness::build(&dir).unwrap();
-    let diff = harness::diff(&DiffOptions {
+    let (diff, counts) = harness::diff_full_with_counts(&DiffOptions {
         crate_dir: &dir,
         module: None,
         ignore_key_order: false,
@@ -1238,9 +1460,40 @@ fn java_classes_bridge_record_and_diff() {
         node_args: &[],
     })
     .unwrap();
-    // Unported functions panic, which Java sees as a RuntimeException: nothing can match.
-    assert_eq!(diff.passed, 0, "{diff:?}");
     assert_eq!(diff.total, recorded.cases);
+    assert!(diff.passed > 0, "{diff:?}");
+    for f in ["digit", "parsePort"] {
+        let (p, t) = counts[f];
+        assert!(
+            t > 0 && p == t,
+            "{f}: {p}/{t} {:?}",
+            diff.mismatches
+                .iter()
+                .filter(|m| m["fn"] == f)
+                .take(3)
+                .collect::<Vec<_>>()
+        );
+    }
+    assert!(
+        !diff
+            .mismatches
+            .iter()
+            .any(|m| matches!(m["fn"].as_str(), Some("digit" | "parsePort"))),
+        "{:?}",
+        diff.mismatches
+    );
+    // Unported functions panic, which Java sees as a RuntimeException.
+    assert!(
+        diff.failed > 0
+            && diff.mismatches.iter().all(|m| {
+                !matches!(m["fn"].as_str(), Some("digit" | "parsePort"))
+                    && m["actual"]["error"]
+                        .as_str()
+                        .is_some_and(|e| e.contains("Rust panic:"))
+            }),
+        "{:?}",
+        diff.mismatches
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -1677,7 +1930,9 @@ fn php_functions_bridge_record_and_diff() {
         &inputs,
         "{\"fn\": \"count_words\", \"args\": [\"to be or not to be\"]}\n\
          {\"fn\": \"count_words\", \"args\": [\"10 010 10\"]}\n\
-         {\"fn\": \"clamp\", \"args\": [42, {\"$undefined\": true}, 50]}\n",
+         {\"fn\": \"clamp\", \"args\": [42, {\"$undefined\": true}, 50]}\n\
+         {\"fn\": \"digit\", \"args\": [\"7\"]}\n\
+         {\"fn\": \"digit\", \"args\": [\"abc\"]}\n",
     )
     .unwrap();
     let recorded = harness::record(&RecordOptions {
@@ -1700,7 +1955,15 @@ fn php_functions_bridge_record_and_diff() {
         cases.contains("{\"fn\":\"clamp\",\"args\":[42,{\"$undefined\":true},50],\"ok\":42}"),
         "the default applies to an omitted middle argument"
     );
+    assert!(
+        cases.contains(r#"{"fn":"digit","args":["7"],"ok":7}"#),
+        "{cases}"
+    );
     assert!(cases.contains("\"error_type\":\"DivisionByZeroError\""));
+    assert!(
+        cases.contains(r#""error_type":"Acme\\Numbers\\ParseException""#),
+        "{cases}"
+    );
     let mut port = port;
     for (name, body) in [
         (
@@ -1719,6 +1982,12 @@ fn php_functions_bridge_record_and_diff() {
              Ok(a / b)",
         ),
         (
+            "digit",
+            "if text.len() == 1 && text.as_bytes()[0].is_ascii_digit() { \
+             Ok(i64::from(text.as_bytes()[0] - b'0')) } else { \
+             Err(\"Acme\\\\Numbers\\\\ParseException: not a digit\".into()) }",
+        ),
+        (
             "words",
             "Ok(text.split(' ').filter(|w| !w.is_empty()).map(String::from).collect())",
         ),
@@ -1731,7 +2000,7 @@ fn php_functions_bridge_record_and_diff() {
              Ok(serde_json::Value::Object(counts))",
         ),
     ] {
-        let file = if matches!(name, "clamp" | "mean" | "ratio") {
+        let file = if matches!(name, "clamp" | "mean" | "ratio" | "digit") {
             "numbers"
         } else {
             "text"
@@ -1867,10 +2136,16 @@ fn csharp_static_methods_bridge_record_and_diff() {
         "\"error_type\":\"System.NullReferenceException\"",
         "{\"fn\":\"Mean\",\"args\":[[]],\"error\":\"mean of nothing\",\
          \"error_type\":\"System.InvalidOperationException\"}",
-        "\"error_type\":\"Acme.Geo.Geometry+ParseException\"",
     ] {
         assert!(cases.contains(expected), "{expected}");
     }
+    assert!(
+        cases.lines().any(|line| {
+            let case: serde_json::Value = serde_json::from_str(line).unwrap();
+            case["fn"] == "Digit" && case["error_type"] == "Acme.Geo.Geometry+ParseException"
+        }),
+        "Digit should record the nested exception"
+    );
     assert!(
         cases
             .lines()
@@ -1950,7 +2225,7 @@ fn csharp_static_methods_bridge_record_and_diff() {
     );
     std::fs::write(dir.join("src/port.rs"), port).unwrap();
     harness::build(&dir).unwrap();
-    let diff = harness::diff(&DiffOptions {
+    let (diff, counts) = harness::diff_full_with_counts(&DiffOptions {
         crate_dir: &dir,
         module: None,
         ignore_key_order: false,
@@ -1959,6 +2234,12 @@ fn csharp_static_methods_bridge_record_and_diff() {
     })
     .unwrap();
     assert_eq!(diff.total, recorded.cases);
+    let (passed, total) = counts["Digit"];
+    assert_eq!(
+        passed, total,
+        "Digit replay mismatches: {:?}",
+        diff.mismatches
+    );
     let unported = cases
         .lines()
         .filter(|l| l.starts_with("{\"fn\":\"FirstIndex\""))

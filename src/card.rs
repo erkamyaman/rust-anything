@@ -39,6 +39,12 @@ pub struct Card {
 }
 
 impl Card {
+    /// Every benched function was left out of the timing because its cases do not match, so the
+    /// card has no speed to claim.
+    fn nothing_timed(&self) -> bool {
+        !self.bench.is_empty() && self.bench.iter().all(|b| b.failing)
+    }
+
     pub fn fallback_rate(&self) -> f64 {
         if self.cases == 0 {
             0.0
@@ -165,6 +171,9 @@ fn times(x: f64) -> String {
     }
 }
 
+/// What the card says instead of a speed when no function's cases all match.
+const NOTHING_TO_COMPARE: &str = "nothing to compare";
+
 /// "Nx faster" at or above parity, "Nx slower" below it, the way the card's headline reads.
 fn speed_phrase(speedup: f64) -> String {
     if speedup >= 1.0 {
@@ -225,7 +234,7 @@ pub fn markdown(card: &Card) -> String {
          | | |\n| --- | --- |\n\
          | Unit | `{}` ({}) |\n\
          | Recorded cases matched | {} / {} |\n\
-         | Speedup, call included | {} (geometric mean) |\n\
+         | Speedup, call included | {} |\n\
          | Fallback to the original | {} ({} of {} cases) |\n\
          | Switched on | {} |\n\n",
         card.crate_name,
@@ -234,7 +243,11 @@ pub fn markdown(card: &Card) -> String {
         card.language,
         card.matched,
         card.cases,
-        table_speed(card.speedup),
+        if card.nothing_timed() {
+            NOTHING_TO_COMPARE.to_string()
+        } else {
+            format!("{} (geometric mean)", table_speed(card.speedup))
+        },
         fallback_percent(card),
         card.fallback_cases,
         card.cases,
@@ -245,6 +258,11 @@ pub fn markdown(card: &Card) -> String {
             "| Function | Cases | Original per call | Rust per call | Speedup |\n| --- | ---: | ---: | ---: | ---: |\n",
         );
         for r in &card.bench {
+            let speed = if r.failing {
+                "left out: cases do not match".to_string()
+            } else {
+                table_speed(r.speedup)
+            };
             let _ = writeln!(
                 out,
                 "| `{}` | {} | {} | {} | {} |",
@@ -252,7 +270,7 @@ pub fn markdown(card: &Card) -> String {
                 r.cases,
                 ns(r.original_ns),
                 ns(r.rust_ns),
-                table_speed(r.speedup)
+                speed
             );
         }
         out.push('\n');
@@ -281,12 +299,31 @@ pub fn svg(card: &Card) -> String {
     const H: u32 = 600;
     let font = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
     let mono = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-    let (orig, rust) = card
-        .bench
+    let timed: Vec<&BenchRow> = card.bench.iter().filter(|b| !b.failing).collect();
+    let (orig, rust) = timed
         .iter()
         .fold((0.0, 0.0), |(o, r), b| (o + b.original_ns, r + b.rust_ns));
     let max = orig.max(rust).max(1.0);
-    let bar = |v: f64| (5.0_f64).max(470.0 * v / max);
+    let nothing_timed = card.nothing_timed();
+    let bar = |v: f64| {
+        if nothing_timed {
+            0.0
+        } else {
+            (5.0_f64).max(470.0 * v / max)
+        }
+    };
+    let timing = |v: f64| {
+        if nothing_timed {
+            "–".to_string()
+        } else {
+            ns(v)
+        }
+    };
+    let speed = if nothing_timed {
+        NOTHING_TO_COMPARE.to_string()
+    } else {
+        speed_phrase(card.speedup)
+    };
     let all = card.matched == card.cases && card.cases > 0;
     let headline = if all {
         format!(
@@ -299,8 +336,10 @@ pub fn svg(card: &Card) -> String {
             card.matched, card.cases
         )
     };
-    let per_call = if card.bench.len() == 1 {
+    let per_call = if timed.len() == 1 {
         "per call"
+    } else if timed.len() < card.bench.len() {
+        "per call, matching functions"
     } else {
         "per call, all functions"
     };
@@ -330,10 +369,7 @@ pub fn svg(card: &Card) -> String {
 "##,
         label = esc(&format!(
             "{}: {} of {} recorded cases match, {}",
-            card.crate_name,
-            card.matched,
-            card.cases,
-            speed_phrase(card.speedup)
+            card.crate_name, card.matched, card.cases, speed
         )),
         name = esc(&card.crate_name),
         title_size = if card.crate_name.chars().count() > 22 {
@@ -344,8 +380,8 @@ pub fn svg(card: &Card) -> String {
         unit = esc(&card.unit),
         lang = esc(&card.language),
         functions = esc(&card.functions.join(", ")),
-        orig_t = esc(&ns(orig)),
-        rust_t = esc(&ns(rust)),
+        orig_t = esc(&timing(orig)),
+        rust_t = esc(&timing(rust)),
         orig_w = bar(orig),
         rust_w = bar(rust),
         state = if card.enabled == Some(true) {
@@ -353,7 +389,7 @@ pub fn svg(card: &Card) -> String {
         } else {
             "off"
         },
-        speed = speed_phrase(card.speedup),
+        speed = esc(&speed),
         crab = include_str!("card_crab.svg").trim(),
         fallback = esc(&fallback_percent(card)),
         machine = esc(&card.machine),
@@ -397,6 +433,7 @@ mod tests {
                 original_ns: 9_120_000.0,
                 rust_ns: 290_000.0,
                 speedup: 31.4,
+                failing: false,
             }],
             fallback_cases: 0,
             enabled: Some(true),
@@ -453,6 +490,34 @@ mod tests {
         assert!(svg(&c).contains("Fallback to the original: 100.0% of cases"));
         c.fallback_cases = 1;
         assert!(svg(&c).contains("Fallback to the original: 0.1% of cases"));
+    }
+
+    #[test]
+    fn a_card_whose_functions_all_fail_claims_no_speed() {
+        // #341 review: every row left out of the timing left verdict's 1.0 as a speed claim.
+        let mut c = card();
+        c.bench[0].failing = true;
+        c.speedup = 1.0;
+        let svg = svg(&c);
+        assert!(
+            svg.contains("<tspan font-weight=\"700\" fill=\"#e8561a\">nothing to compare</tspan>"),
+            "{svg}"
+        );
+        assert!(
+            svg.contains("recorded cases match, nothing to compare\""),
+            "{svg}"
+        );
+        assert!(!svg.contains("faster") && !svg.contains("slower"), "{svg}");
+        assert!(svg.contains("width=\"0\" height=\"14\""), "{svg}");
+        let md = markdown(&c);
+        assert!(
+            md.contains("| Speedup, call included | nothing to compare |"),
+            "{md}"
+        );
+        assert!(
+            md.contains("| `dedupe` | 412 | 9.1 ms | 290.0 µs | left out: cases do not match |"),
+            "{md}"
+        );
     }
 
     #[test]

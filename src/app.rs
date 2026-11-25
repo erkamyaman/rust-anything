@@ -1381,9 +1381,79 @@ pub(crate) fn is_word(arg: &str) -> bool {
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
-fn trap_cases(bases: &[Case]) -> Vec<Case> {
+pub(crate) fn interleave<T>(groups: Vec<Vec<T>>) -> Vec<T> {
+    let mut queues: Vec<std::collections::VecDeque<T>> =
+        groups.into_iter().map(Into::into).collect();
     let mut out = Vec::new();
+    loop {
+        let mut progressed = false;
+        for q in &mut queues {
+            if let Some(item) = q.pop_front() {
+                out.push(item);
+                progressed = true;
+            }
+        }
+        if !progressed {
+            break;
+        }
+    }
+    out
+}
+
+/// Spreads traps round-robin across bases, deduplicating against `existing` and earlier traps
+/// before capping at `limit`. `reserved` traps (such as the unknown-route probe) are always kept
+/// first. Returns `(kept, dropped)` where `dropped` counts unique traps excluded by `limit`.
+pub(crate) fn spread_traps<T, K, F>(
+    per_base: Vec<Vec<T>>,
+    reserved: Vec<T>,
+    existing: &BTreeSet<K>,
+    key: F,
+    limit: usize,
+) -> (Vec<T>, usize)
+where
+    K: Ord + Clone,
+    F: Fn(&T) -> K,
+{
+    let mut seen = existing.clone();
+    let mut out = Vec::new();
+    let mut dropped = 0usize;
+    for item in reserved {
+        if seen.insert(key(&item)) {
+            if out.len() < limit {
+                out.push(item);
+            } else {
+                dropped += 1;
+            }
+        }
+    }
+    let mut queues: Vec<std::collections::VecDeque<T>> =
+        per_base.into_iter().map(Into::into).collect();
+    loop {
+        let mut any = false;
+        for q in &mut queues {
+            while let Some(item) = q.pop_front() {
+                if seen.insert(key(&item)) {
+                    if out.len() < limit {
+                        out.push(item);
+                    } else {
+                        dropped += 1;
+                    }
+                    any = true;
+                    break;
+                }
+            }
+        }
+        if !any {
+            break;
+        }
+    }
+    (out, dropped)
+}
+
+fn trap_cases(bases: &[Case]) -> (Vec<Case>, usize) {
+    let mut per_base = Vec::with_capacity(bases.len());
     for base in bases {
+        let mut slots: Vec<Vec<Case>> = Vec::new();
         for (i, arg) in base.args.iter().enumerate() {
             if i == 0 && is_word(arg) {
                 continue;
@@ -1401,10 +1471,17 @@ fn trap_cases(bases: &[Case]) -> Vec<Case> {
             } else {
                 STRING_TRAPS.to_vec()
             };
-            for v in values.into_iter().filter(|v| v != arg) {
-                let mut case = base.clone();
-                case.args[i] = v.to_string();
-                out.push(case);
+            let slot: Vec<Case> = values
+                .into_iter()
+                .filter(|v| v != arg)
+                .map(|v| {
+                    let mut case = base.clone();
+                    case.args[i] = v.to_string();
+                    case
+                })
+                .collect();
+            if !slot.is_empty() {
+                slots.push(slot);
             }
         }
         if let Some(stdin) = &base.stdin {
@@ -1413,15 +1490,21 @@ fn trap_cases(bases: &[Case]) -> Vec<Case> {
                 .and_then(|t| serde_json::from_str::<Value>(t).ok())
                 .is_some_and(|v| v.is_object() || v.is_array());
             let values: &[&str] = if json { &JSON_TRAPS } else { &STDIN_TRAPS };
-            for v in values {
-                let mut case = base.clone();
-                case.stdin = Some(v.as_bytes().to_vec());
-                out.push(case);
-            }
+            slots.push(
+                values
+                    .iter()
+                    .map(|v| {
+                        let mut case = base.clone();
+                        case.stdin = Some(v.as_bytes().to_vec());
+                        case
+                    })
+                    .collect(),
+            );
         }
+        per_base.push(interleave(slots));
     }
-    out.truncate(MAX_TRAPS);
-    out
+    let existing: BTreeSet<_> = bases.iter().map(Case::key).collect();
+    spread_traps(per_base, Vec::new(), &existing, Case::key, MAX_TRAPS)
 }
 
 pub(crate) fn slug(text: &str) -> String {
@@ -1480,6 +1563,10 @@ pub struct RecordOptions<'a> {
     pub effects: Option<crate::effects::EffectsConfig>,
 }
 
+fn is_zero(n: &usize) -> bool {
+    *n == 0
+}
+
 #[derive(Debug, Serialize)]
 pub struct RecordOutcome {
     pub dir: PathBuf,
@@ -1488,6 +1575,9 @@ pub struct RecordOutcome {
     pub examples: usize,
     pub inputs: usize,
     pub traps: usize,
+    /// Unique traps dropped after hitting `MAX_TRAPS`.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub traps_dropped: usize,
     /// Cases where the two runs of the original differed.
     pub noisy: Vec<String>,
     /// What differed in each noisy case, and how: `values` became wildcards, `order` is compared
@@ -1976,8 +2066,11 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
         push("example", 1, Some("no-args".to_string()), case.clone());
         bases.push(case);
     }
+    let mut traps_dropped = 0usize;
     if opts.traps {
-        for case in trap_cases(&bases) {
+        let (traps, dropped) = trap_cases(&bases);
+        traps_dropped = dropped;
+        for case in traps {
             if push("trap", counts[2] + 1, None, case) {
                 counts[2] += 1;
             }
@@ -2007,6 +2100,7 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
         examples: counts[0],
         inputs: counts[1],
         traps: counts[2],
+        traps_dropped,
         noisy: Vec::new(),
         noise: Vec::new(),
         unstable: Vec::new(),
@@ -3064,7 +3158,8 @@ mod tests {
     fn traps_keep_the_shape_of_the_case() {
         let mut base = Case::new(vec!["div".into(), "7".into(), "2".into()]);
         base.stdin = Some(b"{\"a\":1}".to_vec());
-        let traps = trap_cases(&[base]);
+        let (traps, dropped) = trap_cases(&[base]);
+        assert_eq!(dropped, 0);
         assert!(traps.iter().all(|c| c.args[0] == "div"));
         assert!(traps.iter().any(|c| c.args == ["div", "-7", "2"]));
         assert!(traps.iter().any(|c| c.args == ["div", "7", "0"]));
@@ -3073,8 +3168,49 @@ mod tests {
                 .iter()
                 .any(|c| c.stdin.as_deref() == Some(JSON_TRAPS[0].as_bytes()))
         );
-        let text = trap_cases(&[Case::new(vec!["upper".into(), "hi".into()])]);
+        let (text, dropped_text) = trap_cases(&[Case::new(vec!["upper".into(), "hi".into()])]);
+        assert_eq!(dropped_text, 0);
         assert!(text.iter().any(|c| c.args[1] == "👍🏽 thumbs"));
+    }
+
+    #[test]
+    fn traps_spread_round_robin_deduplicate_before_truncating_and_count_dropped() {
+        // 40 distinct commands, each with an int and a string arg -> > 300 unique traps.
+        let mut bases: Vec<Case> = (0..40)
+            .map(|i| Case::new(vec![format!("cmd{i:02}"), "7".into(), "hi".into()]))
+            .collect();
+        let (unique_traps, unique_dropped) = trap_cases(&bases);
+        // Adding a duplicate base whose traps all collide must not change the kept traps or
+        // inflate `dropped`.
+        bases.push(bases[0].clone());
+        let (traps, dropped) = trap_cases(&bases);
+
+        assert_eq!(unique_traps.len(), MAX_TRAPS);
+        assert!(unique_dropped > 0);
+        assert_eq!(traps.len(), MAX_TRAPS);
+        assert_eq!(dropped, unique_dropped);
+
+        // Every single one of the 40 commands gets traps (not just the first few).
+        for i in 0..40 {
+            let cmd = format!("cmd{i:02}");
+            let count = unique_traps.iter().filter(|c| c.args[0] == cmd).count();
+            assert!(
+                count >= 7,
+                "{cmd} only got {count} traps out of {MAX_TRAPS}"
+            );
+        }
+
+        // Many bases with colliding traps (> 300 raw traps, < 300 unique) must deduplicate
+        // before truncating so nothing is dropped and unique traps from later bases survive.
+        let mut dup_bases: Vec<Case> = (1..=40)
+            .map(|i| Case::new(vec!["dup".into(), i.to_string()]))
+            .collect();
+        dup_bases.push(Case::new(vec!["tail".into(), "hello".into()]));
+        let (dup_traps, dup_dropped) = trap_cases(&dup_bases);
+        assert_eq!(dup_dropped, 0);
+        assert!(dup_traps.iter().any(|c| c.args[0] == "tail"));
+        let keys: BTreeSet<_> = dup_traps.iter().map(Case::key).collect();
+        assert_eq!(keys.len(), dup_traps.len());
     }
 
     #[cfg(unix)]

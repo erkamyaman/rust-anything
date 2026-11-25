@@ -4,6 +4,33 @@
 
 - `tests/skill.rs` fails when the skill names a command the CLI does not have, and `scripts/skill-eval/`
   compares skill versions on a fixed port task, scored by `gate` (turns and cost from the agent's JSON).
+- Ruby ports turn `Err("Mod::Error: message")` into that namespaced exception, and Java, Ruby and
+  PHP replays load the project's own classes, so a port that returns a project-defined exception
+  matches the recorded `error_type`. The Ruby wrapper reopens each receiver with `class << Mod`,
+  so it also loads over a class the original defined (#372, #457 by @SPD-RYUK).
+- `app record` spreads CLI and HTTP traps round-robin across every base case, deduplicates traps
+  before capping at 300, always keeps the HTTP unknown-route probe (`GET /rust-anything-missing`),
+  and reports how many traps were dropped (`traps_dropped` in JSON and CLI output) (#335, #454 by @Lewandox).
+- HTTP cases support binary request bodies via `body_base64` and `body_file` in `--inputs` and case
+  `.toml` files, `curl --data-binary @file` reads raw bytes instead of UTF-8 text, and `curl -F` /
+  `--form` builds deterministic `multipart/form-data` uploads (#336, #452 by @Lewandox).
+- `app record --effect-response 'METHOD /path=STATUS [BODY|@FILE]'` (and MCP `app_record`'s
+  `effect_response`) lets the HTTP effect sink answer matching requests (supporting `*` wildcards)
+  with canned statuses and bodies, saved with the cases so replay sees identical replies
+  (#334, #451 by @Lewandox).
+- `bench`, `report` and the MCP `bench` tool leave functions whose recorded cases do not all match
+  out of the overall speedup and the advice, and name them: a port that still panics was timed at
+  the cost of catching the panic, which pulled the verdict down (#341, #470 by @AyhamJo7).
+- `app record` keeps the saved effects a run does not name: `--effects` replaces the kinds,
+  `--effect-env` adds or replaces one variable, and `--db-reset`/`--db-dump` replace only
+  themselves, so re-recording with one flag no longer drops the HTTP sink and its variables
+  (#331, #468 by @XiaoBinGan).
+- Java bridges ordered sets (`SortedSet`, `NavigableSet`, `TreeSet`, `LinkedHashSet`) as arrays
+  across the reflection converter and binary wire, and refuses unordered `Set` and `HashSet` with
+  "an unordered collection" instead of treating them as project classes (#366, #449 by @Lewandox).
+- `docs/types.md` lists, for each language, what each source type becomes in `port.rs` and the
+  reason a type keeps a function in its language; a test checks every row against the code
+  (#373, #456 by @puretechteam).
 
 ## 4.1.0 (2026-11-24)
 

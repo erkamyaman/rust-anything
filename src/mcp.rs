@@ -591,7 +591,7 @@ fn tool_schemas() -> Value {
         },
         {
             "name": "app_record",
-            "description": "Record the whole CLI app's behavior: run the original on its own documented examples, an inputs file and semantic traps (non-ASCII and emoji, negative division, overflow, float extremes, map order), twice each. What differs between runs is reported by kind in `noise`: values (now [..] wildcards), order (lines compared in any order) and lines (a ... that matches anything): show every one to the user. Cases are trycmd files in <repo>/rust/app-cases/ (argv, stdin, env, files in; stdout, stderr, exit code, files out).",
+            "description": "Record a whole CLI or server's behavior (with optional HTTP, SMTP and database effects): run the original on its own documented examples, an inputs file and semantic traps (non-ASCII and emoji, negative division, overflow, float extremes, map order), twice each. What differs between runs is reported by kind in `noise`: values (now [..] wildcards), order (lines compared in any order) and lines (a ... that matches anything): show every one to the user. Cases are trycmd files in <repo>/rust/app-cases/ for CLIs (argv, stdin, env, files in; stdout, stderr, exit code, files out) or HTTP cases in <repo>/rust/app-cases/http/, with recorded effects alongside.",
             "inputSchema": { "type": "object", "properties": {
                 "repo": { "type": "string", "description": "Repository root." },
                 "run": { "type": "array", "items": { "type": "string" }, "description": "Command that runs the original, paths relative to repo: [\"python3\", \"cli.py\"]. Optional after the first record." },
@@ -600,10 +600,11 @@ fn tool_schemas() -> Value {
                 "name": { "type": "string", "description": "Name the app is invoked by in its docs." },
                 "timeout": { "type": "integer", "description": "Seconds before a run is killed (default 30)." },
                 "traps": { "type": "boolean", "description": "Add semantic-trap cases (default true)." },
-                "http": { "type": "boolean", "description": "The app is a server: `run` starts it (it takes its port from PORT or {port}); cases are requests from curl lines in its docs, `inputs` ({\"name\", \"method\", \"path\", \"headers\", \"body\"}) and traps." },
+                "http": { "type": "boolean", "description": "The app is a server: `run` starts it (it takes its port from PORT or {port}); cases are requests from curl lines in its docs, `inputs` ({\"name\", \"method\", \"path\", \"headers\", \"body\" | \"body_base64\" | \"body_file\"}) and traps." },
                 "port": { "type": "integer", "description": "A port the server always listens on (implies http)." },
                 "effects": { "type": "array", "items": { "type": "string" }, "description": "Record what leaves the process: \"http\" (a local sink set as HTTP_PROXY, http_proxy and RUST_ANYTHING_HTTP_SINK), \"smtp\" (a local mail server, SMTP_HOST and SMTP_PORT, recording decoded headers and MIME parts) and \"smtp-raw\" (raw MIME DATA). Each case stores what reached them, in order, and replay compares it." },
                 "effect_env": { "type": "array", "items": { "type": "string" }, "description": "Point the app's own settings at a sink: VAR=http-url, VAR=smtp-host, VAR=smtp-port or VAR=smtp-url." },
+                "effect_response": { "type": "array", "items": { "type": "string" }, "description": "Canned responses for the HTTP effect sink: \"METHOD /path=STATUS [BODY|@FILE]\" (e.g. \"POST /v1/charges=201 @fixtures/charge.json\", \"POST /hooks/*=500\"). Matched in order with `*` wildcards, falling back to `200 {}`. Enables the outbound HTTP effect (`effects: [\"http\"]`, not server mode); saved for replay." },
                 "db_reset": { "type": "string", "description": "Shell command that resets the database before each case (each start for servers), run in the folder the case runs in; a script it names by a relative path with a script extension (.py, .sh, .js, .ts, .rb, .php, .pl, .ps1, .bat, .cmd, .sql and similar) is the repository's, while other relative paths, extensionless scripts included, are the case folder's. Cases then run one at a time." },
                 "db_dump": { "type": "string", "description": "Shell command that prints the database's state (e.g. `sqlite3 app.db .dump`), run after each case or request in the folder the case runs in, and recorded with the effects." },
                 "args": { "type": "array", "items": { "type": "string" }, "description": "Servers: arguments every start gets after its command, the original's and every build's ([\"db.json\"]). Implies http; saved." },
@@ -626,7 +627,7 @@ fn tool_schemas() -> Value {
         },
         {
             "name": "app_front_door",
-            "description": "Scaffold <repo>/rust/app, the Rust binary that owns the CLI's entry point: a clap parser for the recorded commands and flags, every command running the original with the same argv, stdin and env (each fallback counted). For a server: an axum app that starts the original on a port of its own and proxies every route no unit answers. Builds it and replays the cases: 100% passed at 100% fallback. Needs app_record first; never overwrites rust/app.",
+            "description": "Scaffold <repo>/rust/app, the Rust entry point for a CLI, server or library (wiring recorded effects too): for a CLI, a clap parser for the recorded commands and flags, every command running the original with the same argv, stdin and env (each fallback counted); for a server, an axum app that starts the original on a port of its own and proxies every route no unit answers; for a library, a Rust crate re-exporting each wired unit's port. Builds it and replays the cases: 100% passed at 100% fallback. Needs app_record first; never overwrites rust/app.",
             "inputSchema": { "type": "object", "properties": {
                 "repo": { "type": "string", "description": "Repository root." },
                 "check": { "type": "boolean", "description": "Build and replay (default true)." },
@@ -1019,9 +1020,23 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         "app_record" => {
             let repo = path("repo")?;
             let inputs = opt_path("inputs");
-            let effects = crate::effects::EffectsConfig::from_args(
+            let effect_response = match args.get("effect_response") {
+                None | Some(Value::Null) => Vec::new(),
+                Some(Value::Array(items)) => items
+                    .iter()
+                    .map(|v| {
+                        v.as_str().map(ToString::to_string).ok_or_else(|| {
+                            anyhow::anyhow!("effect_response must be an array of strings")
+                        })
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+                Some(_) => anyhow::bail!("effect_response must be an array of strings"),
+            };
+            let effects = crate::effects::EffectsConfig::from_args_with_responses(
                 &strings("effects"),
                 &strings("effect_env"),
+                &effect_response,
+                &repo,
                 args["db_reset"].as_str(),
                 args["db_dump"].as_str(),
             )?;
@@ -1395,5 +1410,19 @@ mod tests {
         assert_eq!(progress[1]["params"]["progress"], 1);
         assert_eq!(progress[1]["params"]["total"], 1);
         assert!(progress[1]["params"]["message"].is_string());
+    }
+
+    #[test]
+    fn app_record_rejects_non_string_array_effect_response() {
+        let bad_str = call(
+            "app_record",
+            &json!({ "repo": ".", "effect_response": "GET /x=201" }),
+        );
+        assert!(bad_str.is_err());
+        let bad_mixed = call(
+            "app_record",
+            &json!({ "repo": ".", "effect_response": ["GET /x=201", 42] }),
+        );
+        assert!(bad_mixed.is_err());
     }
 }

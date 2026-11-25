@@ -215,20 +215,24 @@ pub fn ruby_wrapper(m: &Manifest, api: &PortApi) -> Result<String, String> {
             args = args.join(", "),
         );
         let parts: Vec<&str> = recv.split("::").filter(|p| *p != "Object").collect();
-        let mut code = String::new();
-        for (depth, part) in parts.iter().enumerate() {
-            let _ = writeln!(code, "{}module {part}", "  ".repeat(depth));
-        }
-        let indent = "  ".repeat(parts.len());
+        let scope = parts.join("::");
+        let mut code = if scope.is_empty() {
+            String::new()
+        } else {
+            crate::codegen_ruby::reopen(&scope)
+        };
+        let class = if scope.is_empty() {
+            class
+        } else {
+            class.replacen(
+                &format!("class {}\n", s.class),
+                &format!("class {scope}::{}\n", s.class),
+                1,
+            )
+        };
         for line in class.lines() {
-            if line.is_empty() {
-                code.push('\n');
-            } else {
-                let _ = writeln!(code, "{indent}{line}");
-            }
-        }
-        for depth in (0..parts.len()).rev() {
-            let _ = writeln!(code, "{}end", "  ".repeat(depth));
+            code.push_str(line);
+            code.push('\n');
         }
         let _ = write!(out, "\n{code}");
     }

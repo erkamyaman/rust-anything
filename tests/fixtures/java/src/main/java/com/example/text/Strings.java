@@ -70,4 +70,12 @@ public final class Strings {
         }
         return h;
     }
+
+    /** Parses a single ASCII digit. */
+    public static int digit(String text) {
+        if (text.length() == 1 && text.charAt(0) >= '0' && text.charAt(0) <= '9') {
+            return text.charAt(0) - '0';
+        }
+        throw new ParseException("not a digit");
+    }
 }

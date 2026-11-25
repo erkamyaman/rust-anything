@@ -41,7 +41,7 @@
   <sub>ms、Fuse.js、json-server の 59 個の実ファイルで Prettier と Rust 移植版を比較（Apple M4）。出力はバイト単位で同一です。<a href="real-world.md#prettier">計測方法</a>。</sub>
 </p>
 
-<p align="center"><sub>PHP と C#：現在は記録・再生と front door に対応、ユニット単位の移植は次の予定です。</sub></p>
+<p align="center"><sub>PHP と C#：FFI と P/Invoke 越しのユニット移植に対応しています。</sub></p>
 
 <table>
   <tr>
@@ -199,11 +199,11 @@ rust-anything 自体はコードを自動翻訳しません。Rust コードを�
 
 C、PHP、C#、PowerShell を除くすべての言語でバッチクラス（`--batch`）も生成されます。要素は一度だけ境界を越えて Rust 側に保持され、呼び出しのたびに全コアを使って全要素を一括処理します。
 
-言語はリポジトリから自動検出されます（`go.mod`、`pom.xml`、`.csproj` または `.sln`、`pyproject.toml`、`Gemfile`、`composer.json`、`package.json`、該当しない場合は最も多いソースファイルから判断）。`--lang` で上書きもできます。型情報はソースから取得します: TS の型、Python の型ヒント、C/Go/Java/C# のシグネチャ、Ruby の YARD タグ、PHP の型および phpdoc。型注釈がなく数値として使われている引数は数値型と推論されます。
+言語はリポジトリから自動検出されます（`go.mod`、`pom.xml`、`build.gradle`/`build.gradle.kts`、`.csproj` または `.sln`、`pyproject.toml`、`Gemfile`、`composer.json`、`package.json`、該当しない場合は最も多いソースファイルから判断）。`.kt` ソースのみを含み `.java` ソースを含まない Gradle モジュールは Kotlin、混在するモジュールは Java として扱われます。`--lang` で上書きもできます。型情報はソースから取得します: TS の型、Python の型ヒント、C/Go/Java/Kotlin/C# のシグネチャ、Ruby の YARD タグ、PHP の型および phpdoc。型注釈がなく数値として使われている引数は数値型と推論されます。
 
-PHP については、`analyze` で PHP アプリの移行計画を立てられ（Composer パッケージと PSR-4 オートローディング、緩い比較や整数オーバーフローによる float 化などのリスク、Composer パッケージからクレートへのマッピング）、PHP の CLI やサーバーを記録・リプレイして Rust 製フロントドアの背後に配置できます。PHP の FFI を通じたユニット単位の Rust 移植は次のステップです（[issue #2](https://github.com/erkamyaman/rust-anything/issues/2)）。
+PHP については、`analyze` で PHP アプリの移行計画を立てられ（Composer パッケージと PSR-4 オートローディング、緩い比較や整数オーバーフローによる float 化などのリスク、Composer パッケージからクレートへのマッピング）、PHP の CLI やサーバーを記録・リプレイして Rust 製フロントドアの背後に配置できます。スカラー・文字列・リスト・連想配列を引数に取るトップレベル関数は、PHP の FFI 拡張（`ext-ffi`）越しにブリッジされます。まず `ext-ffi` 自体がインストールされ有効になっている必要があります。`php -m` は CLI 側の設定しか見ないため、サーバーで使う場合は実際に動かす SAPI で確認してください（PHP の設定は SAPI ごとに違い、CLI で有効でも PHP-FPM では無効ということがあります）。そのうえで、既定の `ffi.enable` 設定は CLI での利用を許可しますが、サーバーなど他の SAPI では `ffi.enable=1` が必要です。`diff` が通ったら、生成された `php/<クレート名>.php`（`-` は `_` になるので `foo-rs` なら `php/foo_rs.php`）を、アプリが元のファイルを読み込んでいた場所で読み込んでください。フォルダ単位のユニットは複数の PHP ファイルを含むことがあり、ラッパーはそれら全部を 1 ファイルにまとめます。関数はガードなしで宣言されるため、`require` の置き換えは 1 回だけにしてください。2 つのファイルの読み込みを同じラッパーに置き換えると、2 回目の読み込みで `Cannot redeclare function` になります。ネイティブライブラリはラッパー自身のフォルダからの相対パスで読み込まれるため、両方のファイルはそのままの位置に置きます。ラッパーはブリッジされたトップレベル関数だけを宣言するので、元のファイルを置き換えるものであり、並べて読み込むものではありません。クラス、`public static` メソッド、`define('FEATURE_ENABLED', true)` のようなトップレベルの文はラッパーに含まれないため、それらは読み込まれ続けるファイルに残してください。同じことはブリッジが見送った関数にも当てはまります。参照渡しの引数（`increment(int &$n)`）、可変長引数（`...$args`）、`callable`／`Closure`、オブジェクトを受け取る関数はブリッジされないので、そうした関数を元のファイルから消すと、その関数の呼び出しは失敗します。ブリッジが除外した関数はすべて、読み込まれ続けるファイルに残してください（`bridge` は除外理由を行ごとに表示します）。PHP から Rust へのデータは JSON（約 1 µs）で渡るため、`bench` では小さな関数が PHP より遅く出ます。PHP にはまだ `shadow` がありません。
 
-C# も同じように動作します: `analyze` は `.csproj` プロジェクトとその NuGet パッケージ（クレートにマッピング）を読み取り、`using` ディレクティブをフォルダに解決して、C# 特有の挙動の違い（`decimal`、`dynamic`、LINQ の遅延クエリ、`Task`、`lock`、リフレクション）を指摘します。C# の CLI や ASP.NET サーバーは記録・リプレイ・Rust フロントドア化が可能で、P/Invoke を用いたユニット単位の移植が次のステップです。
+C# も同じように動作します: `analyze` は `.csproj` プロジェクトとその NuGet パッケージ（クレートにマッピング）を読み取り、`using` ディレクティブをフォルダに解決して、C# 特有の挙動の違い（`decimal`、`dynamic`、LINQ の遅延クエリ、`Task`、`lock`、リフレクション）を指摘します。C# の CLI や ASP.NET サーバーは記録・リプレイ・Rust フロントドア化が可能です。スカラー・文字列・配列・リスト・辞書・レコード／通常クラスを引数に取る `public static` メソッドは P/Invoke 越しにブリッジされ（記録と diff には PATH 上の `dotnet` を使います）、`diff` が通ったら `cs/` に生成されるラッパー（クレート名のファイル 1 つ: `foo-rs` なら `cs/FooRs.cs`）をプロジェクトにコンパイルし、ビルドしたネイティブライブラリをアプリの隣に置きます。同じ名前で複数のシグネチャを持つオーバーロードは、1 つの名前が 1 つのエクスポートを置き換えてしまうため C# 側に残ります（Java、Kotlin と同じ扱い）。呼び出しは JSON（約 1〜3 µs）で渡るので、`bench` では小さなメソッドが .NET より遅く出ます。C# にはまだ `shadow` がありません。
 
 ## 詳しく知る
 

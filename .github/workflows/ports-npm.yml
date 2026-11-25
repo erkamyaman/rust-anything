@@ -40,7 +40,7 @@ jobs:
           exe=target/${{ matrix.target }}/release/${{ matrix.port }}
           [ -f "$exe.exe" ] && exe="$exe.exe"
           cp "$exe" bin/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: bin-${{ matrix.port }}-${{ matrix.key }}
           path: bin/*
@@ -52,11 +52,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: cargo build --release --locked
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: bin-*
           path: built
@@ -92,7 +92,7 @@ jobs:
           rule='{"eqeqeq":"error"}'
           diff <("$prefix/bin/eslint-rs" --no-config-lookup --rule "$rule" --stdin < "$RUNNER_TEMP/y.js" || true) \
             <(node "$modules/eslint-rs/node_modules/eslint/bin/eslint.js" --no-config-lookup --rule "$rule" --stdin < "$RUNNER_TEMP/y.js" || true)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: npm-tarballs
           path: tarballs/*

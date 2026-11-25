@@ -291,6 +291,7 @@ pub fn bench(crate_dir: &Path, manifest: &Manifest, min_ms: u64) -> Result<Vec<B
             let t = timings.get(&f.name)?;
             let (o, n) = (t["original_ns"].as_f64()?, t["rust_ns"].as_f64()?);
             Some(BenchRow {
+                failing: false,
                 name: f.name.clone(),
                 cases: usize::try_from(t["cases"].as_u64().unwrap_or(0)).unwrap_or(0),
                 original_ns: o,
