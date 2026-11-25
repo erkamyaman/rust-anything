@@ -12,6 +12,13 @@ const SERVER_DOCS: &str = include_str!("fixtures/http/python/README.md");
 const CLI: &str = "import sys\nprint('hello', *sys.argv[1:])\n";
 const CLI_INPUTS: &str = "{\"name\": \"greet\", \"args\": [\"world\"]}\n";
 
+/// Tests that start servers take turns: each picks a free port and then starts the server on
+/// it, and two of them at once can pick the same one.
+fn one_at_a_time() -> std::sync::MutexGuard<'static, ()> {
+    static SERVERS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    SERVERS.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 fn repo(name: &str) -> PathBuf {
     let repo = std::env::temp_dir().join(format!(
         "rust-anything-app-clear-{name}-{}",
@@ -73,6 +80,7 @@ fn an_app_recorded_as_a_server_can_be_recorded_as_a_cli_again() {
     let Some(python) = common::python() else {
         return;
     };
+    let _turn = one_at_a_time();
     let repo = repo("server-to-cli");
     let server = strings(&[python, "server.py"]);
     let cli = strings(&[python, "cli.py"]);
@@ -187,6 +195,7 @@ fn saved_args_and_fresh_lists_can_be_removed() {
     let Some(python) = common::python() else {
         return;
     };
+    let _turn = one_at_a_time();
     let repo = repo("lists");
     let server = strings(&[python, "server.py"]);
     let cli = strings(&[python, "cli.py"]);
@@ -405,6 +414,7 @@ fn a_switch_cut_short_is_finished_by_the_next_recording() {
     let Some(python) = common::python() else {
         return;
     };
+    let _turn = one_at_a_time();
     let repo = repo("cut-short");
     let server_cases = record_server(&repo, python);
     let http_dir = app::cases_dir(&repo).join("http");
@@ -457,6 +467,7 @@ fn a_folder_a_cli_case_reads_stays_when_the_server_cases_go() {
     let Some(python) = common::python() else {
         return;
     };
+    let _turn = one_at_a_time();
     let repo = repo("kept-base");
     let server_cases = record_server(&repo, python);
     let first = &server_cases[0];
@@ -488,6 +499,7 @@ fn a_server_recording_after_a_cut_short_switch_removes_the_old_requests() {
     let Some(python) = common::python() else {
         return;
     };
+    let _turn = one_at_a_time();
     let repo = repo("cut-short-back");
     let server_cases = record_server(&repo, python);
     let http_dir = app::cases_dir(&repo).join("http");
@@ -507,6 +519,28 @@ fn a_server_recording_after_a_cut_short_switch_removes_the_old_requests() {
     )
     .unwrap_err();
     drop(pinned);
+    // A CLI case written by hand that reads a folder named after one of the old requests.
+    let last = server_cases.last().unwrap();
+    let cases = app::cases_dir(&repo);
+    std::fs::create_dir_all(http_dir.join(format!("{last}.in"))).unwrap();
+    std::fs::write(
+        http_dir.join(format!("{last}.in/data.txt")),
+        "x
+",
+    )
+    .unwrap();
+    std::fs::write(
+        cases.join("by-hand.toml"),
+        format!(
+            "bin.name = \"cli\"
+args = []
+
+[fs]
+base = \"http/{last}.in\"
+"
+        ),
+    )
+    .unwrap();
 
     // Back to a server whose docs now show one request: the old requests it does not write again
     // go, as they would after any server recording.
@@ -522,6 +556,8 @@ fn a_server_recording_after_a_cut_short_switch_removes_the_old_requests() {
     for name in server_cases.iter().filter(|n| !now.contains(n)) {
         assert!(!http_dir.join(format!("{name}.toml")).exists(), "{name}");
     }
+    assert!(!now.contains(last));
+    assert!(http_dir.join(format!("{last}.in/data.txt")).is_file());
     let _ = std::fs::remove_dir_all(&repo);
 }
 
@@ -530,6 +566,7 @@ fn a_saved_case_name_never_removes_a_file_outside_the_cases() {
     let Some(python) = common::python() else {
         return;
     };
+    let _turn = one_at_a_time();
     let repo = repo("outside");
     record_cli(&repo, python, Clear::default());
     let cases = app::cases_dir(&repo);

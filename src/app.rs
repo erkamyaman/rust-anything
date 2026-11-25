@@ -2063,19 +2063,27 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
             }
         })?;
         config.unordered = unordered_of(&outcome.noise);
-        // After a CLI recording, only the requests a `--no-http` run cut short (saved in
-        // `recorded` as `http/<name>`) are this folder's.
-        let http_prefix = format!("{}/", crate::http::HTTP_DIR);
-        let owned: Vec<String> = if previous_http {
-            previous.clone()
-        } else {
-            previous
+        let mut finished = Vec::new();
+        if !previous_http {
+            // Requests a `--no-http` run cut short left in `recorded` as `http/<name>`: removed
+            // from the top folder as that run would have, so a folder a CLI case reads stays.
+            let http_prefix = format!("{}/", crate::http::HTTP_DIR);
+            let pending: Vec<String> = previous
                 .iter()
-                .filter_map(|name| name.strip_prefix(http_prefix.as_str()))
-                .map(str::to_string)
-                .collect()
-        };
-        drop_stale(&mut outcome, &owned)?;
+                .filter(|name| name.starts_with(&http_prefix))
+                .cloned()
+                .collect();
+            if !pending.is_empty() {
+                let written: Vec<String> = outcome
+                    .recorded
+                    .iter()
+                    .map(|name| format!("{http_prefix}{name}"))
+                    .collect();
+                finished = remove_stale(&cases_dir(&repo), &written, &pending)?;
+            }
+        }
+        drop_stale(&mut outcome, if previous_http { &previous } else { &[] })?;
+        outcome.stale.extend(finished);
         config.recorded = outcome.recorded.clone();
         std::fs::write(
             cases_dir(&repo).join(CONFIG_FILE),
