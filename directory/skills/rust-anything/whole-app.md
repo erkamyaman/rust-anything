@@ -127,7 +127,10 @@ or `{port}` (`--port` if it is fixed), and requests come from `curl` lines in it
 app sends email, calls webhooks or APIs, or writes a database, record those too: `--effects
 http,smtp` (and `--effect-env VAR=KIND` for its own URL or mail settings), `--db-reset` and
 `--db-dump` for the database. Ask the user for the reset and dump commands when the database is
-not a local file. Then `rust-anything app replay <repo>`: the original must pass 100%.
+not a local file. Then `rust-anything app replay <repo>`: the original must pass 100%. Flags are
+saved in `rust/app-cases/rust-anything.json`; see
+[Saved settings](https://github.com/erkamyaman/rust-anything/blob/main/docs/whole-apps.md#saved-settings-rustapp-casesrust-anythingjson)
+for which settings stick, merge, or clear on re-record.
 
 ## 4. Build the front door
 

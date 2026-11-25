@@ -219,7 +219,7 @@ Load the shadow where the app loaded the original. `RUST_ANYTHING_MODE=shadow` (
 original's results and reports Rust mismatches; `new` switches to Rust; `old` turns Rust off.
 The public API does not change.
 
-For TS/JS and Python, `rust-anything enable <crate>` switches a gated unit on in place instead: one
+For TS/JS, Python and PowerShell, `rust-anything enable <crate>` switches a gated unit on in place instead: one
 marked block in the original files rebinds its functions to Rust for every caller.
 `rust-anything disable <crate>` removes it byte for byte; `RUST_ANYTHING_UNIT_<NAME>=original`
 runs the original for one run. Ask the user before enabling: it edits their source files.

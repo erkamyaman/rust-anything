@@ -212,5 +212,31 @@ rust-anything app lift .
   `port.rs`, so the cases that matched through the bindings still describe it; the checklist
   warns about files of the original that still import the shadows.
 
+### Saved settings (`rust/app-cases/rust-anything.json`)
+
+`app record` saves its configuration in `rust/app-cases/rust-anything.json`, and `app replay` and
+`app lift` read it on every run. Editing this file by hand is supported (for example to remove a
+sticky setting or clear `unordered`). `app front-door` reads it once, when it scaffolds `rust/app`,
+and copies `run` into `rust/app/src/original.rs`: after changing `run`, edit that file too and
+rebuild, since `app front-door` never overwrites an existing `rust/app`.
+
+| Field | Flag | On re-record |
+| --- | --- | --- |
+| `name` | `--name` | Replaces if passed; keeps saved otherwise |
+| `run` | `-- <cmd>` | Replaces if passed; keeps saved otherwise |
+| `timeout_secs` | `--timeout` | Replaces if passed; keeps saved (default `30`) otherwise |
+| `normalize` | `--normalize NAME` | Merges (appends new built-in normalizer names) |
+| `normalizers` | `--normalize NAME=REGEX` | Merges (inserts or updates by `NAME`) |
+| `http` | `--http`, `--port`, `--arg`, `--pace` | Sticky once set; cannot be cleared via CLI flags |
+| `http.port` | `--port` | Replaces if passed; keeps saved otherwise |
+| `http.args` | `--arg` | Replaces if passed; keeps saved (cannot be cleared via CLI) |
+| `http.pace_ms` | `--pace` | Replaces if passed; `--pace 0` clears it |
+| `http.fresh` / `fresh` | `--fresh` | Replaces if passed; keeps saved (cannot be cleared via CLI) |
+| `effects` | `--effects`, `--effect-env`, `--db-reset`, `--db-dump` | Merges with saved sink and database settings |
+| `float_tolerance` | `--float-tolerance` | Replaces if passed; `--float-tolerance 0` clears it |
+| `float_files` | `--float-file` | Replaces if passed; keeps saved otherwise |
+| `unordered` | *(written by `app record`)* | Recomputed from `order` noise; tells `replay` to compare those lines in any order |
+| `recorded` | *(written by `app record`)* | Tracks generated case names so stale cases are cleaned up on the next `app record` |
+
 All five are MCP tools too: `app_record`, `app_replay`, `app_front_door`, `app_wire` and
 `app_lift`.
