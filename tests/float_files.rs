@@ -62,3 +62,36 @@ fn float_files_match_within_the_tolerance_and_report_real_differences() {
         "{report}"
     );
 }
+
+#[test]
+fn negative_float_tolerance_after_a_space_gets_the_range_message() {
+    let cli = env!("CARGO_BIN_EXE_rust-anything");
+    let dir = std::env::temp_dir().join(format!(
+        "rust-anything-negative-tolerance-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let dir_arg = dir.to_str().unwrap();
+    for args in [
+        vec!["diff", dir_arg, "--float-tolerance", "-0.5"],
+        vec![
+            "app",
+            "record",
+            dir_arg,
+            "--float-tolerance",
+            "-0.5",
+            "--",
+            "true",
+        ],
+    ] {
+        let out = Command::new(cli).args(&args).output().unwrap();
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(out.status.code(), Some(2), "{args:?}: {stderr}");
+        assert!(
+            stderr.contains("--float-tolerance must be at least 0 and below 1"),
+            "{args:?}: {stderr}"
+        );
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

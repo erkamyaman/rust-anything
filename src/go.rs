@@ -121,9 +121,9 @@ pub fn pick(report: &Report, function: Option<&str>) -> Result<Pick> {
                 );
             }
             format!(
-                "no hot function to port: none of the {} hot functions is exported by a portable \
+                "no hot function to port: none of the {} is exported by a portable \
                  unit, can cross the bridge and takes arguments. `rust-anything profile` shows why.",
-                report.hot.len()
+                crate::report::count(report.hot.len(), "hot function")
             )
         })?,
     };
@@ -212,6 +212,10 @@ pub fn task(crate_dir: &Path, pick: &Pick, command: &[String]) -> String {
             crate::codegen_batch::pascal(function)
         )
     });
+    let rules = match crate::rules::section(crate_dir) {
+        r if r.is_empty() => r,
+        r => format!("{r}\n"),
+    };
     format!(
         "# Port `{function}` to Rust\n\n\
          `{function}` (`{file}:{line}`) took {pct:.0}% of `{command}`. Port it, and only it, in \
@@ -222,7 +226,9 @@ pub fn task(crate_dir: &Path, pick: &Pick, command: &[String]) -> String {
            their messages, edge cases (empty input, Unicode, large numbers). Read the original \
            first; port its behavior, not a cleaner idea of it.\n\
          - No `unwrap`, `expect` or `panic!` outside tests; no `unsafe` without a `// SAFETY:` comment.\n\
-         - Keep helpers private; only the unit's functions are `pub`.\n\n\
+         - Keep helpers private; only the unit's functions are `pub`.\n\
+         - Never hard-code recorded outputs or weaken tests; gate checks both.\n\n\
+         {rules}\
          ## Loop\n\n\
          ```sh\n\
          rust-anything build .\n\
@@ -619,27 +625,7 @@ fn check(crate_dir: &Path, steps: &mut Vec<String>) -> Result<(usize, usize, Vec
         format!("diff: {}/{} cases match", diff.passed, diff.total),
     );
     if diff.failed > 0 || !diff.missing.is_empty() || diff.total == 0 {
-        let shown: Vec<String> = diff
-            .mismatches
-            .iter()
-            .take(5)
-            .map(|m| serde_json::to_string(m).unwrap_or_default())
-            .collect();
-        return Ok((
-            diff.total,
-            diff.passed,
-            vec![format!(
-                "{} of {} recorded cases differ{}. First mismatches:\n{}",
-                diff.total - diff.passed,
-                diff.total,
-                if diff.missing.is_empty() {
-                    String::new()
-                } else {
-                    format!("; missing from Rust: {}", diff.missing.join(", "))
-                },
-                shown.join("\n")
-            )],
-        ));
+        return Ok((diff.total, diff.passed, vec![differences(&diff)]));
     }
     let gate = crate::gate::gate(crate_dir, &[])?;
     let failed: Vec<String> = gate
@@ -659,10 +645,85 @@ fn check(crate_dir: &Path, steps: &mut Vec<String>) -> Result<(usize, usize, Vec
     Ok((diff.total, diff.passed, failed))
 }
 
+/// What still differs, for the agent's next attempt: each distinct difference with one example
+/// and where it starts, or the first raw mismatches when there are no groups.
+fn differences(diff: &crate::harness::DiffOutcome) -> String {
+    let head = format!(
+        "{} of {} recorded cases differ{}.",
+        diff.total - diff.passed,
+        diff.total,
+        if diff.missing.is_empty() {
+            String::new()
+        } else {
+            format!("; missing from Rust: {}", diff.missing.join(", "))
+        }
+    );
+    if diff.groups.is_empty() {
+        let shown: Vec<String> = diff
+            .mismatches
+            .iter()
+            .take(5)
+            .map(|m| serde_json::to_string(m).unwrap_or_default())
+            .collect();
+        return format!("{head} First mismatches:\n{}", shown.join("\n"));
+    }
+    let mut out = format!(
+        "{head} {} distinct difference(s), most cases first:",
+        diff.groups.len()
+    );
+    for g in diff.groups.iter().take(5) {
+        let mut example = g.example.clone();
+        let at = example
+            .as_object_mut()
+            .and_then(|m| m.remove("at"))
+            .and_then(|at| serde_json::from_value::<crate::mismatch::At>(at).ok());
+        out += &format!(
+            "\n- {} ({} case(s), id {})\n  example: {}",
+            g.label(),
+            g.cases,
+            g.id,
+            serde_json::to_string(&example).unwrap_or_default()
+        );
+        if let Some(at) = at {
+            out += &format!("\n  {}", at.describe());
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::profile::Caller;
+
+    #[test]
+    fn the_retry_prompt_shows_each_difference_once_with_where_it_starts() {
+        let mut diff = crate::harness::DiffOutcome {
+            total: 10,
+            passed: 6,
+            failed: 4,
+            mismatches: (0..4)
+                .map(|i| serde_json::json!({ "fn": "count", "args": [format!("a\t{i}")], "expected": { "ok": 1 }, "actual": { "ok": 2 } }))
+                .collect(),
+            ..Default::default()
+        };
+        crate::mismatch::annotate(&mut diff);
+        diff.groups = crate::mismatch::group_mismatches(&diff.mismatches);
+        let text = differences(&diff);
+        assert!(
+            text.starts_with("4 of 10 recorded cases differ. 1 distinct difference(s)"),
+            "{text}"
+        );
+        assert!(
+            text.contains("- count: return $ (value) (4 case(s), id "),
+            "{text}"
+        );
+        assert_eq!(text.matches("example:").count(), 1, "{text}");
+        assert!(
+            text.contains("at return $ (value): expected 1, got 2"),
+            "{text}"
+        );
+    }
 
     fn hot(name: &str, pct: f64, unit: bool, params: &[&str], batch: Option<&str>) -> Hot {
         Hot {
@@ -787,6 +848,26 @@ mod tests {
         assert!(
             named.contains("cannot be bridged") && named.contains("takes or returns a function"),
             "{named}"
+        );
+    }
+
+    #[test]
+    fn none_eligible_message_uses_singular_and_plural_count() {
+        let r1 = report(vec![hot("main", 99.0, true, &[], None)]);
+        let err1 = pick(&r1, None).unwrap_err().to_string();
+        assert!(
+            err1.contains("none of the 1 hot function is exported"),
+            "{err1}"
+        );
+
+        let r2 = report(vec![
+            hot("main", 99.0, true, &[], None),
+            hot("cli", 80.0, true, &[], None),
+        ]);
+        let err2 = pick(&r2, None).unwrap_err().to_string();
+        assert!(
+            err2.contains("none of the 2 hot functions is exported"),
+            "{err2}"
         );
     }
 

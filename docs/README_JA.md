@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · 日本語 · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · 日本語 · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a> · <a href="README_TH.md">ไทย</a> · <a href="https://github.com/erkamyaman/rust-anything/issues/425">+ add yours</a></sub></p>
 <p align="center"><sub>この翻訳はコミュニティによって管理されており、<a href="../README.md">英語版 README</a> より古い場合があります。</sub></p>
 
 <p align="center"><b>アプリを Rust で書き直し、元と同じように動くことを証明する。</b><br>
@@ -41,7 +41,7 @@
   <sub>ms、Fuse.js、json-server の 59 個の実ファイルで Prettier と Rust 移植版を比較（Apple M4）。出力はバイト単位で同一です。<a href="real-world.md#prettier">計測方法</a>。</sub>
 </p>
 
-<p align="center"><sub>PHP と C#：FFI と P/Invoke 越しのユニット移植に対応しています。</sub></p>
+<p align="center"><sub>PHP、C#、PowerShell：FFI と P/Invoke 越しのユニット移植に対応しています。</sub></p>
 
 <table>
   <tr>
@@ -199,7 +199,7 @@ rust-anything 自体はコードを自動翻訳しません。Rust コードを�
 
 C、PHP、C#、PowerShell を除くすべての言語でバッチクラス（`--batch`）も生成されます。要素は一度だけ境界を越えて Rust 側に保持され、呼び出しのたびに全コアを使って全要素を一括処理します。
 
-言語はリポジトリから自動検出されます（`go.mod`、`pom.xml`、`build.gradle`/`build.gradle.kts`、`.csproj` または `.sln`、`pyproject.toml`、`Gemfile`、`composer.json`、`package.json`、該当しない場合は最も多いソースファイルから判断）。`.kt` ソースのみを含み `.java` ソースを含まない Gradle モジュールは Kotlin、混在するモジュールは Java として扱われます。`--lang` で上書きもできます。型情報はソースから取得します: TS の型、Python の型ヒント、C/Go/Java/Kotlin/C# のシグネチャ、Ruby の YARD タグ、PHP の型および phpdoc。型注釈がなく数値として使われている引数は数値型と推論されます。
+言語はリポジトリから自動検出されます（`go.mod`、`pom.xml`、`build.gradle`/`build.gradle.kts`、`.csproj` または `.sln`、`pyproject.toml`、`Gemfile`、`composer.json`、`package.json`、該当しない場合は最も多いソースファイルから判断）。`.kt` ソースのみを含み `.java` ソースを含まない Gradle モジュールは Kotlin、混在するモジュールは Java として扱われます。`--lang` で上書きもできます。型情報はソースから取得します: TS の型、Python の型ヒント、C/Go/Java/Kotlin/C# のシグネチャ、Ruby の YARD タグ、PHP の型および phpdoc。型注釈がなく数値として使われている引数は数値型と推論されます。各型が移植後に何になるか、どの型が関数を元の言語に残すかは [型](types.md) にまとめています。
 
 PHP については、`analyze` で PHP アプリの移行計画を立てられ（Composer パッケージと PSR-4 オートローディング、緩い比較や整数オーバーフローによる float 化などのリスク、Composer パッケージからクレートへのマッピング）、PHP の CLI やサーバーを記録・リプレイして Rust 製フロントドアの背後に配置できます。スカラー・文字列・リスト・連想配列を引数に取るトップレベル関数は、PHP の FFI 拡張（`ext-ffi`）越しにブリッジされます。まず `ext-ffi` 自体がインストールされ有効になっている必要があります。`php -m` は CLI 側の設定しか見ないため、サーバーで使う場合は実際に動かす SAPI で確認してください（PHP の設定は SAPI ごとに違い、CLI で有効でも PHP-FPM では無効ということがあります）。そのうえで、既定の `ffi.enable` 設定は CLI での利用を許可しますが、サーバーなど他の SAPI では `ffi.enable=1` が必要です。`diff` が通ったら、生成された `php/<クレート名>.php`（`-` は `_` になるので `foo-rs` なら `php/foo_rs.php`）を、アプリが元のファイルを読み込んでいた場所で読み込んでください。フォルダ単位のユニットは複数の PHP ファイルを含むことがあり、ラッパーはそれら全部を 1 ファイルにまとめます。関数はガードなしで宣言されるため、`require` の置き換えは 1 回だけにしてください。2 つのファイルの読み込みを同じラッパーに置き換えると、2 回目の読み込みで `Cannot redeclare function` になります。ネイティブライブラリはラッパー自身のフォルダからの相対パスで読み込まれるため、両方のファイルはそのままの位置に置きます。ラッパーはブリッジされたトップレベル関数だけを宣言するので、元のファイルを置き換えるものであり、並べて読み込むものではありません。クラス、`public static` メソッド、`define('FEATURE_ENABLED', true)` のようなトップレベルの文はラッパーに含まれないため、それらは読み込まれ続けるファイルに残してください。同じことはブリッジが見送った関数にも当てはまります。参照渡しの引数（`increment(int &$n)`）、可変長引数（`...$args`）、`callable`／`Closure`、オブジェクトを受け取る関数はブリッジされないので、そうした関数を元のファイルから消すと、その関数の呼び出しは失敗します。ブリッジが除外した関数はすべて、読み込まれ続けるファイルに残してください（`bridge` は除外理由を行ごとに表示します）。PHP から Rust へのデータは JSON（約 1 µs）で渡るため、`bench` では小さな関数が PHP より遅く出ます。PHP にはまだ `shadow` がありません。
 
@@ -208,7 +208,9 @@ C# も同じように動作します: `analyze` は `.csproj` プロジェクト
 ## 詳しく知る
 
 - [仕組み](how-it-works.md): 移植ループ、`bridge` と `analyze` が判断すること、ホットパス、検出できないもの、実際の移植に必要なこと、元の実装への追従（`map`）
+- [ポートをパッケージとして配布](packaging.md): maturin の wheel と napi-rs のプラットフォーム別 npm パッケージ、それらをビルドする CI
 - [アプリ全体の移植](whole-apps.md): サーバー、CLI、ライブラリ。フロントドアから `app lift` まで
+- [型](types.md): 各言語の型が `port.rs` で何になるか、型が拒否される理由
 - [例とケーススタディ](examples.md): x18n と、6 つの言語の実コード
 - [実プロジェクトの移植](real-world.md): json-server、Fuse.js、vercel/ms とベンチマーク
 - [インストール、更新、開発](install.md): すべてのインストール方法、Windows、ソースからのビルド

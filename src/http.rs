@@ -53,30 +53,55 @@ pub struct HttpConfig {
     /// Milliseconds to wait after each response before the next request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pace_ms: Option<u64>,
+    /// Seconds to wait for the server to listen before giving up (`app record --ready-timeout`).
+    /// Unset keeps the default, `READY`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ready_secs: Option<u64>,
+}
+
+/// How long a start waits for the port: the saved `--ready-timeout`, or `READY`.
+pub(crate) fn ready_timeout(http: &HttpConfig) -> Duration {
+    http.ready_secs.map_or(READY, Duration::from_secs)
 }
 
 /// The `http` config of a recording: the saved one, changed by what this record was given.
-pub(crate) fn merge_config(saved: Option<HttpConfig>, opts: &RecordOptions) -> Option<HttpConfig> {
-    let asked =
-        opts.http || opts.port.is_some() || !opts.server_args.is_empty() || opts.pace_ms.is_some();
+pub(crate) fn merge_config(
+    saved: Option<HttpConfig>,
+    opts: &RecordOptions,
+) -> Result<Option<HttpConfig>> {
+    let asked = opts.http == Some(true)
+        || opts.port.is_some()
+        || opts.server_args.is_some_and(|args| !args.is_empty())
+        || opts.pace_ms.is_some()
+        || opts.ready_secs.is_some();
+    if opts.http == Some(false) {
+        ensure!(
+            !asked,
+            "--no-http cannot be combined with --http, --port, --arg, --pace or --ready-timeout"
+        );
+        return Ok(None);
+    }
     let mut config = match (saved, asked) {
         (Some(c), _) => c,
         (None, true) => HttpConfig::default(),
-        (None, false) => return None,
+        (None, false) => return Ok(None),
     };
-    if opts.port.is_some() {
-        config.port = opts.port;
+    if let Some(port) = opts.port {
+        config.port = (port > 0).then_some(port);
     }
-    if !opts.server_args.is_empty() {
-        config.args = opts.server_args.to_vec();
+    if let Some(args) = opts.server_args {
+        config.args = args.to_vec();
     }
-    if !opts.fresh.is_empty() {
-        config.fresh = opts.fresh.to_vec();
+    if let Some(fresh) = opts.fresh {
+        config.fresh = fresh.to_vec();
     }
     if let Some(pace) = opts.pace_ms {
         config.pace_ms = (pace > 0).then_some(pace);
     }
-    Some(config)
+    if let Some(secs) = opts.ready_secs {
+        config.ready_secs = (secs > 0).then_some(secs);
+    }
+    Ok(Some(config))
 }
 
 pub(crate) const FILES_DIR: &str = "files";
@@ -196,14 +221,26 @@ struct HttpInput {
 }
 
 #[derive(Debug, Clone)]
-struct Resp {
-    status: u16,
-    headers: BTreeMap<String, String>,
-    body: Vec<u8>,
+pub(crate) struct Resp {
+    pub(crate) status: u16,
+    pub(crate) headers: BTreeMap<String, String>,
+    pub(crate) body: Vec<u8>,
 }
 
+/// Picks an ephemeral port free on IPv4 loopback and not already bound on IPv6 loopback
+/// (on dual-stack hosts a port free on `127.0.0.1` can still be bound on `[::1]`, which
+/// `listening()` treats as in use).
 pub fn free_port() -> Result<u16> {
-    Ok(TcpListener::bind("127.0.0.1:0")?.local_addr()?.port())
+    for _ in 0..16 {
+        let v4 = TcpListener::bind("127.0.0.1:0")?;
+        let port = v4.local_addr()?.port();
+        match TcpListener::bind(SocketAddr::from((Ipv6Addr::LOCALHOST, port))) {
+            Ok(_) => return Ok(port),
+            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => continue,
+            Err(_) => return Ok(port),
+        }
+    }
+    bail!("could not find a free loopback port")
 }
 
 /// The loopback addresses a server may listen on. A server that binds to `localhost` can get only
@@ -347,14 +384,14 @@ fn read_response(stream: &mut impl Read, head_only: bool) -> Result<Resp> {
     })
 }
 
-fn send(addr: SocketAddr, req: &Req, timeout: Duration) -> Result<Resp> {
+fn connect(addr: SocketAddr, req: &Req, host: &str, timeout: Duration) -> Result<TcpStream> {
     let mut stream = TcpStream::connect_timeout(&addr, timeout)?;
     stream.set_read_timeout(Some(timeout))?;
     stream.set_write_timeout(Some(timeout))?;
     let body_opt = req.body_bytes()?;
     let body = body_opt.as_deref().unwrap_or(&[]);
     let mut head = format!(
-        "{} {} HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n",
+        "{} {} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n",
         req.method, req.path
     );
     for (k, v) in &req.headers {
@@ -371,14 +408,133 @@ fn send(addr: SocketAddr, req: &Req, timeout: Duration) -> Result<Resp> {
     head += "\r\n";
     stream.write_all(head.as_bytes())?;
     stream.write_all(body)?;
+    Ok(stream)
+}
+
+fn send(addr: SocketAddr, req: &Req, timeout: Duration) -> Result<Resp> {
+    let mut stream = connect(addr, req, &addr.to_string(), timeout)?;
     read_response(&mut stream, req.method == "HEAD")
 }
 
+/// Reads through to `inner` and keeps every byte read.
+struct Tee<R> {
+    inner: R,
+    seen: Vec<u8>,
+}
+
+impl<R: Read> Read for Tee<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        self.seen.extend_from_slice(&buf[..n]);
+        Ok(n)
+    }
+}
+
+/// Sends `req` as `send` does, keeping the client's `Host`, and returns the parsed response with
+/// the bytes it came in, so a proxy can relay them unchanged.
+pub(crate) fn exchange(addr: SocketAddr, req: &Req, timeout: Duration) -> Result<(Resp, Vec<u8>)> {
+    let host = req
+        .headers
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case("host"))
+        .map_or_else(|| addr.to_string(), |(_, v)| v.clone());
+    let stream = connect(addr, req, &host, timeout)?;
+    let mut tee = Tee {
+        inner: stream,
+        seen: Vec::new(),
+    };
+    let resp = read_response(&mut tee, req.method == "HEAD")?;
+    Ok((resp, tee.seen))
+}
+
+/// Headers of a client's request that belong to its connection, not to the request.
+const HOP_HEADERS: [&str; 5] = [
+    "connection",
+    "keep-alive",
+    "transfer-encoding",
+    "content-length",
+    "expect",
+];
+
+/// Reads one request from a client: the head, then a body framed by `Content-Length` or chunked.
+/// A client waiting on `Expect: 100-continue` is told to go on.
+pub(crate) fn read_request<S: Read + Write>(stream: &mut S) -> Result<Req> {
+    let mut buf = Vec::new();
+    let mut chunk = [0u8; 8192];
+    let header_end = loop {
+        if let Some(i) = find(&buf, b"\r\n\r\n") {
+            break i;
+        }
+        ensure!(buf.len() < 1 << 20, "the request head is too large");
+        let n = stream.read(&mut chunk)?;
+        ensure!(n > 0, "the connection closed before a full request");
+        buf.extend_from_slice(&chunk[..n]);
+    };
+    let head = String::from_utf8_lossy(&buf[..header_end]).into_owned();
+    let rest = buf.split_off(header_end + 4);
+    let mut lines = head.split("\r\n");
+    let line = lines.next().unwrap_or_default();
+    let mut parts = line.split_whitespace();
+    let (Some(method), Some(target), Some(_)) = (parts.next(), parts.next(), parts.next()) else {
+        bail!("not an HTTP request: `{line}`");
+    };
+    let path = match target.split_once("://") {
+        Some((_, rest)) => rest.find('/').map_or("/", |i| &rest[i..]),
+        None => target,
+    };
+    ensure!(path.starts_with('/'), "not an HTTP request: `{line}`");
+    let mut headers = BTreeMap::new();
+    let mut framing = BTreeMap::new();
+    for line in lines {
+        if let Some((k, v)) = line.split_once(':') {
+            let (k, v) = (k.trim(), v.trim().to_string());
+            let lower = k.to_ascii_lowercase();
+            if HOP_HEADERS.contains(&lower.as_str()) {
+                framing.insert(lower, v);
+            } else {
+                headers.insert(k.to_string(), v);
+            }
+        }
+    }
+    if framing
+        .get("expect")
+        .is_some_and(|e| e.eq_ignore_ascii_case("100-continue"))
+    {
+        stream.write_all(b"HTTP/1.1 100 Continue\r\n\r\n")?;
+    }
+    let chunked = framing
+        .get("transfer-encoding")
+        .is_some_and(|t| t.to_ascii_lowercase().contains("chunked"));
+    let body = if chunked {
+        Some(read_chunked(stream, rest)?)
+    } else if let Some(len) = framing.get("content-length") {
+        let len: usize = len.parse().context("invalid Content-Length")?;
+        let mut rest = rest;
+        fill(stream, &mut rest, len)?;
+        rest.truncate(len);
+        Some(rest)
+    } else {
+        None
+    };
+    let (body, body_base64) = match body {
+        Some(bytes) => Req::from_body_bytes(bytes),
+        None => (None, None),
+    };
+    Ok(Req {
+        method: method.to_string(),
+        path: path.to_string(),
+        headers,
+        body,
+        body_base64,
+        body_file: None,
+    })
+}
+
 /// A server process; stopped (SIGTERM, then SIGKILL) when dropped.
-struct Server {
+pub(crate) struct Server {
     child: Child,
     /// The loopback address that answered while waiting for the server; requests go there.
-    addr: SocketAddr,
+    pub(crate) addr: SocketAddr,
     dir: PathBuf,
     cwd: PathBuf,
     log: PathBuf,
@@ -386,10 +542,26 @@ struct Server {
     sinks: Option<crate::effects::Sinks>,
 }
 
+#[derive(Debug)]
+struct PortInUse(u16);
+
+impl std::fmt::Display for PortInUse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "port {} is already in use", self.0)
+    }
+}
+
+impl std::error::Error for PortInUse {}
+
 impl Server {
-    fn start(command: &[String], launch: &Launch, repo: &Path, port: u16) -> Result<Server> {
+    pub(crate) fn start(
+        command: &[String],
+        launch: &Launch,
+        repo: &Path,
+        port: u16,
+    ) -> Result<Server> {
         if listening(port, Duration::from_millis(100)).is_some() {
-            bail!("port {port} is already in use");
+            return Err(anyhow::Error::new(PortInUse(port)));
         }
         let dir = app::temp_dir("server")?;
         let words: Vec<String> = command
@@ -432,7 +604,9 @@ impl Server {
         let mut child = cmd
             .spawn()
             .with_context(|| format!("starting `{}`", command.join(" ")))?;
-        let deadline = Instant::now() + READY;
+        // A huge `--ready-timeout` has no representable deadline; treat it as "no deadline" rather
+        // than panicking after the child is already running.
+        let deadline = Instant::now().checked_add(launch.ready);
         let addr = loop {
             let failure = if let Some(status) = child.try_wait()? {
                 Some(format!("exited ({status}) before listening"))
@@ -442,8 +616,8 @@ impl Server {
                 } else {
                     break addr;
                 }
-            } else if Instant::now() > deadline {
-                Some(format!("did not listen within {}s", READY.as_secs()))
+            } else if deadline.is_some_and(|d| Instant::now() > d) {
+                Some(format!("did not listen within {}s", launch.ready.as_secs()))
             } else {
                 None
             };
@@ -475,6 +649,13 @@ impl Server {
             stopped: false,
             sinks,
         })
+    }
+
+    /// Empties the sinks, for a server whose effects are not compared.
+    pub(crate) fn drain_effects(&self, repo: &Path) {
+        if let Some(sinks) = &self.sinks {
+            sinks.take(&self.cwd, repo);
+        }
     }
 
     fn fallbacks(&self) -> Option<usize> {
@@ -689,11 +870,32 @@ type Answer = (
 );
 
 /// What every start gets besides its command: the server's arguments and its fresh files.
-struct Launch<'a> {
-    args: &'a [String],
-    files: Option<&'a Path>,
-    pace: Option<Duration>,
-    effects: Option<&'a crate::effects::EffectsConfig>,
+pub(crate) struct Launch<'a> {
+    pub(crate) args: &'a [String],
+    pub(crate) files: Option<&'a Path>,
+    pub(crate) pace: Option<Duration>,
+    pub(crate) effects: Option<&'a crate::effects::EffectsConfig>,
+    /// How long to wait for the port before giving up.
+    pub(crate) ready: Duration,
+}
+
+/// Starts a server on an auto-picked ephemeral port, retrying if another process claims the port
+/// in the brief window between `free_port()` and `Server::start()`.
+pub(crate) fn start_ephemeral(
+    command: &[String],
+    launch: &Launch,
+    repo: &Path,
+    mut next_port: impl FnMut() -> Result<u16>,
+) -> Result<Server> {
+    for attempt in 0..5 {
+        let port = next_port()?;
+        match Server::start(command, launch, repo, port) {
+            Ok(server) => return Ok(server),
+            Err(e) if e.downcast_ref::<PortInUse>().is_some() && attempt < 4 => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    unreachable!("loop always returns on attempt 4 or earlier")
 }
 
 /// Starts the server once and sends every request in order.
@@ -701,11 +903,14 @@ fn run_all(
     command: &[String],
     launch: &Launch,
     repo: &Path,
-    port: u16,
+    fixed_port: Option<u16>,
     reqs: &[&Req],
     timeout: Duration,
 ) -> Result<Vec<Answer>> {
-    let mut server = Server::start(command, launch, repo, port)?;
+    let mut server = match fixed_port {
+        Some(port) => Server::start(command, launch, repo, port)?,
+        None => start_ephemeral(command, launch, repo, free_port)?,
+    };
     let mut out = Vec::new();
     for req in reqs {
         let before = server.fallbacks().unwrap_or(0);
@@ -1499,23 +1704,10 @@ pub(crate) fn record(
         files: files.as_deref(),
         pace: http.pace_ms.map(Duration::from_millis),
         effects: config.effects.as_ref(),
+        ready: ready_timeout(&http),
     };
-    let one = run_all(
-        &config.run,
-        &launch,
-        repo,
-        fixed.map_or_else(free_port, Ok)?,
-        &reqs,
-        timeout,
-    )?;
-    let two = run_all(
-        &config.run,
-        &launch,
-        repo,
-        fixed.map_or_else(free_port, Ok)?,
-        &reqs,
-        timeout,
-    )?;
+    let one = run_all(&config.run, &launch, repo, fixed, &reqs, timeout)?;
+    let two = run_all(&config.run, &launch, repo, fixed, &reqs, timeout)?;
 
     let dir = app::cases_dir(repo).join(HTTP_DIR);
     std::fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
@@ -1738,6 +1930,37 @@ pub(crate) fn recorded_routes(repo: &Path) -> Result<Vec<String>> {
     Ok(out)
 }
 
+/// The curl examples in the docs no recorded case sends, as `METHOD /path`.
+pub(crate) fn unrecorded_examples(repo: &Path) -> Result<Vec<String>> {
+    let recorded: BTreeSet<String> = load_specs(&app::cases_dir(repo).join(HTTP_DIR))?
+        .iter()
+        .map(|s| req_key(&s.req))
+        .collect();
+    let mut seen = BTreeSet::new();
+    Ok(
+        app::scan_examples(repo, |line, doc_dir| parse_curl(line, repo, doc_dir))
+            .into_iter()
+            .filter(|req| !recorded.contains(&req_key(req)) && seen.insert(req_key(req)))
+            .map(|req| format!("{} {}", req.method, req.path))
+            .collect(),
+    )
+}
+
+/// Response headers whose value differed between the original's own runs in some recorded case.
+pub(crate) fn noisy_headers(repo: &Path) -> BTreeSet<String> {
+    load_specs(&app::cases_dir(repo).join(HTTP_DIR))
+        .unwrap_or_default()
+        .iter()
+        .flat_map(|spec| &spec.headers)
+        .filter(|(_, v)| v.contains("[..]"))
+        .map(|(k, _)| k.to_ascii_lowercase())
+        .collect()
+}
+
+pub(crate) fn is_skipped_header(name: &str) -> bool {
+    SKIP_HEADERS.contains(&name)
+}
+
 fn load_specs(dir: &Path) -> Result<Vec<Spec>> {
     let mut paths: Vec<PathBuf> = std::fs::read_dir(dir)
         .with_context(|| {
@@ -1770,10 +1993,7 @@ pub(crate) fn replay(
 ) -> Result<ReplayOutcome> {
     let dir = app::cases_dir(repo);
     let specs = app::only_case(load_specs(&dir.join(HTTP_DIR))?, case, |s| &s.name)?;
-    let port = match port.or(config.http.as_ref().and_then(|h| h.port)) {
-        Some(p) => p,
-        None => free_port()?,
-    };
+    let fixed_port = port.or(config.http.as_ref().and_then(|h| h.port));
     let reqs: Vec<&Req> = specs.iter().map(|s| &s.req).collect();
     let files = saved_snapshot(repo, config)?;
     let http = config.http.clone().unwrap_or_default();
@@ -1782,8 +2002,9 @@ pub(crate) fn replay(
         files: files.as_deref(),
         pace: http.pace_ms.map(Duration::from_millis),
         effects: config.effects.as_ref(),
+        ready: ready_timeout(&http),
     };
-    let answers = run_all(command, &launch, repo, port, &reqs, timeout)?;
+    let answers = run_all(command, &launch, repo, fixed_port, &reqs, timeout)?;
     let mut outcome = ReplayOutcome {
         build: command.to_vec(),
         passed: 0,
@@ -1792,6 +2013,7 @@ pub(crate) fn replay(
         failures: Vec::new(),
         fallback: None,
         report: dir.join(app::REPORT_FILE),
+        groups: Vec::new(),
     };
     let (mut reported, mut fell_back) = (false, Vec::new());
     for (spec, (answer, fallback, effects)) in specs.iter().zip(answers) {
@@ -1802,65 +2024,59 @@ pub(crate) fn replay(
         }
         let mut problems = Vec::new();
         match answer {
-            Err(e) => problems.push(Problem {
-                field: "response".to_string(),
-                detail: format!("no response: {e}\n"),
-            }),
+            Err(e) => problems.push(
+                Problem::new("response", format!("no response: {e}\n"))
+                    .at(crate::mismatch::At::new("no response")),
+            ),
             Ok(resp) => {
                 if resp.status != spec.status {
-                    problems.push(Problem {
-                        field: "status".to_string(),
-                        detail: format!("expected {}, got {}\n", spec.status, resp.status),
-                    });
+                    problems.push(
+                        Problem::new(
+                            "status",
+                            format!("expected {}, got {}\n", spec.status, resp.status),
+                        )
+                        .at(crate::mismatch::At::new(&format!(
+                            "{}→{}",
+                            spec.status, resp.status
+                        ))),
+                    );
                 }
                 for (k, expected) in &spec.headers {
                     let field = format!("header {k}");
                     let key = k.to_ascii_lowercase();
                     match resp.headers.get(&key) {
-                        None => problems.push(Problem {
-                            field,
-                            detail: format!("- {expected}\n(missing)\n"),
-                        }),
+                        None => problems.push(
+                            Problem::new(field, format!("- {expected}\n(missing)\n"))
+                                .at(crate::mismatch::At::new("missing key")),
+                        ),
                         Some(actual) => {
                             let (e, a) = (norm.apply(expected), norm.apply(actual));
                             if !app::line_matches(&e, &a) {
-                                problems.push(Problem {
-                                    field,
-                                    detail: format!("- {e}\n+ {a}\n"),
-                                });
+                                let literal = e.split("[..]").next().unwrap_or_default();
+                                let at = crate::mismatch::text_at("text", literal, &a);
+                                problems
+                                    .push(Problem::new(field, format!("- {e}\n+ {a}\n")).at(at));
                             }
                         }
                     }
                 }
+                let unordered = norm.unordered(&spec.name, "body");
                 if let Some(expected) = &spec.body
-                    && let Some(detail) = app::compare(
-                        norm,
-                        expected,
-                        &resp.body,
-                        spec.binary,
-                        norm.unordered(&spec.name, "body"),
-                    )
+                    && let Some(detail) =
+                        app::compare(norm, expected, &resp.body, spec.binary, unordered)
                 {
-                    problems.push(Problem {
-                        field: "body".to_string(),
-                        detail,
-                    });
+                    let at = app::locate(norm, expected, &resp.body, spec.binary, unordered);
+                    problems.push(Problem::new("body", detail).at(at));
                 }
             }
         }
+        let unordered = norm.unordered(&spec.name, crate::effects::EXT);
+        let got = effects.as_deref().unwrap_or_default();
         if let Some(expected) = &spec.effects
-            && let Some(detail) = app::compare(
-                norm,
-                expected,
-                effects.as_deref().unwrap_or_default(),
-                false,
-                norm.unordered(&spec.name, crate::effects::EXT),
-            )
+            && let Some(detail) = app::compare(norm, expected, got, false, unordered)
         {
-            problems.push(Problem {
-                field: crate::effects::EXT.to_string(),
-                detail,
-            });
+            let at = app::locate(norm, expected, got, false, unordered);
+            problems.push(Problem::new(crate::effects::EXT, detail).at(at));
         }
         if problems.is_empty() {
             outcome.passed += 1;
@@ -1880,8 +2096,6 @@ pub(crate) fn replay(
             names: fell_back,
         });
     }
-    std::fs::write(&outcome.report, app::report_markdown(&outcome))
-        .with_context(|| format!("writing {}", outcome.report.display()))?;
     Ok(outcome)
 }
 
@@ -1960,6 +2174,40 @@ fn decode_base64_strict(input: &str) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_ready_timeout_is_saved_kept_and_reset() {
+        let opts = |ready_secs| RecordOptions {
+            repo: Path::new("."),
+            run: &[],
+            inputs: None,
+            normalize: &[],
+            name: None,
+            traps: false,
+            timeout_secs: None,
+            http: None,
+            server_args: None,
+            fresh: None,
+            pace_ms: None,
+            port: None,
+            float_tolerance: None,
+            float_files: &[],
+            effects: None,
+            ready_secs,
+        };
+        let old: HttpConfig = serde_json::from_str(r#"{"port":8080}"#).unwrap();
+        assert_eq!(ready_timeout(&old), READY);
+        assert!(merge_config(None, &opts(None)).unwrap().is_none());
+        let set = merge_config(Some(old), &opts(Some(5))).unwrap().unwrap();
+        assert_eq!(ready_timeout(&set), Duration::from_secs(5));
+        let kept = merge_config(Some(set), &opts(None)).unwrap().unwrap();
+        assert_eq!(kept.ready_secs, Some(5));
+        let reset = merge_config(Some(kept), &opts(Some(0))).unwrap().unwrap();
+        assert_eq!(reset.ready_secs, None);
+        assert!(!serde_json::to_string(&reset).unwrap().contains("ready"));
+        let implied = merge_config(None, &opts(Some(90))).unwrap().unwrap();
+        assert_eq!(implied.ready_secs, Some(90));
+    }
 
     #[test]
     fn the_tree_of_a_server_is_found_and_zombies_are_not_alive() {
@@ -2233,6 +2481,103 @@ mod tests {
         assert_eq!((r.status, r.body.as_slice()), (404, &b"not found"[..]));
         let close = b"HTTP/1.0 500 Oops\r\n\r\nbye";
         assert_eq!(read_response(&mut &close[..], false).unwrap().body, b"bye");
+    }
+
+    struct Client {
+        sent: std::io::Cursor<Vec<u8>>,
+        heard: Vec<u8>,
+    }
+
+    impl Read for Client {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            self.sent.read(buf)
+        }
+    }
+
+    impl Write for Client {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.heard.write(buf)
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn client(raw: &[u8]) -> Client {
+        Client {
+            sent: std::io::Cursor::new(raw.to_vec()),
+            heard: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn requests_parse_with_length_chunks_or_no_body() {
+        let mut c = client(
+            b"POST /upper?x=1 HTTP/1.1\r\nHost: example.test\r\nContent-Type: text/plain\r\nContent-Length: 5\r\nConnection: keep-alive\r\n\r\nhelloEXTRA",
+        );
+        let req = read_request(&mut c).unwrap();
+        assert_eq!(
+            (req.method.as_str(), req.path.as_str()),
+            ("POST", "/upper?x=1")
+        );
+        assert_eq!(req.body.as_deref(), Some("hello"));
+        assert_eq!(
+            req.headers.keys().collect::<Vec<_>>(),
+            ["Content-Type", "Host"]
+        );
+        let mut c = client(
+            b"PUT http://example.test/a HTTP/1.1\r\nTransfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n3\r\nab\xff\r\n0\r\n\r\n",
+        );
+        let req = read_request(&mut c).unwrap();
+        assert_eq!(req.path, "/a");
+        assert_eq!(req.body, None);
+        assert_eq!(req.body_bytes().unwrap().unwrap(), b"ab\xff");
+        assert!(req.headers.is_empty(), "{req:?}");
+        assert_eq!(c.heard, b"HTTP/1.1 100 Continue\r\n\r\n");
+        let req = read_request(&mut client(b"GET / HTTP/1.1\r\n\r\n")).unwrap();
+        assert_eq!((req.body, req.body_base64), (None, None));
+        assert!(read_request(&mut client(b"hello\r\n\r\n")).is_err());
+        assert!(
+            read_request(&mut client(
+                b"GET / HTTP/1.1\r\nContent-Length: 9\r\n\r\nshort"
+            ))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn an_exchange_keeps_the_raw_response_and_the_client_host() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let req = read_request(&mut stream).unwrap();
+            stream
+                .write_all(b"HTTP/1.1 201 Created\r\nX-Id: 7\r\nContent-Length: 2\r\n\r\nok")
+                .unwrap();
+            req
+        });
+        let mut headers = BTreeMap::new();
+        headers.insert("Host".to_string(), "example.test".to_string());
+        let req = Req {
+            method: "POST".to_string(),
+            path: "/x".to_string(),
+            headers,
+            body: Some("hi".to_string()),
+            body_base64: None,
+            body_file: None,
+        };
+        let (resp, raw) = exchange(addr, &req, Duration::from_secs(5)).unwrap();
+        assert_eq!((resp.status, resp.body.as_slice()), (201, &b"ok"[..]));
+        assert_eq!(resp.headers["x-id"], "7");
+        assert_eq!(
+            raw,
+            b"HTTP/1.1 201 Created\r\nX-Id: 7\r\nContent-Length: 2\r\n\r\nok"
+        );
+        let seen = server.join().unwrap();
+        assert_eq!(seen.headers["Host"], "example.test");
+        assert_eq!(seen.body.as_deref(), Some("hi"));
     }
 
     #[test]
@@ -2603,5 +2948,129 @@ mod tests {
         assert!(load_spec(&http_dir, &http_dir.join("dir-body.toml")).is_err());
 
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn merge_config_drops_http_and_clears_saved_lists() {
+        let base_opts = |http, port, server_args, fresh, pace_ms| RecordOptions {
+            repo: Path::new("."),
+            run: &[],
+            inputs: None,
+            normalize: &[],
+            name: None,
+            traps: false,
+            timeout_secs: None,
+            http,
+            port,
+            server_args,
+            fresh,
+            pace_ms,
+            float_tolerance: None,
+            float_files: &[],
+            effects: None,
+            ready_secs: None,
+        };
+        let saved = HttpConfig {
+            port: Some(8080),
+            args: vec!["db.json".into()],
+            fresh: vec!["data".into()],
+            pace_ms: Some(25),
+            ready_secs: None,
+        };
+
+        // `--no-http` drops the saved server configuration.
+        let dropped = merge_config(
+            Some(saved.clone()),
+            &base_opts(Some(false), None, None, None, None),
+        )
+        .unwrap();
+        assert!(dropped.is_none());
+
+        // Combining `--no-http` with server-only options fails.
+        assert!(
+            merge_config(
+                Some(saved.clone()),
+                &base_opts(Some(false), Some(8080), None, None, None)
+            )
+            .is_err()
+        );
+        let one_arg = ["db.json".to_string()];
+        assert!(
+            merge_config(
+                Some(saved.clone()),
+                &base_opts(Some(false), None, Some(&one_arg), None, None)
+            )
+            .is_err()
+        );
+        assert!(
+            merge_config(
+                Some(saved.clone()),
+                &base_opts(Some(false), None, None, None, Some(10))
+            )
+            .is_err()
+        );
+
+        // Passing `Some(&[])` clears saved `args` and `fresh`; `--port 0` clears `port`.
+        let cleared = merge_config(
+            Some(saved.clone()),
+            &base_opts(None, Some(0), Some(&[]), Some(&[]), Some(0)),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(cleared.port, None);
+        assert!(cleared.args.is_empty());
+        assert!(cleared.fresh.is_empty());
+        assert_eq!(cleared.pace_ms, None);
+
+        // Clearing `args` on a CLI recording (no saved `http`) does not turn it into a server.
+        assert!(
+            merge_config(None, &base_opts(None, None, Some(&[]), Some(&[]), None))
+                .unwrap()
+                .is_none()
+        );
+
+        // Omitting options preserves the saved `http` settings.
+        let kept = merge_config(Some(saved), &base_opts(None, None, None, None, None))
+            .unwrap()
+            .unwrap();
+        assert_eq!(kept.port, Some(8080));
+        assert_eq!(kept.args, ["db.json"]);
+        assert_eq!(kept.fresh, ["data"]);
+        assert_eq!(kept.pace_ms, Some(25));
+    }
+
+    #[test]
+    fn start_ephemeral_retries_when_an_auto_picked_port_is_snatched() {
+        let busy = TcpListener::bind("127.0.0.1:0").unwrap();
+        let busy_port = busy.local_addr().unwrap().port();
+        let free = free_port().unwrap();
+        assert_ne!(free, busy_port);
+
+        let launch = Launch {
+            args: &[],
+            files: None,
+            pace: None,
+            effects: None,
+            ready: Duration::from_secs(1),
+        };
+        let repo = std::env::temp_dir();
+
+        // Explicit fixed port still fails immediately with PortInUse.
+        let fixed_err = Server::start(&[], &launch, &repo, busy_port)
+            .err()
+            .expect("busy fixed port must fail");
+        assert!(
+            fixed_err.downcast_ref::<PortInUse>().is_some(),
+            "{fixed_err:#}"
+        );
+
+        // Ephemeral start retries past the busy port and proceeds to the next port (where empty
+        // command fails after passing the busy-port check).
+        let mut ports = [busy_port, free].into_iter();
+        let err = start_ephemeral(&[], &launch, &repo, || Ok(ports.next().unwrap()))
+            .err()
+            .expect("empty command must fail after retrying past busy port");
+        assert!(err.downcast_ref::<PortInUse>().is_none(), "{err:#}");
+        assert!(format!("{err:#}").contains("empty command"), "{err:#}");
     }
 }

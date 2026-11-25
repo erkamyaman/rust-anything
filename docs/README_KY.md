@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · Кыргызча · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · Кыргызча · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a> · <a href="README_TH.md">ไทย</a> · <a href="https://github.com/erkamyaman/rust-anything/issues/425">+ add yours</a></sub></p>
 <p align="center"><sub>Бул котормону коомчулук колдойт, ошондуктан ал <a href="../README.md">англисче README</a> нускасынан артта калышы мүмкүн.</sub></p>
 
 <p align="center"><b>Колдонмоңузду Rust тилинде кайра жазып, анын мурункудай иштээрин далилдеңиз.</b><br>
@@ -41,7 +41,7 @@
   <sub>ms, Fuse.js жана json-server долбоорлорунан алынган 59 чыныгы файлда Prettier жана анын Rust порту (Apple M4). Чыгышы байтма-байт бирдей. <a href="real-world.md#prettier">Кантип өлчөнгөн</a>.</sub>
 </p>
 
-<p align="center"><sub>PHP жана C#: бүгүн жазуу, кайра ойнотуу жана front door; модуль порттору кийинки кезекте.</sub></p>
+<p align="center"><sub>PHP, C# жана PowerShell: FFI жана P/Invoke аркылуу модуль порттору.</sub></p>
 
 <table>
   <tr>
@@ -201,7 +201,7 @@ OpenCode'ду кол менен туташтыруу үчүн серверди `
 ```sh
 rust-anything profile . -- node bench.mjs              # what is hot, and who calls it
 rust-anything bridge . src/fuzzy.ts --batch fuzzyScore:text
-# write src/port.rs (or let your agent), then:
+# src/port.rs жазыңыз (же агентиңизге жаздырыңыз), андан кийин:
 rust-anything record rust/fuzzy-rs && rust-anything build rust/fuzzy-rs
 rust-anything diff rust/fuzzy-rs                       # every recorded case must match
 rust-anything bench rust/fuzzy-rs                      # faster? the verdict says
@@ -241,9 +241,9 @@ rust-anything кодду которбойт: Rust кодун сиздин код
 C, PHP, C# жана PowerShell'ден башка ар бир тил batch класстарын да алат (`--batch`): элементтер чектен бир жолу өтүп, Rust
 ичинде калат, ал эми ар бир чакыруу алардын баарын бардык ядролордо иштетет.
 
-Тил репозиторийден аныкталат (`go.mod`, `pom.xml`, `.csproj` же `.sln`, `pyproject.toml`, `Gemfile`,
-`composer.json`, `package.json`, болбосо эң көп кездешкен баштапкы файлдар боюнча); `--lang` аны кол
-менен көрсөтөт. Типтер баштапкы коддон алынат: TS типтери, Python hint'тери, C, Go, Java жана C#
+Тил репозиторийден аныкталат (`go.mod`, `pom.xml`, `build.gradle`/`build.gradle.kts`, `.csproj` же `.sln`, `pyproject.toml`, `Gemfile`,
+`composer.json`, `package.json`, болбосо эң көп кездешкен баштапкы файлдар боюнча); `.kt` баштапкы файлдары бар жана `.java` файлы жок Gradle модулу Kotlin деп эсептелет, аралаш модулдар Java бойдон калат. `--lang` аны кол
+менен көрсөтөт. Типтер баштапкы коддон алынат: TS типтери, Python hint'тери, C, Go, Java, Kotlin жана C#
 сигнатуралары, Ruby YARD тегдери, PHP типтери жана phpdoc; сан катары колдонулган типсиз параметрлер
 сан деп эсептелет.
 

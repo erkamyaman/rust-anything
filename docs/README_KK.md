@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · Қазақша · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · Қазақша · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a> · <a href="README_TH.md">ไทย</a> · <a href="https://github.com/erkamyaman/rust-anything/issues/425">+ add yours</a></sub></p>
 <p align="center"><sub>Бұл аударманы қауымдастық жүргізеді, сондықтан ол <a href="../README.md">ағылшынша README</a> нұсқасынан артта қалуы мүмкін.</sub></p>
 
 <p align="center"><b>Қолданбаңызды Rust тілінде қайта жазып, оның бұрынғыдай жұмыс істейтінін дәлелдеңіз.</b><br>
@@ -41,7 +41,7 @@
   <sub>ms, Fuse.js және json-server жобаларынан алынған 59 нақты файлда Prettier мен оның Rust порты (Apple M4). Шығысы байтпа-байт бірдей. <a href="real-world.md#prettier">Қалай өлшенді</a>.</sub>
 </p>
 
-<p align="center"><sub>PHP және C#: бүгін жазу, қайта ойнату және front door; модуль порттары келесі кезекте.</sub></p>
+<p align="center"><sub>PHP, C# және PowerShell: FFI және P/Invoke арқылы модуль порттары.</sub></p>
 
 <table>
   <tr>
@@ -198,7 +198,7 @@ OpenCode-ты қолмен қосу үшін серверді `~/.config/opencod
 ```sh
 rust-anything profile . -- node bench.mjs              # what is hot, and who calls it
 rust-anything bridge . src/fuzzy.ts --batch fuzzyScore:text
-# write src/port.rs (or let your agent), then:
+# src/port.rs жазыңыз (немесе агентіңізге жаздырыңыз), содан кейін:
 rust-anything record rust/fuzzy-rs && rust-anything build rust/fuzzy-rs
 rust-anything diff rust/fuzzy-rs                       # every recorded case must match
 rust-anything bench rust/fuzzy-rs                      # faster? the verdict says
@@ -238,10 +238,10 @@ bridge, порт сәйкес келуге тиіс нақты мінез-құл
 C, PHP, C# және PowerShell-ден басқа әр тіл batch кластарын да алады (`--batch`): элементтер шекарадан бір рет өтіп, Rust ішінде
 қалады, ал әр шақыру олардың барлығын барлық ядроларда өңдейді.
 
-Тіл репозиторийден анықталады (`go.mod`, `pom.xml`, `.csproj` немесе `.sln`, `pyproject.toml`,
+Тіл репозиторийден анықталады (`go.mod`, `pom.xml`, `build.gradle`/`build.gradle.kts`, `.csproj` немесе `.sln`, `pyproject.toml`,
 `Gemfile`, `composer.json`, `package.json`, әйтпесе ең көп кездесетін бастапқы файлдар бойынша);
-`--lang` оны қолмен көрсетеді. Типтер бастапқы кодтан алынады: TS типтері, Python hint-тері, C, Go, Java
-және C# сигнатуралары, Ruby YARD тегтері, PHP типтері және phpdoc; сан ретінде қолданылатын типсіз
+`.kt` бастапқы файлдары бар және `.java` файлы жоқ Gradle модулі Kotlin болып есептеледі, аралас модульдер Java болып қалады. `--lang` оны қолмен көрсетеді. Типтер бастапқы кодтан алынады: TS типтері, Python hint-тері, C, Go, Java,
+Kotlin және C# сигнатуралары, Ruby YARD тегтері, PHP типтері және phpdoc; сан ретінде қолданылатын типсіз
 параметрлер сан деп есептеледі.
 
 PHP үшін `analyze` PHP қолданбасын жоспарлайды (Composer пакеттері және PSR-4 autoloading,

@@ -25,7 +25,7 @@ the same way: record a built app (`dotnet out/app.dll`, servers with
 
 Tools: the `rust-anything` CLI, or the same steps as MCP tools (`rust-anything mcp`): `go`,
 `profile`, `analyze`, `bridge`, `refresh`, `record`, `build`, `diff`, `bench`, `shadow`, `gate`,
-`enable`, `disable`, `report`, and for a whole app `app_record`, `app_replay`, `app_front_door`, `app_wire`, `app_lift`.
+`enable`, `disable`, `report`, `rules`, and for a whole app `app_record`, `app_replay`, `app_front_door`, `app_wire`, `app_lift`, `app_drift`.
 If the MCP tools are not available, use the CLI; if `rust-anything` is not installed, ask the user
 to install it (`cargo install rust-anything`) and run
 `rust-anything setup`, then restart the agent. When a step fails because a runtime, the agent
@@ -104,6 +104,11 @@ rust-anything record <crate>                   # the original's behavior on edge
 
 Write the port in `src/port.rs` only; `src/lib.rs` and the wrappers are generated. After changing
 a signature in `port.rs`, run `rust-anything refresh <crate>`.
+
+Before writing code, run `rust-anything rules <repo>` and follow every rule it lists: behavior the
+user already corrected in an earlier unit. Each time the user corrects how the port behaves, add
+it right away with `rust-anything rules <repo> --add "<the rule, in one sentence>"`, so the next
+unit and the next agent keep it.
 
 - Read each risk the plan lists for the unit, at its `file:line`, before writing code.
 - String offsets: JS and Java index UTF-16 code units, Rust UTF-8 bytes: use `src/utf16.rs`.
@@ -184,6 +189,10 @@ rust-anything diff <crate>                     # must be N/N
 rust-anything bench <crate>                    # original vs Rust, bridge included, with a verdict
 ```
 
+`diff` groups the mismatches into distinct differences (fix the largest group first) and names
+where each first differs (`at`: the channel, the JSON path, the character). To hand a failing diff
+to someone else, `diff --redact` shows only shapes and hashes, no arguments or outputs.
+
 A mismatch is a behavior difference: fix the port, never the recording. If the difference is
 intended (the user wants the port to fix a bug of the original), ask the user first, then add one
 line per case to `<crate>/known-diffs.jsonl`: `{"fn", "args", "actual", "reason"}`, with `fn`,
@@ -237,7 +246,9 @@ reached by a recorded failing case (add one with `record --inputs` when gate nam
 state the original also treats as impossible, a `// INFALLIBLE: <why>` comment), the port at most
 3x the original's lines plus 50 for imports and signatures (over that, use the crates `analyze` lists and fold repeated code), the
 module builds, every export present, every recorded case matches. A Rust panic never matches a
-recorded error: return `Err` where the original throws.
+recorded error: return `Err` where the original throws. Gate also fails a port that writes
+recorded results into its code, has fewer tests or assertions than at its last passing gate, or
+runs on an edited `cases.jsonl`: compute every result, and never weaken a test or the recording.
 
 Then report to the user, and **wait for their go-ahead before the next unit**:
 

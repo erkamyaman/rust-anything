@@ -28,9 +28,13 @@ pub struct Batch {
 impl Batch {
     pub fn parse(spec: &str) -> Option<Self> {
         let (function, param) = spec.split_once(':')?;
+        let (function, param) = (function.trim(), param.trim());
+        if function.is_empty() || param.is_empty() {
+            return None;
+        }
         Some(Self {
-            function: function.trim().into(),
-            param: param.trim().into(),
+            function: function.into(),
+            param: param.into(),
         })
     }
 }
@@ -98,6 +102,16 @@ pub(crate) fn is_copy(ty: &str) -> bool {
 
 const RESULTS: &[&str] = &["f64", "i64", "bool", "String"];
 
+/// `names` joined with commas, or `none`.
+fn listed<'a>(names: impl Iterator<Item = &'a str>) -> String {
+    let names: Vec<&str> = names.collect();
+    if names.is_empty() {
+        "none".into()
+    } else {
+        names.join(", ")
+    }
+}
+
 /// Why a batch cannot be generated, or its spec.
 fn spec<'a>(b: &Batch, api: &'a PortApi) -> Result<Spec<'a>, String> {
     spec_with(b, api, false)
@@ -114,13 +128,26 @@ pub(crate) fn spec_with<'a>(
         .functions
         .iter()
         .find(|f| f.js_name == b.function)
-        .ok_or_else(|| format!("`{}` is not a function of src/port.rs", b.function))?;
+        .ok_or_else(|| {
+            format!(
+                "`{}` is not a function of src/port.rs (functions: {})",
+                b.function,
+                listed(api.functions.iter().map(|f| f.js_name.as_str()))
+            )
+        })?;
     let wanted = snake_case(&b.param);
     let item = f
         .params
         .iter()
         .position(|(n, _)| *n == wanted || *n == b.param)
-        .ok_or_else(|| format!("`{}` has no parameter `{}`", b.function, b.param))?;
+        .ok_or_else(|| {
+            format!(
+                "`{}` has no parameter `{}` (parameters: {})",
+                b.function,
+                b.param,
+                listed(f.params.iter().map(|(n, _)| n.as_str()))
+            )
+        })?;
     let ty = f.params[item].1.trim();
     let value = |t: &str| dynamic && matches!(t, "Value" | "serde_json::Value");
     if !ITEMS.contains(&ty) && !value(ty) {
@@ -672,6 +699,21 @@ mod tests {
             "serde_json::Value",
         ] {
             assert!(!is_copy(t), "{t}");
+        }
+    }
+
+    #[test]
+    fn unknown_names_list_the_choices() {
+        let api = crate::codegen::parse_port(
+            "pub fn add(a: f64, b: f64) -> f64 {\n    a + b\n}\npub fn neg(x: f64) -> f64 {\n    -x\n}\n",
+        );
+        let batch = |spec: &str| Batch::parse(spec).unwrap();
+        let err = spec(&batch("nope:a"), &api).err().unwrap();
+        assert!(err.contains("(functions: add, neg)"), "{err}");
+        let err = spec(&batch("add:zz"), &api).err().unwrap();
+        assert!(err.contains("(parameters: a, b)"), "{err}");
+        for empty in ["add:", ":a", " : ", "add: "] {
+            assert_eq!(Batch::parse(empty), None, "{empty:?}");
         }
     }
 

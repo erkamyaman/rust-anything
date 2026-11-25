@@ -2,8 +2,163 @@
 
 ## Unreleased
 
+## 5.0.0 (2026-11-25)
+
+The old program is the judge, now with sharper eyes: every mismatch says where it starts and
+which bug it belongs to, live traffic can be shadowed, drift is checked in CI, and `gate` catches
+ports that copy the recording instead of computing it. Ideas from Anthropic's write-up on moving
+the Messages API to Rust.
+
+- `bridge` on a crate folder that already has a port names the next step: run
+  `rust-anything refresh <crate>` to regenerate the bindings, pass `--out` or `--name` for a new
+  crate, or remove the folder to start over (#568, #599 by @alvaroalonsoparrondo-a11y).
+- `bridge --kind napi` (or `wasm`) on a unit that is not TS/JS stops before writing anything, with
+  `--kind napi is for TS/JS units; mathy.py is Python and is bridged with PyO3`, instead of writing a
+  napi crate for a Python unit that only fails at `diff`. The `--kind` help says it is for TS/JS units
+  (#575, #598 by @alvaroalonsoparrondo-a11y).
+- `--float-tolerance -0.5` (with a space) on `record`, `diff` and `app record` gets the range message
+  instead of clap's `unexpected argument '-0' found`, and `diff` checks the tolerance before it
+  reads or runs anything (#574, #597 by @alvaroalonsoparrondo-a11y).
+- `diff` names where each mismatch first differs, as `at` in the JSON: the channel (`return`,
+  `throw`, `return vs throw` or `call N` for a class scenario), the JSON path (`$.items[2].name`),
+  the kind (`value`, `type`, `missing key`, `extra key`, `length`) and, for strings, the character
+  with a little context around it. `app replay` does the same for each failing field: the line
+  and column of text output, the JSON path in a JSON body, the status change (`200→500`).
+- `diff`, `app replay` and `report` group the failing cases that differ the same way into
+  distinct differences, each with a short stable id and a count, so 40 mismatches from one bug
+  read as one line. `rust/app-cases/replay-report.md` gains a "Distinct differences" table before
+  the failing cases, `report` a "Remaining differences" table (and `differences` in its JSON)
+  while cases still differ, and `go` hands the agent each difference once with an example and
+  where it starts, instead of the first five raw mismatches.
+- `diff --redact` and `app replay --redact` (MCP `redact: true`) print mismatches as shapes only:
+  where they differ, types, lengths and hashes, never arguments, outputs or request paths. The
+  replay report is written redacted too, so it can be pasted into an issue or handed to another
+  agent.
+- `app shadow` checks a server build on live traffic: a proxy answers every request with the
+  original, then sends it to the build and compares status, headers and body with the saved
+  normalizers. The build's outbound HTTP and mail go to local sinks and its `--fresh` files to a
+  copy of its own, so no side effect happens twice. Mismatches are logged to
+  `rust/app-cases/shadow/mismatches.jsonl` as redacted shapes (where each field first differs,
+  never values) and grouped into distinct differences at the end; `--keep` saves the requests in
+  `app record --inputs` format. `--upstream` uses an original that is already running,
+  `--requests` stops after a count. Servers only, no MCP tool.
+- `app drift [REPO] [--build CMD]` (MCP `app_drift`) checks that the recording still describes
+  the original and the port still matches: it replays the original against `rust/app-cases`
+  (cases it no longer matches changed upstream), lists examples in its docs that no case records,
+  and replays the build (`rust/app`, built with cargo, by default), marking each case "original
+  changed, port still old" or "port regression". It writes `rust/app-cases/drift-report.md`,
+  leaves `replay-report.md` as it was, and exits 1 on any change. `docs/whole-apps.md` has a
+  GitHub Actions workflow that runs it on a schedule.
+- `gate` has a cheat guard. `literals` fails when the port writes three or more recorded arguments
+  or results (strings of 8 or more characters, numbers with 5 or more significant digits) that the
+  original's source never spells out, or names `cases.jsonl`, `known-diffs.jsonl` or
+  `recorded-from.json`; one or two are named and pass, and `// recorded-literal: <reason>` on a line
+  lets a library constant stay. `tests` fails when the crate has fewer `#[test]`s or assertions, or
+  more `#[ignore]`s, than at its last passing gate (kept in `.rust-anything/tests.json`). `record`
+  now also saves the number and hash of the recorded lines in `recorded-from.json`, and `recording`
+  fails when one of them was edited or removed; appended cases (`fuzz --keep`) still pass, and older
+  recordings are not checked until recorded again. `go`'s TASK.md says so.
+- `rules` keeps port rules in `rust/RULES.md`: `rust-anything rules <repo>` lists them and
+  `--add "<rule>"` appends one (an exact duplicate is skipped; a crate folder stands for its
+  repository). `go` puts them in TASK.md (and so in every retry prompt), both MCP prompts end with
+  them, and the MCP server's instructions, the `rules` tool and the skill tell agents to read them
+  before porting and to add each correction the user makes.
+
+- Docs and tests: translated READMEs link the Types and packaging pages, CONTRIBUTING lists every
+  test file, the FAQ states the PHP and .NET requirements, `build` and `refresh` help covers every
+  language, and new unit tests cover `c_literal`, `local_module_version`, `shell_quote` and the
+  base64 helpers (#564 by @Lewandox, #578 by @XiaoBinGan, #585 to #596 and #600 to #603 by
+  @alvaroalonsoparrondo-a11y).
+
+### Upgrading
+
+- `rust/app-cases/replay-report.md` gains a "Distinct differences" section and an `at` line above
+  each failing field, so a committed report differs once after upgrading: replay and commit it
+  again.
+- `gate` has new `literals` and `tests` checks and an extended `recording` check, which can fail
+  ports that passed before. A constant the original really takes from a library can stay with
+  `// recorded-literal: <reason>` on its line; to accept fewer tests on purpose, delete
+  `<crate>/.rust-anything/tests.json` and run `gate` again to save a new baseline.
+
+## 4.2.0 (2026-11-25)
+
+- MCP boolean arguments (`force`, `dry_run`, `whole_app`, `ignore_key_order`, `pin_clock`, `partial`,
+  `traps`, `http`, `library`, `check`, `skip_gate`) given a non-boolean such as `"false"` or `1` are
+  refused with `` `<key>` must be a boolean ``, instead of silently falling back to the default
+  (#563 by @Lewandox).
+- `app record` and `app replay` without a fixed `--port` pick a port that is free on both `127.0.0.1`
+  and `[::1]`, and try another one if something takes it before the server starts, instead of
+  failing now and then with `port <N> is already in use` (#562 by @Lewandox).
+- `bench --min-ms 0` and `report --min-ms 0` (and MCP `bench`/`report` with `min_ms: 0`) are refused
+  with `` `--min-ms` must be at least 1 ``, like `fuzz --cases 0`, instead of timing a single pass
+  (#561 by @ardazeybek).
+- A failed MCP tool call whose program is missing (`` `cargo` not found on PATH ``) gets the
+  `missing_tool` code with `rust-anything doctor` as the next step, instead of a generic `failed`
+  (#557 by @Lewandox).
+- `record --count 0` (and MCP `record` with `count: 0`) without `--inputs` or `--from-tests` stops
+  with an error before touching `cases.jsonl` or the manifest, like `fuzz --cases 0`: it used to
+  replace the recording with an empty file and exit 0. `--count 0 --inputs <file>` still records
+  just the given cases (#539, #546 by @alvaroalonsoparrondo-a11y, with the early check and a test
+  from #556 by @ardazeybek).
+- `enable --partial` and `enable --only` (without `--force`) on a crate with no `cases.jsonl` say
+  ``no cases.jsonl in <crate> (run `rust-anything record` first)`` like plain `enable`, instead of
+  the bare `No such file or directory (os error 2)` (#540, #545 by @alvaroalonsoparrondo-a11y).
+- MCP tools refuse a numeric argument of the wrong type, a negative one or one out of range
+  (`count`, `rounds`, `cases`, `seed`, `min_ms`, `time`, `float_tolerance`, `port`, `pace`,
+  `ready_timeout`) instead of silently using the default; a `port` above 65535 is an error rather
+  than no port (#543 by @Lewandox).
+- The "not found on PATH" check behind `build`, `gate` and the other outside-tool steps looks up a
+  program the way it is spawned: on Windows only the name and `<name>.exe` count (a bare `.cmd`
+  script no longer does), and on Unix a relative `PATH` entry is resolved from the command's
+  working directory (#541 by @Lewandox).
+- MCP `bridge` refuses a `kind` other than `"napi"` or `"wasm"`, `record`, `build` and `diff` refuse a
+  non-string `profile`, and `fuzz` refuses a non-string `keep`, instead of silently falling back to
+  the default (#530 by @Lewandox).
+- `bridge --name` (and MCP `bridge`'s `name`) is refused before any folder is written when it is
+  not a valid Cargo crate name: empty, padded, a path such as `../escape`, a leading digit, a Rust
+  keyword or a reserved Windows file name. A unit whose file name starts with a digit or has no
+  letters gets a valid default name (`unit-123-rs`, `unit-rs`) (#529 by @Lewandox).
+- `build`, `gate` and the other steps that run an outside tool say `` `cargo` not found on PATH ``
+  with `doctor`'s install command when the program is missing, instead of the raw `No such file or
+  directory (os error 2)`; `gate` no longer tells you to fix a compile error when the build never
+  started (#498, #525 by @Lewandox).
+- `bridge --keep` refuses a name that is not an export or class of the unit, listing the ones it
+  has, before writing anything: a typo used to bridge the export it meant to keep. A bare
+  `--keep ' add '` is trimmed like `--keep "add: reason"` already was (#499, #522 by
+  @alvaroalonsoparrondo-a11y).
+- `--batch function:param` with an unknown function or parameter lists the ones `src/port.rs` has
+  (`(functions: add)`, `(parameters: a, b)`), and an empty side (`add:` or `:a`) gets the same
+  "write it as function:param" error as a spec without a colon (#504, #521 by
+  @alvaroalonsoparrondo-a11y).
+- `enable --only` (and `--partial`) with an unknown name lists the unit's exports after the unknown
+  ones, so the right spelling is in the error (#500, #520 by @Papito084).
+- `package --version` (and MCP `package`'s `version`) is refused before anything is written,
+  `--dry-run` included, unless it is `MAJOR.MINOR.PATCH` with an optional `-prerelease`: an empty,
+  padded or malformed version used to land in the package and fail only at publish time (#502, #519 by
+  @alvaroalonsoparrondo-a11y).
+- `gate`'s `size` check and `go`'s "no hot function to port" message say `1 line` and
+  `1 hot function` for one, like `analyze`'s plan (#503, #516 by @Papito084).
+- The `port_unit` and `port_whole_app` MCP prompts strip the skill's front matter when `SKILL.md`
+  has CRLF line endings, as on a Windows checkout with `core.autocrlf=true` (#501, #515 by @Papito084).
+- Generated Go, Java, Kotlin and Ruby bridges pass a zero-argument fallible port function straight
+  to `run`/`guard` (`run(port::pong)`) instead of wrapping it in a closure, so freshly bridged code
+  passes `gate`'s clippy `redundant_closure` check again (#310, #487 by @Lewandox).
+- `app record --no-http` turns a saved server recording back into a CLI, `--no-args` and
+  `--no-fresh` clear the saved `--arg` and `--fresh` lists (removing an unused snapshot), and
+  `--port 0` drops a saved fixed port; MCP `app_record` takes `http: false`, `args: []`, `fresh: []`
+  and `port: 0` the same way. A new run command re-infers an inferred app name, while one given
+  with `--name` is kept (#330, #486 by @Lewandox).
+- `app record --timeout 0` and `app replay --timeout 0` (and MCP `app_record` / `app_replay` with
+  `timeout: 0`) are refused before anything runs, instead of killing every run at once; a saved
+  `timeout_secs` of 0 is refused too, with a hint to pass `--timeout` (#497, #514 by @aloneangel45).
+- `app record --ready-timeout SECS` (and MCP `app_record`'s `ready_timeout`) sets how long a server
+  start waits for its port instead of a fixed 60 seconds. It is saved with the cases and used by
+  replay and the front door; 0 restores the default (#332, #478 by @XiaoBinGan).
 - `tests/skill.rs` fails when the skill names a command the CLI does not have, and `scripts/skill-eval/`
   compares skill versions on a fixed port task, scored by `gate` (turns and cost from the agent's JSON).
+- `analyze` prefers a matching sibling source file over a directory index for extensionless
+  TypeScript and JavaScript imports, as TypeScript's bundler resolution does
+  (#476, #477 by @isnaenihidayat).
 - Ruby ports turn `Err("Mod::Error: message")` into that namespaced exception, and Java, Ruby and
   PHP replays load the project's own classes, so a port that returns a project-defined exception
   matches the recorded `error_type`. The Ruby wrapper reopens each receiver with `class << Mod`,
@@ -31,6 +186,25 @@
 - `docs/types.md` lists, for each language, what each source type becomes in `port.rs` and the
   reason a type keeps a function in its language; a test checks every row against the code
   (#373, #456 by @puretechteam).
+- Docs: the README unit-port caption and the FAQ runtime extras table include PowerShell (#505,
+  #506), the translated READMEs got a `+ add yours` language link (#513), the PHP and C# unit
+  bridges are documented in the Azerbaijani, Uzbek, Turkish, Ukrainian, Simplified Chinese and
+  Korean READMEs (#479, #480, #481, #482, #483, #484), the `port.rs` comment is translated in the
+  Vietnamese, Kazakh, Kyrgyz and Turkmen READMEs (#485), and the Turkish, Ukrainian, Azerbaijani,
+  Vietnamese, Hindi and Arabic READMEs mention Gradle and Kotlin detection (#507, #508, #509,
+  #510, #511, #512), by @Papito084; whole-app support for any language (#445), the
+  `rust/app-cases/rust-anything.json` settings (#446) and the Japanese Gradle and Kotlin note
+  (#444) by @Papito084; the Persian, Kazakh, Kyrgyz, Turkmen, Tatar, Uyghur and Uzbek READMEs
+  mention Gradle and Kotlin detection (#547, #548, #549, #550, #551, #552, #553) and include
+  PowerShell in the unit-port caption (#559, #560), by @alvaroalonsoparrondo-a11y; the Arabic,
+  French, Spanish, German, Italian and Portuguese captions (#555 by @Lewandox) and the Turkish and
+  Azerbaijani ones (#558 by @ardazeybek) do too; the Japanese README says PHP and C# units port
+  now (#460 by @XiaoBinGan); the Simplified and Traditional Chinese READMEs mention Gradle and
+  Kotlin detection (#471, #473 by @hkhkkh); a Thai README was added (#475 by @matavanary); and the
+  plugin directory copy of `SKILL.md` is back in sync (#474 by @AyhamJo7).
+- Tests: end-to-end Python and Node profile workloads (#447) and a report on a built crate (#459)
+  by @Papito084; the busy-port and exiting-build messages (#458) and a check that a forked server
+  is gone after record (#544) by @XiaoBinGan.
 
 ## 4.1.0 (2026-11-24)
 

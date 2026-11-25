@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · Oʻzbekcha · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · Oʻzbekcha · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a> · <a href="README_TH.md">ไทย</a> · <a href="https://github.com/erkamyaman/rust-anything/issues/425">+ add yours</a></sub></p>
 <p align="center"><sub>Bu tarjima hamjamiyat tomonidan yuritiladi va <a href="../README.md">inglizcha README</a>dan ortda qolishi mumkin.</sub></p>
 
 <p align="center"><b>Ilovangizni Rust'da qayta yozing va u hamon xuddi shunday ishlashini isbotlang.</b><br>
@@ -41,7 +41,7 @@ Turkiyada 🇹🇷 <a href="https://github.com/erkamyaman">erKam Yaman</a> tomon
   <sub>ms, Fuse.js va json-server'dan olingan 59 ta haqiqiy faylda Prettier uning Rust portiga qarshi (Apple M4). Baytma-bayt bir xil natija. <a href="real-world.md#prettier">Qanday o'lchangan</a>.</sub>
 </p>
 
-<p align="center"><sub>PHP va C#: bugun yozib olish, qayta ijro va front door; modul portlari keyingi bosqichda.</sub></p>
+<p align="center"><sub>PHP, C# va PowerShell: FFI va P/Invoke orqali modul portlari.</sub></p>
 
 <table>
   <tr>
@@ -240,23 +240,32 @@ Bir xil natija yetarli emas. Ilova tashqariga yuboradigan narsalarni ham yozib o
 C, PHP, C# va PowerShell'dan tashqari har bir til batch klasslarini ham oladi (`--batch`): elementlar ko'prikdan bir marta
 o'tadi va Rust'da qoladi, har bir chaqiruv esa barcha yadrolarda ularning hammasi ustida ishlaydi.
 
-Til repozitoriydan aniqlanadi (`go.mod`, `pom.xml`, `.csproj` yoki `.sln`, `pyproject.toml`,
-`Gemfile`, `composer.json`, `package.json`, aks holda eng ko'p uchraydigan manba fayllari); `--lang`
-buni almashtiradi. Tiplar manbadan olinadi: TS tiplari, Python type hint'lari, C, Go, Java va C#
+Til repozitoriydan aniqlanadi (`go.mod`, `pom.xml`, `build.gradle`/`build.gradle.kts`, `.csproj` yoki `.sln`, `pyproject.toml`,
+`Gemfile`, `composer.json`, `package.json`, aks holda eng ko'p uchraydigan manba fayllari); `.kt` manba fayllari bor va `.java` fayli yo'q Gradle moduli Kotlin hisoblanadi, aralash modullar Java bo'lib qoladi. `--lang`
+buni almashtiradi. Tiplar manbadan olinadi: TS tiplari, Python type hint'lari, C, Go, Java, Kotlin va C#
 signaturalari, Ruby YARD teglari, PHP tiplari va phpdoc; son sifatida ishlatilgan tipsiz parametrlar
 son deb aniqlanadi.
 
 PHP uchun `analyze` PHP ilovasini rejalashtiradi (Composer paketlari va PSR-4 autoloading,
 erkin taqqoslash va butun sonning float'ga to'lib o'tishi kabi xavflar, crate'larga moslangan Composer
 paketlari), PHP CLI yoki serverini esa yozib olish, qayta ijro etish va Rust front door'i ortiga qo'yish
-mumkin. Uning birliklarini PHP FFI orqali Rust'ga port qilish keyingi qadam
-([issue #2](https://github.com/erkamyaman/rust-anything/issues/2)).
+mumkin. Modulning skalyar, qator, ro'yxat va assotsiativ massiv parametrlariga ega yuqori darajadagi
+funksiyalari PHP FFI kengaytmasi (`php` `ext-ffi` bilan, CLI uchun odatiy holda yoqilgan) orqali
+ko'priklanadi: `diff` muvaffaqiyatli o'tgach, asl fayl o'rniga generatsiya qilingan `php/<crate>.php`
+faylini talab qiling. Har bir chaqiruv JSON sifatida o'tadi, taxminan 1 µs, shuning uchun `bench`
+kichik funksiyalarni PHP'dan sekinroq ko'rsatadi; PHP uchun hozircha `shadow` mavjud emas
+([issue #200](https://github.com/erkamyaman/rust-anything/issues/200)).
 
 C# ham xuddi shunday ishlaydi: `analyze` `.csproj` loyihalarini va ularning NuGet paketlarini
 o'qiydi (crate'larga moslangan), `using` direktivalarini papkalarga bog'laydi va C# boshqacha
 qiladigan narsalarni belgilaydi (`decimal`, `dynamic`, LINQ'ning kechiktirilgan so'rovlari, `Task`,
 `lock`, reflection). C# CLI yoki ASP.NET serverini yozib olish, qayta ijro etish va Rust front door'i
-ortiga qo'yish mumkin; birliklarni P/Invoke orqali port qilish navbatda.
+ortiga qo'yish mumkin. Modulning skalyar, qator, massiv, ro'yxat, lug'at va record yoki oddiy klass
+parametrlariga ega public static metodlari P/Invoke orqali ko'priklanadi (yozib olish va taqqoslash
+uchun `PATH`da `dotnet`): `diff` muvaffaqiyatli o'tgach, generatsiya qilingan `<namespace>.Rust`
+klasslarini chaqiring yoki `using` orqali ularga taxallus bering. Har bir chaqiruv JSON sifatida
+o'tadi, taxminan 1-3 µs, shuning uchun `bench` kichik metodlarni .NET'dan sekinroq ko'rsatadi; C# uchun
+hozircha `shadow` mavjud emas ([issue #200](https://github.com/erkamyaman/rust-anything/issues/200)).
 
 ## Batafsil
 

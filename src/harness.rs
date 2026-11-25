@@ -100,6 +100,10 @@ pub struct DiffOutcome {
     /// Matches across the last changes to `port.rs`, and whether they stopped going up.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trend: Option<crate::recording::Trend>,
+    /// The distinct differences among all the mismatches (not only the first ones), most cases
+    /// first.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<crate::mismatch::Group>,
 }
 
 fn is_zero(n: &usize) -> bool {
@@ -276,7 +280,20 @@ pub(crate) fn generate_cases_salted(
     Ok((cases, traps, regex_functions))
 }
 
+/// `--count 0` with no `--inputs` (or `--from-tests`) would record nothing and replace
+/// `cases.jsonl` with an empty file, so it is refused before anything is touched.
+fn check_count(opts: &RecordOptions) -> Result<()> {
+    if opts.count == 0 && opts.inputs.is_none() {
+        bail!(
+            "`--count 0` records nothing: pass --count 1 or more, or give cases with --inputs or \
+             --from-tests"
+        );
+    }
+    Ok(())
+}
+
 pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
+    check_count(opts)?;
     let crate_dir = std::path::absolute(opts.crate_dir)?;
     let opts = &RecordOptions {
         crate_dir: &crate_dir,
@@ -329,6 +346,7 @@ pub(crate) fn record_with(
 /// Records on a connected Android device: the cases are generated here, the original Kotlin
 /// runs under ART, and the results come back as the same `cases.jsonl`.
 pub fn record_android(opts: &RecordOptions, device: Option<&str>) -> Result<RecordOutcome> {
+    check_count(opts)?;
     let manifest = Manifest::load(opts.crate_dir)?;
     let (cases, traps, regex_functions) = generate_cases(opts, &manifest)?;
     let _ = std::fs::remove_file(opts.crate_dir.join(WORK_DIR).join(TIMED_OUT));
@@ -772,6 +790,9 @@ pub struct BenchOptions<'a> {
 /// Times the recorded cases against the original and the built Rust module, bridge included,
 /// and marks the functions whose recorded cases do not all match.
 pub fn bench(opts: &BenchOptions) -> Result<Vec<BenchRow>> {
+    if opts.min_ms == 0 {
+        bail!("`--min-ms` must be at least 1");
+    }
     let mut rows = time_functions(opts)?;
     let crate_dir = std::path::absolute(opts.crate_dir)?;
     let diff = DiffOptions {
@@ -938,7 +959,7 @@ pub fn diff(opts: &DiffOptions) -> Result<DiffOutcome> {
 
 /// Like `diff`, without truncating `mismatches`, so callers can inspect per-function results.
 pub fn diff_full(opts: &DiffOptions) -> Result<DiffOutcome> {
-    let mut outcome = settle(opts, diff_exact(opts)?)?;
+    let mut outcome = located(settle(opts, diff_exact(opts)?)?);
     anyhow::ensure!(
         outcome.total > 0,
         "no recorded cases to compare; run `rust-anything record` first"
@@ -965,6 +986,12 @@ pub fn per_function_counts(crate_dir: &Path, outcome: &DiffOutcome) -> Result<Fu
 /// that `diff_full` verified, failing if `cases.jsonl` was modified concurrently.
 pub fn diff_full_with_counts(opts: &DiffOptions) -> Result<(DiffOutcome, FunctionCounts)> {
     let cases_path = opts.crate_dir.join(CASES);
+    if !cases_path.exists() {
+        bail!(
+            "no {CASES} in {} (run `rust-anything record` first)",
+            opts.crate_dir.display()
+        );
+    }
     let snapshot = std::fs::read_to_string(&cases_path)
         .with_context(|| format!("reading {}", cases_path.display()))?;
     let outcome = diff_full(opts)?;
@@ -1022,7 +1049,7 @@ pub fn diff_android(
 }
 
 fn diff_after(opts: &DiffOptions, exact: DiffOutcome) -> Result<DiffOutcome> {
-    let mut outcome = settle(opts, exact)?;
+    let mut outcome = located(settle(opts, exact)?);
     outcome.mismatches.truncate(SHOWN_MISMATCHES);
     anyhow::ensure!(
         outcome.total > 0,
@@ -1032,6 +1059,13 @@ fn diff_after(opts: &DiffOptions, exact: DiffOutcome) -> Result<DiffOutcome> {
         outcome.trend = crate::recording::track(opts.crate_dir, outcome.passed, outcome.total);
     }
     Ok(outcome)
+}
+
+/// Each mismatch with where it starts, and the distinct differences among them.
+fn located(mut outcome: DiffOutcome) -> DiffOutcome {
+    crate::mismatch::annotate(&mut outcome);
+    outcome.groups = crate::mismatch::group_mismatches(&outcome.mismatches);
+    outcome
 }
 
 /// Applies the float tolerance and `known-diffs.jsonl` to a driver's outcome, keeping every
@@ -1818,7 +1852,9 @@ pub(crate) fn record_cases(
             cmd.process_group(0);
         }
         let _scratch = scratch_cwd(&mut cmd)?;
-        let mut child = cmd.spawn().with_context(|| format!("running {what}"))?;
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| crate::process::spawn_error(&cmd, what, e))?;
         let mut current: Option<(usize, Instant)> = None;
         let status = loop {
             if let Some(status) = child.try_wait()? {
@@ -1897,7 +1933,9 @@ pub(crate) fn scratch_cwd(cmd: &mut Command) -> Result<Option<Scratch>> {
 
 fn run(cmd: &mut Command, what: &str) -> Result<()> {
     let _scratch = scratch_cwd(cmd)?;
-    let output = cmd.output().with_context(|| format!("running {what}"))?;
+    let output = cmd
+        .output()
+        .map_err(|e| crate::process::spawn_error(cmd, what, e))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let tail: Vec<&str> = stderr.lines().rev().take(25).collect();
@@ -2579,6 +2617,19 @@ assert(round(new Uint8Array([1])) instanceof Uint8Array, 'bytes stay bytes')
         let cases = generate(&f(&[("n", "number")]), 18, &[]);
         let text = serde_json::to_string(&cases).unwrap();
         assert!(text.contains("NaN") && text.contains("-0"));
+    }
+
+    #[test]
+    fn run_reports_missing_program_clearly() {
+        let program = "rust-anything-nonexistent-build-tool-498";
+        let err = run(&mut Command::new(program), "cargo build").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains(&format!("`{program}` not found on PATH")),
+            "{msg}"
+        );
+        assert!(msg.contains("rust-anything doctor"), "{msg}");
+        assert!(!msg.contains("os error"), "{msg}");
     }
 }
 

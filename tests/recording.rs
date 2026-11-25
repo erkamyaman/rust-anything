@@ -443,3 +443,82 @@ fn record_prints_one_case_in_the_singular() {
         "{printed}"
     );
 }
+
+#[test]
+fn record_count_zero_without_inputs_is_refused_and_keeps_the_cases() {
+    // `--count 0` with nothing else to record used to replace cases.jsonl with an empty file and
+    // exit 0, losing the earlier recording.
+    let dir = std::env::temp_dir().join(format!("rust-anything-count-zero-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let cases = dir.join("cases.jsonl");
+    let recorded = "{\"fn\":\"add\",\"args\":[1,2],\"ok\":3}\n";
+    std::fs::write(&cases, recorded).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-anything"))
+        .args([
+            "record".as_ref(),
+            dir.as_os_str(),
+            "--count".as_ref(),
+            "0".as_ref(),
+        ])
+        .output()
+        .unwrap();
+    let kept = std::fs::read_to_string(&cases).unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(2), "{stderr}");
+    assert!(stderr.contains("`--count 0` records nothing"), "{stderr}");
+    assert!(stderr.contains("--inputs or --from-tests"), "{stderr}");
+    assert_eq!(kept, recorded);
+}
+
+#[test]
+fn record_count_zero_with_inputs_records_only_given_cases() {
+    if !common::have("node") {
+        return;
+    }
+    let root = project(
+        "count-zero-inputs",
+        &[
+            (
+                "package.json",
+                "{\"name\": \"twice\", \"type\": \"module\"}\n",
+            ),
+            (
+                "twice.ts",
+                "export function twice(n: number): number {\n  return n * 2\n}\n",
+            ),
+            ("inputs.jsonl", "{\"fn\": \"twice\", \"args\": [21]}\n"),
+        ],
+    );
+    let cli = env!("CARGO_BIN_EXE_rust-anything");
+    let crate_dir = root.join("port");
+    let inputs = root.join("inputs.jsonl");
+    let run_ok = |args: &[&std::ffi::OsStr]| {
+        let out = Command::new(cli).args(args).output().unwrap();
+        assert!(out.status.success(), "{out:?}");
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+    run_ok(&[
+        "bridge".as_ref(),
+        root.as_os_str(),
+        "twice.ts".as_ref(),
+        "--out".as_ref(),
+        crate_dir.as_os_str(),
+    ]);
+    let printed = run_ok(&[
+        "record".as_ref(),
+        crate_dir.as_os_str(),
+        "--count".as_ref(),
+        "0".as_ref(),
+        "--inputs".as_ref(),
+        inputs.as_os_str(),
+    ]);
+    let cases = std::fs::read_to_string(crate_dir.join("cases.jsonl")).unwrap();
+    let _ = std::fs::remove_dir_all(&root);
+
+    assert!(
+        printed.starts_with("Recorded 1 case (0 threw)"),
+        "{printed}"
+    );
+    assert_eq!(cases.lines().count(), 1, "{cases}");
+}

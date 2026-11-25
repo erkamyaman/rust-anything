@@ -33,6 +33,9 @@ pub struct Card {
     pub fallback_cases: usize,
     /// `Some(true)` while `enable` has switched the unit on; `None` where `enable` does not apply.
     pub enabled: Option<bool>,
+    /// The distinct differences still left, most cases first (at most five).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub differences: Vec<crate::mismatch::Group>,
     pub machine: String,
     pub markdown: PathBuf,
     pub svg: PathBuf,
@@ -64,6 +67,7 @@ pub struct Options<'a> {
 }
 
 pub fn report(opts: &Options) -> Result<Card> {
+    anyhow::ensure!(opts.min_ms > 0, "`--min-ms` must be at least 1");
     let crate_dir = opts.crate_dir.canonical().with_context(|| {
         format!(
             "resolving {} (run `rust-anything bridge` first)",
@@ -108,6 +112,7 @@ pub fn report(opts: &Options) -> Result<Card> {
         bench,
         fallback_cases,
         enabled: crate::enable::is_enabled(&crate_dir).ok(),
+        differences: diff.groups.iter().take(5).cloned().collect(),
         machine: machine(),
         markdown: out.join("REPORT.md"),
         svg: out.join("card.svg"),
@@ -275,6 +280,21 @@ pub fn markdown(card: &Card) -> String {
         }
         out.push('\n');
     }
+    if card.matched < card.cases && !card.differences.is_empty() {
+        out.push_str(
+            "### Remaining differences\n\n| Cases | Id | Difference |\n| ---: | --- | --- |\n",
+        );
+        for g in &card.differences {
+            let _ = writeln!(
+                out,
+                "| {} | `{}` | `{}` |",
+                g.cases,
+                g.id,
+                g.label().replace('`', "'").replace('|', "\\|")
+            );
+        }
+        out.push('\n');
+    }
     let _ = writeln!(
         out,
         "Measured with `rust-anything report` on {}: `diff` replays every recorded case, `bench` \
@@ -437,6 +457,7 @@ mod tests {
             }],
             fallback_cases: 0,
             enabled: Some(true),
+            differences: Vec::new(),
             machine: "Apple M4, 10 cores, macOS".into(),
             markdown: "REPORT.md".into(),
             svg: "card.svg".into(),
@@ -554,5 +575,29 @@ mod tests {
         let svg = svg(&c);
         assert!(svg.contains("src/&lt;a&amp;b&gt;.ts"));
         assert!(svg.contains("400 of 412 recorded cases match"));
+    }
+
+    #[test]
+    fn remaining_differences_are_listed_while_cases_differ() {
+        let mut c = card();
+        assert!(!markdown(&c).contains("Remaining differences"));
+        c.matched = 400;
+        c.differences = vec![crate::mismatch::Group {
+            id: "a1b2c3d4".into(),
+            function: Some("dedupe".into()),
+            channel: "return".into(),
+            path: Some("$[]".into()),
+            kind: "value".into(),
+            cases: 12,
+            example: serde_json::Value::Null,
+        }];
+        let md = markdown(&c);
+        assert!(md.contains("### Remaining differences"), "{md}");
+        assert!(
+            md.contains("| 12 | `a1b2c3d4` | `dedupe: return $[] (value)` |"),
+            "{md}"
+        );
+        c.matched = c.cases;
+        assert!(!markdown(&c).contains("Remaining differences"));
     }
 }

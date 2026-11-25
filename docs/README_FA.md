@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · فارسی · <a href="README_HI.md">हिन्दी</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · فارسی · <a href="README_HI.md">हिन्दी</a> · <a href="README_TH.md">ไทย</a> · <a href="https://github.com/erkamyaman/rust-anything/issues/425">+ add yours</a></sub></p>
 <p align="center"><sub>این ترجمه را جامعه نگهداری می‌کند و ممکن است از <a href="../README.md">README انگلیسی</a> عقب بماند.</sub></p>
 
 <div dir="rtl">
@@ -45,7 +45,7 @@
   <sub>Prettier در برابر نسخهٔ Rust آن روی 59 فایل واقعی از ms، Fuse.js و json-server (Apple M4). خروجی یکسان، بایت‌به‌بایت. <a href="real-world.md#prettier">چگونه اندازه‌گیری شد</a>.</sub>
 </p>
 
-<p align="center"><sub>PHP و C#: ضبط، بازپخش و front door، به‌علاوهٔ انتقال واحدها از راه FFI و P/Invoke.</sub></p>
+<p align="center"><sub>PHP، C# و PowerShell: انتقال واحدها از راه FFI و P/Invoke.</sub></p>
 
 <table>
   <tr>
@@ -241,10 +241,10 @@ Rust را با همان API بدون تغییر فراخوانی کند، رفت
 هر زبان به‌جز C، PHP، C# و PowerShell کلاس‌های دسته‌ای (`--batch`) هم دارد: عناصر یک بار از مرز عبور
 می‌کنند و در Rust می‌مانند، و هر فراخوانی همه را روی همهٔ هسته‌ها پردازش می‌کند.
 
-زبان از روی مخزن تشخیص داده می‌شود (`go.mod`، `pom.xml`، یک `.csproj` یا `.sln`،
+زبان از روی مخزن تشخیص داده می‌شود (`go.mod`، `pom.xml`، `build.gradle`/`build.gradle.kts`، یک `.csproj` یا `.sln`،
 `pyproject.toml`، `Gemfile`، `composer.json`، `package.json`، وگرنه رایج‌ترین فایل‌های منبع)؛
-`--lang` آن را بازنویسی می‌کند. نوع‌ها از منبع گرفته می‌شوند: نوع‌های TS، type hintهای Python، امضاهای C، Go،
-Java و C#، برچسب‌های YARD در Ruby، نوع‌ها و phpdoc در PHP؛ پارامترهای بدون نوعی که
+یک ماژول Gradle که منبع `.kt` دارد و منبع `.java` ندارد Kotlin است و ماژول‌های ترکیبی Java می‌مانند. `--lang` آن را بازنویسی می‌کند. نوع‌ها از منبع گرفته می‌شوند: نوع‌های TS، type hintهای Python، امضاهای C، Go،
+Java، Kotlin و C#، برچسب‌های YARD در Ruby، نوع‌ها و phpdoc در PHP؛ پارامترهای بدون نوعی که
 به‌عنوان عدد استفاده می‌شوند، عدد استنتاج می‌شوند.
 
 برای PHP، `analyze` یک برنامهٔ PHP را برنامه‌ریزی می‌کند (بسته‌های Composer و بارگذاری خودکار PSR-4، خطرهایی

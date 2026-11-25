@@ -710,12 +710,35 @@ fn needs_js(api: &codegen::PortApi) -> bool {
     api.needs_json()
 }
 
+/// The name and the reason of a `--keep name` or `--keep "name: reason"` entry, trimmed.
+fn keep_entry(k: &str) -> (&str, &str) {
+    let (name, reason) = k.split_once(':').unwrap_or((k, ""));
+    (name.trim(), reason.trim())
+}
+
+/// Fails when a `--keep` entry names none of the unit's exports and classes (`names`), so a typo
+/// does not bridge the export it meant to keep.
+fn check_keep(keep: &[String], names: &[&str], unit: &str) -> Result<()> {
+    if let Some((name, _)) = keep
+        .iter()
+        .map(|k| keep_entry(k))
+        .find(|(name, _)| !names.contains(name))
+    {
+        let mut known = names.to_vec();
+        known.sort_unstable();
+        known.dedup();
+        bail!(
+            "--keep `{name}` is not an export of `{unit}` (exports: {})",
+            known.join(", ")
+        );
+    }
+    Ok(())
+}
+
 /// The reason given with `--keep name` or `--keep "name: reason"`, if `name` is kept.
 fn keep_reason(keep: &[String], name: &str) -> Option<String> {
     keep.iter().find_map(|k| {
-        let (kept, reason) = k
-            .split_once(':')
-            .map_or((k.as_str(), ""), |(n, r)| (n.trim(), r.trim()));
+        let (kept, reason) = keep_entry(k);
         (kept == name).then(|| {
             if reason.is_empty() {
                 "kept on request".to_string()
@@ -1069,7 +1092,66 @@ pub(crate) const DYNAMIC_LOOKUP_BUILD_RS: &str = r#"fn main() {
 }
 "#;
 
+/// Rejects Cargo package names that would produce invalid `Cargo.toml` / Rust library names or
+/// write outside `<root>/rust/` via path separators.
+fn validate_crate_name(name: &str) -> Result<&str> {
+    const RUST_KEYWORDS: &[&str] = &[
+        "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum",
+        "extern", "false", "fn", "for", "gen", "if", "impl", "in", "let", "loop", "match", "mod",
+        "move", "mut", "pub", "ref", "return", "self", "Self", "static", "struct", "super",
+        "trait", "true", "type", "unsafe", "use", "where", "while", "abstract", "become", "box",
+        "do", "final", "macro", "override", "priv", "try", "typeof", "unsized", "virtual", "yield",
+    ];
+    const WINDOWS_RESERVED: &[&str] = &[
+        "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8",
+        "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+    ];
+    let first = name.bytes().next();
+    let valid_chars = first.is_some_and(|b| b.is_ascii_alphabetic() || b == b'_')
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+    if !valid_chars {
+        bail!(
+            "invalid crate name `{name}`: must be non-empty, start with an ASCII letter or `_`, \
+             and use only ASCII letters, digits, `-` and `_`"
+        );
+    }
+    let lib = name.replace('-', "_");
+    if lib == "_" || RUST_KEYWORDS.contains(&lib.as_str()) {
+        bail!("invalid crate name `{name}`: `{lib}` is a reserved Rust keyword");
+    }
+    let lower = name.to_ascii_lowercase();
+    if WINDOWS_RESERVED.contains(&lower.as_str()) {
+        bail!("invalid crate name `{name}`: `{name}` is a reserved filename on Windows");
+    }
+    Ok(name)
+}
+
+/// Derives a valid Cargo crate name from a unit's file/folder stem.
+fn default_crate_name(stem: &str) -> String {
+    let clean: String = stem
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let trimmed = clean.trim_matches('-');
+    if trimmed.is_empty() {
+        "unit-rs".to_string()
+    } else if trimmed.as_bytes()[0].is_ascii_digit() {
+        format!("unit-{trimmed}-rs")
+    } else {
+        format!("{trimmed}-rs")
+    }
+}
+
 pub fn bridge(opts: &Options) -> Result<Outcome> {
+    let explicit_name = opts.name.as_deref().map(validate_crate_name).transpose()?;
     let root = opts
         .root
         .canonical()
@@ -1109,6 +1191,16 @@ pub fn bridge(opts: &Options) -> Result<Outcome> {
             unit.id,
             unit.status,
             unit.notes.first().map_or("", String::as_str)
+        );
+    }
+    if let Some(k @ (Kind::Napi | Kind::Wasm)) = opts.kind
+        && lang != crate::lang::Lang::Ts
+    {
+        bail!(
+            "--kind {} is for TS/JS units; {wanted} is {} and is bridged with {}",
+            if k == Kind::Napi { "napi" } else { "wasm" },
+            lang.name(),
+            Bridge::for_lang(lang).label()
         );
     }
     let kind = opts.kind.unwrap_or(match unit.bridge {
@@ -1232,6 +1324,11 @@ pub fn bridge(opts: &Options) -> Result<Outcome> {
         )
         .collect();
     defined.sort();
+    check_keep(
+        &opts.keep,
+        &defined.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+        &unit.id,
+    )?;
     if let Some(pair) = defined.windows(2).find(|w| w[0].0 == w[1].0) {
         bail!(
             "`{}` is defined twice in `{}` ({} and {}), and the bridge names every export by \
@@ -1271,27 +1368,19 @@ pub fn bridge(opts: &Options) -> Result<Outcome> {
         .split('.')
         .next()
         .unwrap_or("unit");
-    let crate_name = opts.name.clone().unwrap_or_else(|| {
-        let clean: String = stem
-            .chars()
-            .map(|c| {
-                if c.is_ascii_alphanumeric() {
-                    c.to_ascii_lowercase()
-                } else {
-                    '-'
-                }
-            })
-            .collect();
-        format!("{}-rs", clean.trim_matches('-'))
-    });
+    let crate_name = explicit_name
+        .map(str::to_string)
+        .unwrap_or_else(|| default_crate_name(stem));
     let crate_dir = opts
         .out
         .clone()
         .unwrap_or_else(|| root.join("rust").join(&crate_name));
     if crate_dir.exists() && std::fs::read_dir(&crate_dir)?.next().is_some() {
         bail!(
-            "{} already exists and is not empty; rust-anything never overwrites a port in progress",
-            crate_dir.display()
+            "{dir} already exists and is not empty; rust-anything never overwrites a port in \
+             progress. Run `rust-anything refresh {dir}` to regenerate the bindings, pass --out or \
+             --name for a new crate, or remove the folder to start over",
+            dir = crate_dir.display()
         );
     }
 
@@ -1786,6 +1875,80 @@ mod tests {
     use super::*;
 
     #[test]
+    fn keep_entries_are_trimmed() {
+        let keep = |k: &[&str]| k.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            keep_reason(&keep(&["add"]), "add").as_deref(),
+            Some("kept on request")
+        );
+        assert_eq!(
+            keep_reason(&keep(&[" add "]), "add").as_deref(),
+            Some("kept on request")
+        );
+        assert_eq!(
+            keep_reason(&keep(&[" add : slow in Rust "]), "add").as_deref(),
+            Some("slow in Rust")
+        );
+        assert_eq!(
+            keep_reason(&keep(&["add:"]), "add").as_deref(),
+            Some("kept on request")
+        );
+        assert_eq!(keep_reason(&keep(&["add"]), "sub"), None);
+    }
+
+    #[test]
+    fn unknown_keep_names_are_refused() {
+        let keep = |k: &str| vec![k.to_string()];
+        assert!(check_keep(&keep(" add : reason"), &["add", "Point"], "src/add.ts").is_ok());
+        assert!(check_keep(&keep("Point"), &["add", "Point"], "src/add.ts").is_ok());
+        let err = check_keep(&keep("nope"), &["sub", "add"], "src/add.ts")
+            .unwrap_err()
+            .to_string();
+        assert_eq!(
+            err,
+            "--keep `nope` is not an export of `src/add.ts` (exports: add, sub)"
+        );
+    }
+
+    #[test]
+    fn bridge_refuses_unknown_keep_name() {
+        let dir = crate::app::temp_dir("bridge-keep").unwrap();
+        std::fs::write(
+            dir.join("package.json"),
+            r#"{"name":"demo","version":"1.0.0"}"#,
+        )
+        .unwrap();
+        std::fs::create_dir_all(dir.join("src")).unwrap();
+        std::fs::write(
+            dir.join("src/add.ts"),
+            "export function add(a: number, b: number): number { return a + b; }\n",
+        )
+        .unwrap();
+        let out = dir.join("rust/add-rs");
+        let err = bridge(&Options {
+            root: &dir,
+            unit: "src/add.ts",
+            kind: Some(Kind::Napi),
+            out: Some(out.clone()),
+            name: None,
+            force: false,
+            lang: None,
+            keep: vec!["nope".into()],
+            batch: vec![],
+            allocator: Allocator::default(),
+            as_json: vec![],
+        })
+        .unwrap_err();
+        assert!(
+            format!("{err:#}")
+                .contains("--keep `nope` is not an export of `src/add.ts` (exports: add)"),
+            "{err:#}"
+        );
+        assert!(!out.exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn a_relative_root_is_resolved_from_the_crate_and_kept_relative() {
         let base = std::env::temp_dir().join(format!("rust-anything-root-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
@@ -1952,5 +2115,85 @@ mod tests {
         assert_eq!(snake_case("try"), "r#try");
         assert_eq!(snake_case("self"), "self_");
         assert_eq!(snake_case("Super"), "super_");
+    }
+
+    #[test]
+    fn validates_crate_names() {
+        for good in ["add-rs", "my_crate", "_helper", "Foo2", "a-1_b"] {
+            assert_eq!(validate_crate_name(good).unwrap(), good, "{good}");
+        }
+        for bad in [
+            "",
+            " ",
+            " add-rs ",
+            "foo bar",
+            "123-rs",
+            "-foo",
+            "../escape",
+            "a/b",
+            "a\\b",
+            "a\"b",
+            "café",
+            "_",
+            "fn",
+            "type",
+            "self",
+            "Self",
+            "gen",
+            "con",
+            "NUL",
+        ] {
+            assert!(
+                validate_crate_name(bad).is_err(),
+                "expected error for {bad:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn default_crate_name_is_always_valid_for_cargo() {
+        assert_eq!(default_crate_name("add"), "add-rs");
+        assert_eq!(default_crate_name("my_util"), "my-util-rs");
+        assert_eq!(default_crate_name("123"), "unit-123-rs");
+        assert_eq!(default_crate_name("---"), "unit-rs");
+        assert_eq!(default_crate_name(""), "unit-rs");
+        for stem in ["add", "my_util", "123", "---", "", "00-index", "café"] {
+            let name = default_crate_name(stem);
+            assert!(
+                validate_crate_name(&name).is_ok(),
+                "{stem:?} -> {name:?} should be a valid crate name"
+            );
+        }
+    }
+
+    #[test]
+    fn bridge_refuses_invalid_name_before_writing_anything() {
+        let out = std::env::temp_dir().join(format!("ra-bridge-bad-name-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&out);
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mini");
+        for bad in ["../escape", "123bad", "", "fn"] {
+            let err = bridge(&Options {
+                root: &root,
+                unit: "packages/a/src/util.ts",
+                kind: Some(Kind::Napi),
+                out: Some(out.clone()),
+                name: Some(bad.to_string()),
+                force: false,
+                keep: Vec::new(),
+                lang: None,
+                batch: Vec::new(),
+                as_json: Vec::new(),
+                allocator: Allocator::default(),
+            })
+            .unwrap_err();
+            assert!(
+                format!("{err:#}").contains("invalid crate name"),
+                "{bad:?}: {err:#}"
+            );
+            assert!(
+                !out.exists(),
+                "refused --name {bad:?} must not create folder"
+            );
+        }
     }
 }

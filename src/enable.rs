@@ -88,10 +88,13 @@ pub fn enable_only(
                 }
             }
             if !unknown.is_empty() {
+                let available: Vec<&str> =
+                    manifest.exports.iter().map(|f| f.name.as_str()).collect();
                 bail!(
-                    "unknown export(s) in {}: {}",
+                    "unknown export(s) in {}: {} (exports: {})",
                     manifest.crate_name,
-                    unknown.join(", ")
+                    unknown.join(", "),
+                    available.join(", ")
                 );
             }
             if manifest.language == Lang::Powershell && chosen.len() < manifest.exports.len() {
@@ -248,10 +251,12 @@ pub fn select_matching(
             }
         }
         if !unknown.is_empty() {
+            let available: Vec<&str> = manifest.exports.iter().map(|f| f.name.as_str()).collect();
             bail!(
-                "unknown export(s) in {}: {}",
+                "unknown export(s) in {}: {} (exports: {})",
                 manifest.crate_name,
-                unknown.join(", ")
+                unknown.join(", "),
+                available.join(", ")
             );
         }
         if !failures.is_empty() {
@@ -677,6 +682,10 @@ mod tests {
         // --only rejects an unknown export name.
         let err = select_matching(&manifest, &outcome, &counts, &["nope".into()]).unwrap_err();
         assert!(format!("{err:#}").contains("unknown export(s)"), "{err:#}");
+        assert!(
+            format!("{err:#}").contains("(exports: slug, words, missing_fn)"),
+            "{err:#}"
+        );
 
         // --partial fails clearly when nothing matches.
         let none_counts = BTreeMap::from([("slug".into(), (1, 2)), ("words".into(), (0, 223))]);

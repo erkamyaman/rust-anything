@@ -7,7 +7,8 @@ steps 1 to 5 of [SKILL.md](SKILL.md), and the **lift** at the end removes the fa
 makes the decisions; you find the facts.
 
 Everything you write for the port lives in `<repo>/rust/`: `MAP.md`, `DECISIONS.md`,
-`GLOSSARY.md`, `HANDOFF.md`, `research/`, `app-cases/`, the unit crates, and the `app/` crate.
+`GLOSSARY.md`, `HANDOFF.md`, `RULES.md`, `research/`, `app-cases/`, the unit crates, and the `app/`
+crate.
 Why this shape, with sources:
 https://github.com/erkamyaman/rust-anything/blob/main/docs/research/whole-app-port.md
 
@@ -155,8 +156,11 @@ scaffolded: `front-door` never overwrites it.
 ## 5. Port every unit
 
 Follow the plan's waves, lowest first, so every unit's dependencies are already Rust; take a
-tangled core in one large piece rather than writing glue around it. Claim the unit in `MAP.md`.
-Each unit goes through steps 1 to 5 of SKILL.md, then:
+tangled core in one large piece rather than writing glue around it. Claim the unit in `MAP.md`,
+and run `rust-anything rules <repo>` first: `rust/RULES.md` holds every behavior the user has
+corrected so far, and the port keeps each one. When the user corrects behavior, add it with
+`rust-anything rules <repo> --add "<rule>"` before going on. Each unit goes through steps 1 to 5
+of SKILL.md, then:
 
 1. Wire the unit into the front door, and stop falling back for what it covers:
    `rust-anything app wire <repo> <unit> --command <name>` (the app's own name as the command
@@ -175,14 +179,16 @@ Each unit goes through steps 1 to 5 of SKILL.md, then:
 When `replay` goes red, fix one case at a time: `rust-anything app replay <repo> --build <build>
 --case <name>` reruns only the case the report names (a library: only that unit), in seconds and
 the same way every time. Read its diff, form one hypothesis, change the port, rerun that case
-until it is green, then run the full `replay` so the fix broke nothing else.
+until it is green, then run the full `replay` so the fix broke nothing else. The report's "Distinct differences" table
+groups the failing cases that differ the same way; `app replay --redact` writes it as shapes only,
+for sharing.
 
 Units in one wave do not depend on each other, so a wave can go **in parallel**: you coordinate,
 and give each unit to its own subagent with the unit id, the `MAP.md` claim, and the files to read
 (`DECISIONS.md`, `GLOSSARY.md`, the unit's research). Each runs steps 1 to 5 of SKILL.md and
 returns its gate and diff results; you wire the units one at a time and replay after each. Turn
-every mistake a subagent made into a rule for the next: an ADR, a glossary entry, or a test, so
-the next unit cannot make it again.
+every mistake a subagent made into a rule for the next: an ADR, a glossary entry, a test, or a
+port rule (`rules --add`), so the next unit cannot make it again.
 
 Translate faithfully first, with the original's structure, types and error paths; make it
 idiomatic only after `replay` passes, and run `replay` again. Where the original returns or throws
@@ -229,10 +235,22 @@ case matches to the bar in `DECISIONS.md`. A library is proved before its lift: 
 `app replay` at 100%; after it, `cargo test` and the Rust tests you added. A mismatch is a bug in the port, never in the cases;
 change a case only with the user's approval, and record why in `DECISIONS.md`.
 
+To keep up with the original after that, run `rust-anything app drift <repo>` (in CI too): it
+replays the original and the build against the cases and lists documented examples no case
+records. Cases the original changed mean `app record` again, then port the change; a port
+regression is a bug in the port.
+
 After the lift, the Rust app no longer has to mirror the original's structure: the cases check
 behavior at the app's edges, not its internals. Offer the user a reshape pass (merge units that
 only existed because of the old layout, replace ported workarounds with idiomatic Rust, drop
 indirection the bridge needed), one change at a time, with `app replay` passing after each.
+
+For a server, offer to check the build on live traffic before the cutover: `rust-anything app
+shadow <repo> --build <binary> --listen <port>` in front of the original (or `--upstream
+HOST:PORT` for one already running) answers every request with the original and logs the build's
+mismatches as shapes in `rust/app-cases/shadow/mismatches.jsonl`. With `--keep`, each mismatching
+request goes to `rust/app-cases/shadow/inputs.jsonl`; `app record --inputs` on it turns them into
+cases to fix with `app replay --case`.
 
 Report to the user: replay results, gate results for every crate, speed against the original, and
 every known behavior difference. The user decides the cutover. Leave the original in place as

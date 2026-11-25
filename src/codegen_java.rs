@@ -1266,10 +1266,12 @@ fn java_string(env: &mut jni::JNIEnv, text: &str) -> jni::sys::jstring {
         }
         params.push("slot: jni::objects::JObjectArray<'local>".to_string());
         let call = format!("port::{}({})", f.rust_name, args.join(", "));
-        let call = if f.fallible {
-            call
+        let run_call = if args.is_empty() && f.fallible {
+            format!("run(port::{})", f.rust_name)
+        } else if f.fallible {
+            format!("run(|| {call})")
         } else {
-            format!("Ok({call})")
+            format!("run(|| Ok({call}))")
         };
         let (ret_ty, ok) = match &ret {
             Some(r) => (
@@ -1287,7 +1289,7 @@ fn java_string(env: &mut jni::JNIEnv, text: &str) -> jni::sys::jstring {
             out,
             "\n/// `{proto}`: typed, no JSON.\n// SAFETY: the JNI symbol of `rustanything.{class}.n_{js}`; nothing else defines it.\n\
              #[unsafe(no_mangle)]\npub extern \"system\" fn Java_rustanything_{mclass}_n_1{mjs}<'local>({params}){ret_ty} {{\n\
-             {prelude}    match run(|| {call}) {{\n        Ok(out) => {ok},\n        Err(message) => {{\n            \
+             {prelude}    match {run_call} {{\n        Ok(out) => {ok},\n        Err(message) => {{\n            \
              report(&mut env, &slot, &message);\n            {default}\n        }}\n    }}\n}}",
             proto = e.prototype.as_deref().unwrap_or(&e.name),
             js = f.js_name,
@@ -2255,5 +2257,44 @@ public class Sets {
                 "missing {imp} in:\n{wrapper_src}"
             );
         }
+    }
+
+    #[test]
+    fn typed_rs_avoids_redundant_closure_for_zero_arg_fallible_functions() {
+        let src = r#"package acme;
+public class Ping {
+    public static String pong() { return "pong"; }
+    public static String purePong() { return "pong"; }
+    public static String echo(String s) { return s; }
+}
+"#;
+        let exports = crate::lang::java::exports("acme/Ping.java", src);
+        let manifest = Manifest {
+            schema: String::new(),
+            root: std::path::PathBuf::new(),
+            root_written: None,
+            unit: "acme/Ping.java".into(),
+            language: crate::lang::Lang::Java,
+            kind: crate::bridge::Kind::Ffi,
+            crate_name: "ping-rs".into(),
+            exports,
+            classes: vec![],
+            js_only: vec![],
+            batches: vec![],
+            allocator: Default::default(),
+            float_tolerance: None,
+            ignore_key_order: false,
+        };
+        let mut api = crate::codegen::parse_port(
+            "pub fn pong() -> Result<String, String> { Ok(\"pong\".into()) }\n\
+             pub fn pure_pong() -> String { \"pong\".into() }\n\
+             pub fn echo(s: String) -> Result<String, String> { Ok(s) }\n",
+        );
+        crate::bridge::match_export_names(&manifest, &mut api);
+        let rs = typed_rs(&manifest, &api);
+        assert!(rs.contains("match run(port::pong)"), "{rs}");
+        assert!(!rs.contains("run(|| port::pong())"), "{rs}");
+        assert!(rs.contains("match run(|| Ok(port::pure_pong()))"), "{rs}");
+        assert!(rs.contains("match run(|| port::echo(s))"), "{rs}");
     }
 }

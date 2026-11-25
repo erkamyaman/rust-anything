@@ -168,7 +168,8 @@ pub fn handle(request: &Value) -> Option<Value> {
             "serverInfo": { "name": "rust-anything", "version": env!("CARGO_PKG_VERSION") },
             "instructions": "Incremental TS/JS to Rust migration. Loop per unit: analyze -> bridge -> \
                 record -> (port src/port.rs) -> build -> diff -> shadow -> gate. Never mark a port done \
-                before gate passes.",
+                before gate passes. Read rust/RULES.md (`rules`) before porting; when the user corrects \
+                behavior, add it with `rules`.",
         }),
         "ping" => json!({}),
         "tools/list" => json!({ "tools": tools() }),
@@ -256,6 +257,12 @@ const FAILURES: &[FailureKind] = &[
         retryable: false,
         matches: |t| t.contains("is older than the crate's sources"),
         next: Some("rust-anything build {path}"),
+    },
+    FailureKind {
+        code: "missing_tool",
+        retryable: false,
+        matches: |t| t.contains("` not found") && t.contains("`rust-anything doctor`"),
+        next: Some("rust-anything doctor"),
     },
     FailureKind {
         code: "build_failed",
@@ -368,6 +375,7 @@ const TOOL_META: &[ToolMeta] = &[
         [false, false, true, true],
     ),
     meta("map", "Map the port", [true, false, true, false]),
+    meta("rules", "Port rules", [false, false, true, false]),
     meta("package", "Lay out packages", [false, false, true, false]),
     meta(
         "app_record",
@@ -386,6 +394,7 @@ const TOOL_META: &[ToolMeta] = &[
         "Lift to pure Rust app",
         [false, true, false, true],
     ),
+    meta("app_drift", "Check app drift", [false, false, true, true]),
 ];
 
 fn tools() -> Value {
@@ -420,11 +429,11 @@ fn tool_schemas() -> Value {
         },
         {
             "name": "bridge",
-            "description": "Scaffold a Rust crate for one unit: napi-rs or wasm-bindgen bindings in src/lib.rs, stubs to port in src/port.rs, UTF-16 helpers when the unit uses string offsets. Never overwrites an existing folder.",
+            "description": "Scaffold a Rust crate for one unit: napi-rs or wasm-bindgen bindings in src/lib.rs, stubs to port in src/port.rs, UTF-16 helpers when the unit uses string offsets. Never overwrites an existing folder. Read the repository's port rules (`rules`) before writing the port.",
             "inputSchema": { "type": "object", "properties": {
                 "root": { "type": "string", "description": "Repository root." },
                 "unit": { "type": "string", "description": "Unit id from analyze." },
-                "kind": { "type": "string", "enum": ["napi", "wasm"], "description": "Defaults to the plan's bridge." },
+                "kind": { "type": "string", "enum": ["napi", "wasm"], "description": "TS/JS units only; defaults to the plan's bridge. Other languages have their own bridge." },
                 "out": { "type": "string", "description": "Crate folder; defaults to <root>/rust/<name>." },
                 "name": { "type": "string", "description": "Crate name; defaults to `<unit>-rs`." },
                 "force": { "type": "boolean", "description": "Bridge a unit the plan marks blocked or keep." },
@@ -436,7 +445,7 @@ fn tool_schemas() -> Value {
         },
         {
             "name": "refresh",
-            "description": "Regenerate a crate's bindings (lib.rs, index.cjs, js.rs) from the signatures in src/port.rs, after changing them, adding any new batch classes. Never touches port.rs.",
+            "description": "Regenerate a crate's bindings and its language wrapper (the JS loader, the Python package or the generated wrapper file) from the signatures in src/port.rs, after changing them, adding any new batch classes. Never touches port.rs.",
             "inputSchema": { "type": "object", "properties": {
                 "crate": crate_dir,
                 "batch": { "type": "array", "items": { "type": "string" }, "description": "Batch classes to add, `function:param`: the function runs over many `param` values kept in Rust, on all cores, in one call. A `<Function>Index` struct in port.rs replaces the default per-item loop." },
@@ -484,6 +493,7 @@ fn tool_schemas() -> Value {
                 "module": { "type": "string", "description": "Test this JS module instead of the crate's `index.cjs`." },
                 "node_args": { "type": "array", "items": { "type": "string" }, "description": "Extra arguments for node, e.g. [\"--import=tsx\"]." },
                 "float_tolerance": { "type": "number", "description": "Floats match within this tolerance for this run (the one saved by record otherwise)." },
+                "redact": { "type": "boolean", "description": "Mismatches as shapes only: where they differ, types, lengths and hashes, never values or arguments; safe to paste into an issue or hand to another agent." },
             }, "required": ["crate"] },
         },
         {
@@ -497,7 +507,7 @@ fn tool_schemas() -> Value {
         },
         {
             "name": "go",
-            "description": "The hot-path loop in one call: profile the workload, pick the top portable function (the outermost loop; batched where profile says so), bridge it into rust/<function>-rs, record generated cases plus the calls the workload makes, write TASK.md, hand the port to `agent` (claude, codex, or a command reading the prompt on stdin), then build, diff and gate, and switch the unit on with `enable` only when every case matches, gate passes and `bench` shows it is not slower as its callers call it. Without `agent` it stops at `waiting_for_port`: port src/port.rs as TASK.md says and call go again; finished steps are kept. Returns the stage (waiting_for_port, mismatch, gate_failed, slower, on, passed), the speedup, the pick, the steps and what to do next.",
+            "description": "The hot-path loop in one call: profile the workload, pick the top portable function (the outermost loop; batched where profile says so), bridge it into rust/<function>-rs, record generated cases plus the calls the workload makes, write TASK.md, hand the port to `agent` (claude, codex, or a command reading the prompt on stdin), then build, diff and gate, and switch the unit on with `enable` only when every case matches, gate passes and `bench` shows it is not slower as its callers call it. Without `agent` it stops at `waiting_for_port`: port src/port.rs as TASK.md says and call go again; finished steps are kept. Returns the stage (waiting_for_port, mismatch, gate_failed, slower, on, passed), the speedup, the pick, the steps and what to do next. TASK.md includes the repository's port rules (`rules`).",
             "inputSchema": { "type": "object", "properties": {
                 "root": { "type": "string", "description": "Repository root." },
                 "command": { "type": "array", "items": { "type": "string" }, "description": "The workload, run in root: [\"python3\", \"app.py\"]." },
@@ -571,6 +581,14 @@ fn tool_schemas() -> Value {
             }, "required": ["repo"] },
         },
         {
+            "name": "rules",
+            "description": "Show the port rules every agent prompt includes (rust/RULES.md, committed with the port), or add one: behavior the port must keep exactly, learned from a correction. Read them before porting; when the user corrects how the port behaves, add the correction as a rule so every later unit and agent keeps it. An exact duplicate is skipped.",
+            "inputSchema": { "type": "object", "properties": {
+                "root": { "type": "string", "description": "Repository root, or a crate folder made by `bridge`." },
+                "add": { "type": "array", "items": { "type": "string" }, "description": "Rules to append." }
+            }, "required": ["root"] },
+        },
+        {
             "name": "package",
             "description": "Lay out installable packages for a gated port; writes files only, never builds other platforms or publishes. PyO3: a maturin project (abi3 wheel importable under the original module's name). CLI front door (`rust/app` of a Node CLI): a main npm package whose command runs `<name>-<platform>`'s front door binary, with the original pinned to its exact version as a dependency for every case the port hands back. napi: a main npm package whose loader picks `<name>-<platform>` from optionalDependencies and falls back to the original JS, one package per platform (this machine's binary copied in when built). wasm: one npm package with the built pkg/. PyO3 and napi also get a GitHub Actions workflow building macOS (arm64, x86_64), Linux (x86_64, aarch64) and Windows.",
             "inputSchema": { "type": "object", "properties": {
@@ -586,7 +604,7 @@ fn tool_schemas() -> Value {
         },
         {
             "name": "gate",
-            "description": "Definition of done: fmt, clippy -D warnings, cargo test, unsafe with SAFETY comments only, no unimplemented functions, build, API present, recorded behavior matches.",
+            "description": "Definition of done: fmt, clippy -D warnings, cargo test, unsafe with SAFETY comments only, no unimplemented functions, build, API present, recorded behavior matches, no recorded values hard-coded in the port, no tests or assertions removed since the last passing gate, and the recorded cases not edited.",
             "inputSchema": { "type": "object", "properties": { "crate": crate_dir, "node_args": { "type": "array", "items": { "type": "string" }, "description": "Extra arguments for node, e.g. [\"--import=tsx\"]." } }, "required": ["crate"] },
         },
         {
@@ -600,16 +618,17 @@ fn tool_schemas() -> Value {
                 "name": { "type": "string", "description": "Name the app is invoked by in its docs." },
                 "timeout": { "type": "integer", "description": "Seconds before a run is killed (default 30)." },
                 "traps": { "type": "boolean", "description": "Add semantic-trap cases (default true)." },
-                "http": { "type": "boolean", "description": "The app is a server: `run` starts it (it takes its port from PORT or {port}); cases are requests from curl lines in its docs, `inputs` ({\"name\", \"method\", \"path\", \"headers\", \"body\" | \"body_base64\" | \"body_file\"}) and traps." },
-                "port": { "type": "integer", "description": "A port the server always listens on (implies http)." },
+                "http": { "type": "boolean", "description": "The app is a server: `run` starts it (it takes its port from PORT or {port}); cases are requests from curl lines in its docs, `inputs` ({\"name\", \"method\", \"path\", \"headers\", \"body\" | \"body_base64\" | \"body_file\"}) and traps. Pass `false` to drop a saved server recording and record as a CLI again." },
+                "port": { "type": "integer", "description": "A port the server always listens on (implies http); 0 removes a saved fixed port." },
                 "effects": { "type": "array", "items": { "type": "string" }, "description": "Record what leaves the process: \"http\" (a local sink set as HTTP_PROXY, http_proxy and RUST_ANYTHING_HTTP_SINK), \"smtp\" (a local mail server, SMTP_HOST and SMTP_PORT, recording decoded headers and MIME parts) and \"smtp-raw\" (raw MIME DATA). Each case stores what reached them, in order, and replay compares it." },
                 "effect_env": { "type": "array", "items": { "type": "string" }, "description": "Point the app's own settings at a sink: VAR=http-url, VAR=smtp-host, VAR=smtp-port or VAR=smtp-url." },
                 "effect_response": { "type": "array", "items": { "type": "string" }, "description": "Canned responses for the HTTP effect sink: \"METHOD /path=STATUS [BODY|@FILE]\" (e.g. \"POST /v1/charges=201 @fixtures/charge.json\", \"POST /hooks/*=500\"). Matched in order with `*` wildcards, falling back to `200 {}`. Enables the outbound HTTP effect (`effects: [\"http\"]`, not server mode); saved for replay." },
                 "db_reset": { "type": "string", "description": "Shell command that resets the database before each case (each start for servers), run in the folder the case runs in; a script it names by a relative path with a script extension (.py, .sh, .js, .ts, .rb, .php, .pl, .ps1, .bat, .cmd, .sql and similar) is the repository's, while other relative paths, extensionless scripts included, are the case folder's. Cases then run one at a time." },
                 "db_dump": { "type": "string", "description": "Shell command that prints the database's state (e.g. `sqlite3 app.db .dump`), run after each case or request in the folder the case runs in, and recorded with the effects." },
-                "args": { "type": "array", "items": { "type": "string" }, "description": "Servers: arguments every start gets after its command, the original's and every build's ([\"db.json\"]). Implies http; saved." },
-                "fresh": { "type": "array", "items": { "type": "string" }, "description": "Repository files or folders the app reads or writes (a project tree, a database file), snapshotted and copied into a fresh working directory before every case (CLIs) or start (servers); a CLI's removed files are compared too. Saved." },
+                "args": { "type": "array", "items": { "type": "string" }, "description": "Servers: arguments every start gets after its command, the original's and every build's ([\"db.json\"]). Non-empty implies http; saved. Pass `[]` to clear saved args." },
+                "fresh": { "type": "array", "items": { "type": "string" }, "description": "Repository files or folders the app reads or writes (a project tree, a database file), snapshotted and copied into a fresh working directory before every case (CLIs) or start (servers); a CLI's removed files are compared too. Saved. Pass `[]` to clear saved paths." },
                 "pace": { "type": "integer", "description": "Servers: milliseconds to wait after each response, for work the server does after answering (a file watcher). Implies http; saved and used by replay; 0 removes it." },
+                "ready_timeout": { "type": "integer", "description": "Servers: seconds to wait for the port before giving up (default 60). Implies http; saved with the cases and used by replay and the front door; 0 restores the default." },
                 "float_tolerance": { "type": "number", "description": "Numeric output: numbers match when they differ by at most this times the larger magnitude (absolute below 1), e.g. 1e-9. Saved with the cases; 0 removes it." },
                 "float_file": { "type": "array", "items": { "type": "string" }, "description": "Written files of raw floats, compared value by value within float_tolerance: `PATH=f32le` or `PATH=f64le`. Saved with the cases." },
             }, "required": ["repo"] },
@@ -623,6 +642,7 @@ fn tool_schemas() -> Value {
                 "port": { "type": "integer", "description": "Servers: the port the build always listens on; otherwise it gets a free one through PORT and {port}." },
                 "timeout": { "type": "integer", "description": "Seconds before a run is killed (default: the one saved by `app record`, 30 seconds unless it was changed)." },
                 "case": { "type": "string", "description": "Replay only this case, by the name the report gives it (a library: only this unit): the fast loop for fixing one mismatch." },
+                "redact": { "type": "boolean", "description": "Write the report and return mismatches as shapes only (no outputs, arguments or request paths)." },
             }, "required": ["repo"] },
         },
         {
@@ -653,7 +673,55 @@ fn tool_schemas() -> Value {
                 "repo": { "type": "string", "description": "Repository root." },
             }, "required": ["repo"] },
         },
+        {
+            "name": "app_drift",
+            "description": "Check that the recording still describes the original and the port still matches: replays the original against rust/app-cases (cases it no longer matches changed upstream, listed in `changed`), lists examples in its docs that no case records (`new`), and replays the build (`failing`, each with a verdict: \"original changed, port still old\" or \"port regression\"). Writes rust/app-cases/drift-report.md and leaves replay-report.md as it was. For CLIs and servers; for units, `map` lists every port whose original changed (`changed_upstream`).",
+            "inputSchema": { "type": "object", "properties": {
+                "repo": { "type": "string", "description": "Repository root." },
+                "build": { "type": "string", "description": "Build to check; defaults to rust/app, built with cargo, when it exists." },
+                "timeout": { "type": "integer", "description": "Seconds before a run is killed (default: the one saved by `app record`, 30 seconds unless it was changed)." },
+            }, "required": ["repo"] },
+        },
     ])
+}
+
+/// `bridge`'s `kind`: `None` (the plan's choice) when omitted or null, an error for any other
+/// value than `"napi"` or `"wasm"`, so a mistyped argument never bridges with a different kind.
+fn kind_arg(args: &Value) -> Result<Option<bridge::Kind>> {
+    Ok(match args.get("kind") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(s)) if s == "napi" => Some(bridge::Kind::Napi),
+        Some(Value::String(s)) if s == "wasm" => Some(bridge::Kind::Wasm),
+        Some(other) => anyhow::bail!("`kind` is \"napi\" or \"wasm\", not {other}"),
+    })
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Profile {
+    Host,
+    Android,
+}
+
+/// `record`/`build`/`diff`'s `profile`: `Host` when omitted or null, an error for any other
+/// value than `"host"` or `"android"`.
+fn profile_arg(args: &Value) -> Result<Profile> {
+    Ok(match args.get("profile") {
+        None | Some(Value::Null) => Profile::Host,
+        Some(Value::String(s)) if s == "host" => Profile::Host,
+        Some(Value::String(s)) if s == "android" => Profile::Android,
+        Some(other) => anyhow::bail!("`profile` is \"host\" or \"android\", not {other}"),
+    })
+}
+
+/// `fuzz`'s `keep`: `None` when omitted or null, an error for any other value than `"mismatches"`
+/// or `"all"`.
+fn keep_arg(args: &Value) -> Result<Option<crate::fuzz::Keep>> {
+    Ok(match args.get("keep") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(s)) if s == "mismatches" => Some(crate::fuzz::Keep::Mismatches),
+        Some(Value::String(s)) if s == "all" => Some(crate::fuzz::Keep::All),
+        Some(other) => anyhow::bail!("`keep` is \"mismatches\" or \"all\", not {other}"),
+    })
 }
 
 /// `bridge`'s `allocator`: the default when omitted (or null), an error for any other value
@@ -665,6 +733,72 @@ fn allocator_arg(args: &Value) -> Result<bridge::Allocator> {
         Some(Value::String(s)) if s == "rusty_alloc" => bridge::Allocator::RustyAlloc,
         Some(other) => anyhow::bail!("`allocator` is \"mimalloc\" or \"rusty_alloc\", not {other}"),
     })
+}
+
+fn opt_string_list(args: &Value, key: &str) -> Result<Option<Vec<String>>> {
+    match args.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Array(items)) => items
+            .iter()
+            .map(|v| {
+                v.as_str()
+                    .map(ToString::to_string)
+                    .ok_or_else(|| anyhow::anyhow!("{key} must be an array of strings"))
+            })
+            .collect::<Result<Vec<_>>>()
+            .map(Some),
+        Some(_) => anyhow::bail!("{key} must be an array of strings"),
+    }
+}
+
+fn opt_u64(args: &Value, key: &str) -> Result<Option<u64>> {
+    match args.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(v) => v
+            .as_u64()
+            .map(Some)
+            .with_context(|| format!("`{key}` must be a non-negative integer, not {v}")),
+    }
+}
+
+fn opt_usize(args: &Value, key: &str) -> Result<Option<usize>> {
+    match opt_u64(args, key)? {
+        None => Ok(None),
+        Some(n) => Ok(Some(
+            usize::try_from(n).with_context(|| format!("`{key}` is too large"))?,
+        )),
+    }
+}
+
+fn opt_u16(args: &Value, key: &str) -> Result<Option<u16>> {
+    match opt_u64(args, key)? {
+        None => Ok(None),
+        Some(n) => {
+            Ok(Some(u16::try_from(n).with_context(|| {
+                format!("`{key}` must be at most {}", u16::MAX)
+            })?))
+        }
+    }
+}
+
+fn opt_f64(args: &Value, key: &str) -> Result<Option<f64>> {
+    match args.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(v) => v
+            .as_f64()
+            .map(Some)
+            .with_context(|| format!("`{key}` must be a number, not {v}")),
+    }
+}
+
+fn opt_bool(args: &Value, key: &str) -> Result<Option<bool>> {
+    match args.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(v) => v
+            .as_bool()
+            .map(Some)
+            .with_context(|| format!("`{key}` must be a boolean, not {v}")),
+    }
 }
 
 fn call(name: &str, args: &Value) -> Result<Value> {
@@ -685,6 +819,18 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             })
             .unwrap_or_default()
     };
+    let opt_timeout = || -> Result<Option<u64>> {
+        match args.get("timeout") {
+            None | Some(Value::Null) => Ok(None),
+            Some(v) => {
+                let secs = v
+                    .as_u64()
+                    .ok_or_else(|| anyhow::anyhow!("--timeout must be at least 1 second"))?;
+                app::check_timeout(Some(secs))?;
+                Ok(Some(secs))
+            }
+        }
+    };
     Ok(match name {
         "analyze" => {
             let root = path("root")?;
@@ -692,27 +838,25 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                 Some(v) if !v.is_null() => serde_json::from_value(v.clone()).context("`lang`")?,
                 _ => crate::lang::Lang::detect(&root),
             };
+            let whole_app = opt_bool(args, "whole_app")?.unwrap_or(false);
             let mut report = analyze::analyze_lang(&root, lang)?;
-            if args["whole_app"].as_bool().unwrap_or(false) {
+            if whole_app {
                 report.whole_app = Some(crate::whole_app::whole_app(&root, &report));
             }
             serde_json::to_value(report)?
         }
         "bridge" => {
-            let kind = match args["kind"].as_str() {
-                Some("napi") => Some(bridge::Kind::Napi),
-                Some("wasm") => Some(bridge::Kind::Wasm),
-                _ => None,
-            };
+            let kind = kind_arg(args)?;
             let root = path("root")?;
             let allocator = allocator_arg(args)?;
+            let force = opt_bool(args, "force")?.unwrap_or(false);
             serde_json::to_value(bridge::bridge(&bridge::Options {
                 root: &root,
                 unit: args["unit"].as_str().context("missing `unit`")?,
                 kind,
                 out: opt_path("out"),
                 name: args["name"].as_str().map(str::to_string),
-                force: args["force"].as_bool().unwrap_or(false),
+                force,
                 keep: strings("keep"),
                 lang: None,
                 batch: strings("batch"),
@@ -722,13 +866,16 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         }
         "record" => {
             let crate_dir = path("crate")?;
-            let profile = args["profile"].as_str().unwrap_or("host");
-            if profile == "host" && !args["device"].is_null() {
+            let profile = profile_arg(args)?;
+            if profile == Profile::Host && !args["device"].is_null() {
                 anyhow::bail!("`device` needs profile `android`");
             }
-            if !matches!(profile, "host" | "android") {
-                anyhow::bail!("unknown record profile `{profile}`: use host or android");
-            }
+            let float_tolerance = opt_f64(args, "float_tolerance")?
+                .map(crate::tolerance::check)
+                .transpose()?;
+            let ignore_key_order = opt_bool(args, "ignore_key_order")?;
+            let pin_clock = opt_bool(args, "pin_clock")?;
+            let count = opt_usize(args, "count")?.unwrap_or(200);
             let mut inputs = opt_path("inputs");
             let test_command = strings("test_command");
             let captured = if test_command.is_empty() {
@@ -748,25 +895,23 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             };
             let module = opt_path("module");
             let resolve_from = opt_path("resolve_from");
-            if let Some(t) = args["float_tolerance"].as_f64() {
+            if let Some(t) = float_tolerance {
                 let mut manifest = bridge::Manifest::load(&crate_dir)?;
-                manifest.float_tolerance = (crate::tolerance::check(t)? > 0.0).then_some(t);
+                manifest.float_tolerance = (t > 0.0).then_some(t);
                 manifest.save(&crate_dir)?;
             }
-            if let Some(on) = args["ignore_key_order"].as_bool() {
+            if let Some(on) = ignore_key_order {
                 let mut manifest = bridge::Manifest::load(&crate_dir)?;
                 manifest.ignore_key_order = on;
                 manifest.save(&crate_dir)?;
             }
-            let helper = match args["pin_clock"].as_bool() {
+            let helper = match pin_clock {
                 Some(on) => crate::pin::set(&crate_dir, on)?,
                 None => None,
             };
             let opts = harness::RecordOptions {
                 crate_dir: &crate_dir,
-                count: args["count"]
-                    .as_u64()
-                    .map_or(200, |n| usize::try_from(n).unwrap_or(200)),
+                count,
                 inputs: inputs.as_deref(),
                 module: module.as_deref(),
                 resolve_from: resolve_from.as_deref(),
@@ -774,9 +919,8 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             };
             let device = args["device"].as_str();
             let mut out = serde_json::to_value(match profile {
-                "host" => harness::record(&opts)?,
-                "android" => harness::record_android(&opts, device)?,
-                other => anyhow::bail!("unknown record profile `{other}`: use host or android"),
+                Profile::Host => harness::record(&opts)?,
+                Profile::Android => harness::record_android(&opts, device)?,
             })?;
             if let Some(c) = captured {
                 out["from_tests"] = c;
@@ -808,8 +952,8 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         }
         "build" => {
             let crate_dir = path("crate")?;
-            match args["profile"].as_str().unwrap_or("host") {
-                "android" => {
+            match profile_arg(args)? {
+                Profile::Android => {
                     if !args["abi"].is_null() && !args["abi"].is_array() {
                         anyhow::bail!("`abi` must be an array of Android ABI names");
                     }
@@ -831,7 +975,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                         },
                     )?)?
                 }
-                "host" => {
+                Profile::Host => {
                     if !args["abi"].is_null()
                         || !args["api"].is_null()
                         || !args["ndk"].is_null()
@@ -841,7 +985,6 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                     }
                     json!({ "artifact": harness::build(&crate_dir)? })
                 }
-                other => anyhow::bail!("unknown build profile `{other}`: use host or android"),
             }
         }
         "diff" => {
@@ -850,31 +993,35 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             let opts = harness::DiffOptions {
                 crate_dir: &crate_dir,
                 module: module.as_deref(),
-                ignore_key_order: args["ignore_key_order"].as_bool().unwrap_or(false),
+                ignore_key_order: opt_bool(args, "ignore_key_order")?.unwrap_or(false),
                 node_args: &strings("node_args"),
-                float_tolerance: args["float_tolerance"].as_f64(),
+                float_tolerance: opt_f64(args, "float_tolerance")?,
             };
-            serde_json::to_value(match args["profile"].as_str().unwrap_or("host") {
-                "host" => {
+            let redact = opt_bool(args, "redact")?.unwrap_or(false);
+            let mut d = match profile_arg(args)? {
+                Profile::Host => {
                     if !args["device"].is_null() || !args["jni_libs"].is_null() {
                         anyhow::bail!("`device` and `jni_libs` need profile `android`");
                     }
                     harness::diff(&opts)?
                 }
-                "android" => harness::diff_android(
+                Profile::Android => harness::diff_android(
                     &opts,
                     args["device"].as_str(),
                     args["jni_libs"].as_str().map(Path::new),
                 )?,
-                other => anyhow::bail!("unknown diff profile `{other}`: use host or android"),
-            })?
+            };
+            if redact {
+                crate::mismatch::redact_diff(&mut d);
+            }
+            serde_json::to_value(d)?
         }
         "bench" => {
             let crate_dir = path("crate")?;
             let resolve_from = opt_path("resolve_from");
             let rows = harness::bench(&harness::BenchOptions {
                 crate_dir: &crate_dir,
-                min_ms: args["min_ms"].as_u64().unwrap_or(200),
+                min_ms: opt_u64(args, "min_ms")?.unwrap_or(200),
                 resolve_from: resolve_from.as_deref(),
                 node_args: &strings("node_args"),
             })?;
@@ -887,13 +1034,8 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         "fuzz" => {
             let crate_dir = path("crate")?;
             let resolve_from = opt_path("resolve_from");
-            let keep = match args["keep"].as_str() {
-                None => None,
-                Some("mismatches") => Some(crate::fuzz::Keep::Mismatches),
-                Some("all") => Some(crate::fuzz::Keep::All),
-                Some(other) => anyhow::bail!("unknown `keep` `{other}`: use mismatches or all"),
-            };
-            let time = match args["time"].as_f64() {
+            let keep = keep_arg(args)?;
+            let time = match opt_f64(args, "time")? {
                 Some(0.0) => Some(std::time::Duration::ZERO),
                 Some(t) if t.is_finite() && t > 0.0 => {
                     Some(crate::process::seconds(t).context("`time` is too large")?)
@@ -903,10 +1045,8 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             };
             serde_json::to_value(crate::fuzz::fuzz(&crate::fuzz::FuzzOptions {
                 crate_dir: &crate_dir,
-                cases: args["cases"]
-                    .as_u64()
-                    .map_or(200, |n| usize::try_from(n).unwrap_or(200)),
-                seed: args["seed"].as_u64(),
+                cases: opt_usize(args, "cases")?.unwrap_or(200),
+                seed: opt_u64(args, "seed")?,
                 time,
                 keep,
                 resolve_from: resolve_from.as_deref(),
@@ -922,6 +1062,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                 strings("crates").into_iter().map(Into::into).collect();
             serde_json::to_value(crate::port_map::map(&path("repo")?, &crates)?)?
         }
+        "rules" => serde_json::to_value(crate::rules::add(&path("root")?, &strings("add"))?)?,
         "package" => {
             let crate_dir = path("crate")?;
             serde_json::to_value(crate::package::package(&crate::package::Options {
@@ -929,7 +1070,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                 name: args["name"].as_str().map(str::to_string),
                 version: args["version"].as_str().map(str::to_string),
                 out: opt_path("out"),
-                dry_run: args["dry_run"].as_bool().unwrap_or(false),
+                dry_run: opt_bool(args, "dry_run")?.unwrap_or(false),
                 fallback: args["fallback"].as_str().map(str::to_string),
                 bin: strings("bin"),
                 original: args["original"].as_str().map(str::to_string),
@@ -945,25 +1086,23 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                 _ => None,
             };
             let root = path("root")?;
+            let count = opt_usize(args, "count")?.unwrap_or(200);
+            let rounds = opt_usize(args, "rounds")?.unwrap_or(3);
             serde_json::to_value(crate::go::go(&crate::go::Options {
                 root: &root,
                 command: &command,
                 lang,
                 agent: args["agent"].as_str(),
                 function: args["function"].as_str(),
-                count: args["count"]
-                    .as_u64()
-                    .map_or(200, |n| usize::try_from(n).unwrap_or(200)),
-                rounds: args["rounds"]
-                    .as_u64()
-                    .map_or(3, |n| usize::try_from(n).unwrap_or(3)),
+                count,
+                rounds,
             })?)?
         }
         "enable" => {
             let crate_dir = std::path::absolute(path("crate")?)?;
             let only = strings("only");
-            let partial = args["partial"].as_bool().unwrap_or(false);
-            let force = args["force"].as_bool().unwrap_or(false);
+            let partial = opt_bool(args, "partial")?.unwrap_or(false);
+            let force = opt_bool(args, "force")?.unwrap_or(false);
             anyhow::ensure!(
                 !(partial && (!only.is_empty() || force)),
                 "`partial` cannot be combined with `only` or `force`"
@@ -1008,7 +1147,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             serde_json::to_value(crate::card::report(&crate::card::Options {
                 crate_dir: &crate_dir,
                 out: out.as_deref(),
-                min_ms: args["min_ms"].as_u64().unwrap_or(200),
+                min_ms: opt_u64(args, "min_ms")?.unwrap_or(200),
                 node_args: &strings("node_args"),
                 resolve_from: opt_path("resolve_from").as_deref(),
             })?)?
@@ -1019,6 +1158,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         )?)?,
         "app_record" => {
             let repo = path("repo")?;
+            let timeout_secs = opt_timeout()?;
             let inputs = opt_path("inputs");
             let effect_response = match args.get("effect_response") {
                 None | Some(Value::Null) => Vec::new(),
@@ -1040,40 +1180,50 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                 args["db_reset"].as_str(),
                 args["db_dump"].as_str(),
             )?;
+            let server_args = opt_string_list(args, "args")?;
+            let fresh = opt_string_list(args, "fresh")?;
             serde_json::to_value(app::record(&app::RecordOptions {
                 repo: &repo,
                 run: &strings("run"),
                 inputs: inputs.as_deref(),
                 normalize: &strings("normalize"),
                 name: args["name"].as_str(),
-                traps: args["traps"].as_bool().unwrap_or(true),
-                timeout_secs: args["timeout"].as_u64(),
-                http: args["http"].as_bool().unwrap_or(false),
-                port: args["port"].as_u64().and_then(|p| u16::try_from(p).ok()),
-                server_args: &strings("args"),
-                fresh: &strings("fresh"),
-                pace_ms: args["pace"].as_u64(),
-                float_tolerance: args["float_tolerance"].as_f64(),
+                traps: opt_bool(args, "traps")?.unwrap_or(true),
+                timeout_secs,
+                http: opt_bool(args, "http")?,
+                port: opt_u16(args, "port")?,
+                server_args: server_args.as_deref(),
+                fresh: fresh.as_deref(),
+                pace_ms: opt_u64(args, "pace")?,
+                float_tolerance: opt_f64(args, "float_tolerance")?,
                 float_files: &strings("float_file"),
+                ready_secs: opt_u64(args, "ready_timeout")?,
                 effects,
             })?)?
         }
         "app_replay" => {
             let repo = path("repo")?;
-            serde_json::to_value(app::replay(&app::ReplayOptions {
+            let timeout_secs = opt_timeout()?;
+            let redact = opt_bool(args, "redact")?.unwrap_or(false);
+            let opts = app::ReplayOptions {
                 repo: &repo,
                 build: args["build"].as_str(),
-                timeout_secs: args["timeout"].as_u64(),
-                port: args["port"].as_u64().and_then(|p| u16::try_from(p).ok()),
+                timeout_secs,
+                port: opt_u16(args, "port")?,
                 case: args["case"].as_str(),
-            })?)?
+            };
+            serde_json::to_value(if redact {
+                app::replay_redacted(&opts)?
+            } else {
+                app::replay(&opts)?
+            })?
         }
         "app_front_door" => {
             let repo = path("repo")?;
             serde_json::to_value(front_door::front_door(&front_door::FrontDoorOptions {
                 repo: &repo,
-                library: args["library"].as_bool().unwrap_or(false),
-                check: args["check"].as_bool().unwrap_or(true),
+                library: opt_bool(args, "library")?.unwrap_or(false),
+                check: opt_bool(args, "check")?.unwrap_or(true),
             })?)?
         }
         "app_wire" => {
@@ -1083,13 +1233,22 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                 unit: args["unit"].as_str().context("missing `unit`")?,
                 commands: &strings("commands"),
                 routes: &strings("routes"),
-                skip_gate: args["skip_gate"].as_bool().unwrap_or(false),
-                check: args["check"].as_bool().unwrap_or(true),
+                skip_gate: opt_bool(args, "skip_gate")?.unwrap_or(false),
+                check: opt_bool(args, "check")?.unwrap_or(true),
             })?)?
         }
         "app_lift" => serde_json::to_value(lift::lift(&lift::LiftOptions {
             repo: &path("repo")?,
         })?)?,
+        "app_drift" => {
+            let repo = path("repo")?;
+            let timeout_secs = opt_timeout()?;
+            serde_json::to_value(crate::drift::drift(&crate::drift::DriftOptions {
+                repo: &repo,
+                build: args["build"].as_str(),
+                timeout_secs,
+            })?)?
+        }
         #[cfg(test)]
         "test_sleep" => {
             std::thread::sleep(std::time::Duration::from_millis(
@@ -1160,6 +1319,83 @@ mod tests {
     }
 
     #[test]
+    fn kind_profile_and_keep_reject_unknown_or_non_string_values() {
+        assert_eq!(kind_arg(&json!({})).unwrap(), None);
+        assert_eq!(kind_arg(&json!({ "kind": null })).unwrap(), None);
+        assert_eq!(
+            kind_arg(&json!({ "kind": "napi" })).unwrap(),
+            Some(bridge::Kind::Napi)
+        );
+        assert_eq!(
+            kind_arg(&json!({ "kind": "wasm" })).unwrap(),
+            Some(bridge::Kind::Wasm)
+        );
+        for bad in [json!("pyo3"), json!("nap"), json!(42), json!(true)] {
+            let err = kind_arg(&json!({ "kind": bad.clone() })).unwrap_err();
+            assert!(
+                format!("{err}").contains("\"napi\" or \"wasm\""),
+                "{bad}: {err}"
+            );
+        }
+
+        assert_eq!(profile_arg(&json!({})).unwrap(), Profile::Host);
+        assert_eq!(
+            profile_arg(&json!({ "profile": null })).unwrap(),
+            Profile::Host
+        );
+        assert_eq!(
+            profile_arg(&json!({ "profile": "host" })).unwrap(),
+            Profile::Host
+        );
+        assert_eq!(
+            profile_arg(&json!({ "profile": "android" })).unwrap(),
+            Profile::Android
+        );
+        for bad in [json!("ios"), json!(123), json!(false)] {
+            let err = profile_arg(&json!({ "profile": bad.clone() })).unwrap_err();
+            assert!(
+                format!("{err}").contains("\"host\" or \"android\""),
+                "{bad}: {err}"
+            );
+        }
+
+        assert_eq!(keep_arg(&json!({})).unwrap(), None);
+        assert_eq!(keep_arg(&json!({ "keep": null })).unwrap(), None);
+        assert_eq!(
+            keep_arg(&json!({ "keep": "mismatches" })).unwrap(),
+            Some(crate::fuzz::Keep::Mismatches)
+        );
+        assert_eq!(
+            keep_arg(&json!({ "keep": "all" })).unwrap(),
+            Some(crate::fuzz::Keep::All)
+        );
+        for bad in [json!("some"), json!(42), json!(true)] {
+            let err = keep_arg(&json!({ "keep": bad.clone() })).unwrap_err();
+            assert!(
+                format!("{err}").contains("\"mismatches\" or \"all\""),
+                "{bad}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn bridge_refuses_a_bad_kind_before_writing_anything() {
+        let out =
+            std::env::temp_dir().join(format!("rust-anything-mcp-kind-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&out);
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mini");
+        for bad in [json!("nap"), json!(42)] {
+            let err = call(
+                "bridge",
+                &json!({ "root": root, "unit": "packages/a/src/util.ts", "out": out, "kind": bad }),
+            )
+            .unwrap_err();
+            assert!(format!("{err}").contains("`kind`"), "{err}");
+            assert!(!out.exists(), "a refused bridge must not create the crate");
+        }
+    }
+
+    #[test]
     fn speaks_mcp() {
         let init = handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2025-06-18" } })).unwrap();
         assert_eq!(init["result"]["serverInfo"]["name"], "rust-anything");
@@ -1191,13 +1427,15 @@ mod tests {
                 "fuzz",
                 "shadow",
                 "map",
+                "rules",
                 "package",
                 "gate",
                 "app_record",
                 "app_replay",
                 "app_front_door",
                 "app_wire",
-                "app_lift"
+                "app_lift",
+                "app_drift"
             ]
         );
         let bad = handle(&json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": { "name": "gate", "arguments": {} } })).unwrap();
@@ -1283,6 +1521,18 @@ mod tests {
                 "stale_recording",
                 false,
                 Some("rust-anything record rust/slug"),
+            ),
+            (
+                "`cargo` not found on PATH; run `rust-anything doctor`",
+                "missing_tool",
+                false,
+                Some("rust-anything doctor"),
+            ),
+            (
+                "running cargo: `cargo` not found on PATH; install it with `rustup`, or run `rust-anything doctor`",
+                "missing_tool",
+                false,
+                Some("rust-anything doctor"),
             ),
             (
                 "cargo build failed (exit status: 101):\nerror[E0308]",
@@ -1424,5 +1674,154 @@ mod tests {
             &json!({ "repo": ".", "effect_response": ["GET /x=201", 42] }),
         );
         assert!(bad_mixed.is_err());
+    }
+
+    #[test]
+    fn app_record_rejects_non_string_array_args_and_fresh() {
+        assert_eq!(opt_string_list(&json!({}), "fresh").unwrap(), None);
+        assert_eq!(
+            opt_string_list(&json!({ "fresh": null }), "fresh").unwrap(),
+            None
+        );
+        assert_eq!(
+            opt_string_list(&json!({ "fresh": [] }), "fresh").unwrap(),
+            Some(Vec::new())
+        );
+        assert_eq!(
+            opt_string_list(&json!({ "args": ["db.json"] }), "args").unwrap(),
+            Some(vec!["db.json".to_string()])
+        );
+        assert!(call("app_record", &json!({ "repo": ".", "fresh": [42] })).is_err());
+        assert!(call("app_record", &json!({ "repo": ".", "fresh": "data" })).is_err());
+        assert!(call("app_record", &json!({ "repo": ".", "args": [42] })).is_err());
+        assert!(call("app_record", &json!({ "repo": ".", "args": "db.json" })).is_err());
+    }
+
+    #[test]
+    fn app_record_and_app_replay_reject_zero_or_negative_timeout() {
+        let dir = std::env::temp_dir().join(format!("ra-mcp-timeout-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for tool in ["app_record", "app_replay"] {
+            for timeout in [json!(0), json!(-1)] {
+                let err = call(tool, &json!({ "repo": dir, "timeout": timeout })).unwrap_err();
+                let msg = format!("{err:#}");
+                assert!(
+                    msg.contains("--timeout") && msg.contains("1 second"),
+                    "{tool} with {timeout}: {msg}"
+                );
+            }
+        }
+        assert!(
+            !dir.join("rust").exists(),
+            "rejected timeout must not create rust/app-cases"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn numeric_args_reject_wrong_types_negatives_and_overflow() {
+        assert_eq!(opt_u64(&json!({}), "min_ms").unwrap(), None);
+        assert_eq!(opt_u64(&json!({ "min_ms": null }), "min_ms").unwrap(), None);
+        assert_eq!(
+            opt_u64(&json!({ "min_ms": 250 }), "min_ms").unwrap(),
+            Some(250)
+        );
+        for bad in [json!(-1), json!("250"), json!(1.5), json!(true)] {
+            let err = opt_u64(&json!({ "min_ms": bad.clone() }), "min_ms").unwrap_err();
+            assert!(format!("{err}").contains("`min_ms`"), "{bad}: {err}");
+        }
+
+        assert_eq!(
+            opt_u16(&json!({ "port": 8080 }), "port").unwrap(),
+            Some(8080)
+        );
+        assert!(opt_u16(&json!({ "port": 70_000 }), "port").is_err());
+        assert!(opt_u16(&json!({ "port": -1 }), "port").is_err());
+        assert!(opt_u16(&json!({ "port": "8080" }), "port").is_err());
+
+        assert_eq!(opt_f64(&json!({}), "time").unwrap(), None);
+        assert_eq!(opt_f64(&json!({ "time": 2.5 }), "time").unwrap(), Some(2.5));
+        assert_eq!(opt_f64(&json!({ "time": 2 }), "time").unwrap(), Some(2.0));
+        for bad in [json!("2.5"), json!(true), json!([])] {
+            let err = opt_f64(&json!({ "time": bad.clone() }), "time").unwrap_err();
+            assert!(format!("{err}").contains("`time`"), "{bad}: {err}");
+        }
+
+        assert!(call("fuzz", &json!({ "crate": ".", "time": "10" })).is_err());
+        assert!(call("fuzz", &json!({ "crate": ".", "seed": "42" })).is_err());
+        assert!(call("fuzz", &json!({ "crate": ".", "cases": -1 })).is_err());
+        assert!(call("bench", &json!({ "crate": ".", "min_ms": -5 })).is_err());
+        assert!(call("report", &json!({ "crate": ".", "min_ms": "100" })).is_err());
+        assert!(call("diff", &json!({ "crate": ".", "float_tolerance": "1e-9" })).is_err());
+        assert!(call("record", &json!({ "crate": ".", "count": -1 })).is_err());
+        let bad_tol = call(
+            "record",
+            &json!({ "crate": ".", "float_tolerance": -1.0, "test_command": ["nonexistent-test-cmd"] }),
+        )
+        .unwrap_err();
+        assert!(
+            format!("{bad_tol:#}").contains("--float-tolerance"),
+            "{bad_tol:#}"
+        );
+        assert!(call("app_replay", &json!({ "repo": ".", "port": 70_000 })).is_err());
+        assert!(call("app_record", &json!({ "repo": ".", "pace": -10 })).is_err());
+        assert!(call("app_record", &json!({ "repo": ".", "ready_timeout": "30" })).is_err());
+    }
+
+    #[test]
+    fn boolean_args_reject_non_boolean_values() {
+        assert_eq!(opt_bool(&json!({}), "force").unwrap(), None);
+        assert_eq!(opt_bool(&json!({ "force": null }), "force").unwrap(), None);
+        assert_eq!(
+            opt_bool(&json!({ "force": true }), "force").unwrap(),
+            Some(true)
+        );
+        assert_eq!(
+            opt_bool(&json!({ "force": false }), "force").unwrap(),
+            Some(false)
+        );
+        for bad in [json!("true"), json!("false"), json!(1), json!(0), json!([])] {
+            let err = opt_bool(&json!({ "force": bad.clone() }), "force").unwrap_err();
+            assert!(format!("{err}").contains("`force`"), "{bad}: {err}");
+        }
+
+        for (tool, args) in [
+            ("analyze", json!({ "root": ".", "whole_app": "true" })),
+            (
+                "bridge",
+                json!({ "root": ".", "unit": "src/a.ts", "force": "true" }),
+            ),
+            (
+                "record",
+                json!({ "crate": ".", "ignore_key_order": "true", "test_command": ["nonexistent"] }),
+            ),
+            (
+                "record",
+                json!({ "crate": ".", "pin_clock": 1, "test_command": ["nonexistent"] }),
+            ),
+            ("diff", json!({ "crate": ".", "ignore_key_order": "false" })),
+            ("package", json!({ "crate": ".", "dry_run": "true" })),
+            ("enable", json!({ "crate": ".", "partial": "true" })),
+            ("enable", json!({ "crate": ".", "force": 1 })),
+            ("app_record", json!({ "repo": ".", "http": "false" })),
+            ("app_record", json!({ "repo": ".", "traps": "false" })),
+            ("app_front_door", json!({ "repo": ".", "check": "false" })),
+            ("app_front_door", json!({ "repo": ".", "library": 1 })),
+            (
+                "app_wire",
+                json!({ "repo": ".", "unit": "a", "skip_gate": "true" }),
+            ),
+            (
+                "app_wire",
+                json!({ "repo": ".", "unit": "a", "check": "false" }),
+            ),
+        ] {
+            let err = call(tool, &args).unwrap_err();
+            assert!(
+                format!("{err:#}").contains("must be a boolean"),
+                "{tool} {args}: {err:#}"
+            );
+        }
     }
 }

@@ -428,10 +428,12 @@ pub fn lib_rs(m: &Manifest, api: &crate::codegen::PortApi) -> Result<String, Str
         }
         let args: Vec<&str> = f.params.iter().map(|(n, _)| n.as_str()).collect();
         let call = format!("port::{}({})", f.rust_name, args.join(", "));
-        let call = if f.fallible {
-            call
+        let guarded = if args.is_empty() && f.fallible {
+            format!("guard(ruby, port::{})", f.rust_name)
+        } else if f.fallible {
+            format!("guard(ruby, || {call})")
         } else {
-            format!("Ok({call})")
+            format!("guard(ruby, || Ok({call}))")
         };
         let (ret, tail) = if f.ret == "()" {
             ("()".to_string(), "")
@@ -451,7 +453,7 @@ pub fn lib_rs(m: &Manifest, api: &crate::codegen::PortApi) -> Result<String, Str
         };
         let _ = writeln!(
             out,
-            "\n/// `{js}`.\nfn {rb_name}({ruby_param}) -> Result<{ret}, Error> {{\n{body}    guard(ruby, || {call}){tail}\n}}",
+            "\n/// `{js}`.\nfn {rb_name}({ruby_param}) -> Result<{ret}, Error> {{\n{body}    {guarded}{tail}\n}}",
             js = f.js_name,
         );
         defs.push(format!(
@@ -658,5 +660,35 @@ mod tests {
         assert!(rs.contains("split(\"::\")"), "{rs}");
         assert!(rs.contains("value::ReprValue"), "{rs}");
         assert!(rs.contains("const_get\", (part, false)"), "{rs}");
+    }
+
+    #[test]
+    fn lib_rs_avoids_redundant_closure_for_zero_arg_fallible_functions() {
+        let m = Manifest {
+            schema: String::new(),
+            root: std::path::PathBuf::new(),
+            root_written: None,
+            unit: "lib/ping.rb".into(),
+            language: crate::lang::Lang::Ruby,
+            kind: crate::bridge::Kind::Ffi,
+            crate_name: "ping-rs".into(),
+            exports: Vec::new(),
+            classes: Vec::new(),
+            js_only: Vec::new(),
+            batches: Vec::new(),
+            allocator: Default::default(),
+            float_tolerance: None,
+            ignore_key_order: false,
+        };
+        let api = crate::codegen::parse_port(
+            "pub fn pong() -> Result<String, String> { Ok(\"pong\".into()) }\n\
+             pub fn pure_pong() -> String { \"pong\".into() }\n\
+             pub fn echo(s: String) -> Result<String, String> { Ok(s) }\n",
+        );
+        let rs = lib_rs(&m, &api).unwrap();
+        assert!(rs.contains("guard(ruby, port::pong)"), "{rs}");
+        assert!(!rs.contains("guard(ruby, || port::pong())"), "{rs}");
+        assert!(rs.contains("guard(ruby, || Ok(port::pure_pong()))"), "{rs}");
+        assert!(rs.contains("guard(ruby, || port::echo(s))"), "{rs}");
     }
 }

@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · Татарча · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · Татарча · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a> · <a href="README_TH.md">ไทย</a> · <a href="https://github.com/erkamyaman/rust-anything/issues/425">+ add yours</a></sub></p>
 <p align="center"><sub>Бу тәрҗемәне җәмәгатьчелек алып бара, шуңа күрә ул <a href="../README.md">инглизчә README</a> файлыннан калышырга мөмкин.</sub></p>
 
 <p align="center"><b>Кушымтагызны Rust телендә яңадан языгыз һәм аның элеккечә эшләвен исбатлагыз.</b><br>
@@ -41,7 +41,7 @@
   <sub>ms, Fuse.js һәм json-server проектларыннан алынган 59 чын файлда Prettier һәм аның Rust порты (Apple M4). Нәтиҗә байтка-байт бертөрле. <a href="real-world.md#prettier">Ничек үлчәнде</a>.</sub>
 </p>
 
-<p align="center"><sub>PHP һәм C#: бүген язып алу, кабат уйнату һәм front door; модуль портлары киләсе чиратта.</sub></p>
+<p align="center"><sub>PHP, C# һәм PowerShell: FFI һәм P/Invoke аша модуль портлары.</sub></p>
 
 <table>
   <tr>
@@ -238,9 +238,9 @@ rust-anything кодны тәрҗемә итми: Rust кодын сезнең �
 C, PHP, C# һәм PowerShell'дан кала һәр тел batch класслар да ала (`--batch`): элементлар бер тапкыр күчә һәм
 Rust'та кала, ә һәр чакыру аларның барысын да барлык ядроларда эшкәртә.
 
-Тел репозиторийдан билгеләнә (`go.mod`, `pom.xml`, `.csproj` яки `.sln`,
+Тел репозиторийдан билгеләнә (`go.mod`, `pom.xml`, `build.gradle`/`build.gradle.kts`, `.csproj` яки `.sln`,
 `pyproject.toml`, `Gemfile`, `composer.json`, `package.json`, юкса иң күп очрый торган чыганак файллар);
-`--lang` аны алыштыра. Типлар чыганак кодтан алына: TS типлары, Python type hints, C, Go, Java һәм C#
+`.kt` чыганак файллары булган һәм `.java` файлы булмаган Gradle модуле Kotlin санала, катнаш модульләр Java булып кала. `--lang` аны алыштыра. Типлар чыганак кодтан алына: TS типлары, Python type hints, C, Go, Java, Kotlin һәм C#
 сигнатуралары, Ruby YARD теглары, PHP типлары һәм phpdoc; сан итеп кулланылган типсыз параметрлар
 сан дип чыгарыла.
 

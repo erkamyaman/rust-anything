@@ -63,22 +63,29 @@ paths in what you commit. CI runs it on every file.
     servers.
   - `tests/app_fresh.rs`: `app record --fresh`, where each case starts from a snapshot of a project
     folder.
+  - `tests/app_stale.rs`: re-recording replaces the case set; a hand-written case is kept and
+    named.
   - `tests/library.rs`: whole-library ports.
   - `tests/effects.rs`: side effects (mail sent, rows written) that make a replay fail even when
     the output matches.
   - `tests/fuzz.rs`: `fuzz` and `record --pin-clock`.
+  - `tests/profile.rs`: `profile` on real Python (cProfile) and Node (`--cpu-prof`) workloads.
   - `tests/switch.rs`: `enable` and `disable` on real source files.
   - `tests/package.rs`: `package` layouts and an installed napi port.
   - `tests/doctor.rs`: `doctor --json` and its exit code.
   - `tests/report.rs`: what the plan says about units you cannot start with.
+  - `tests/card.rs`: `report` (`card::report`) end to end on a built N-API crate.
   - `tests/port_map.rs`: the port map, upstream changes and unreadable manifests.
   - `tests/overloads.rs`: Java, C# and Kotlin overloads kept in the original while the rest is
     bridged.
+  - `tests/error_resolution.rs`: C# and PHP exception class resolution (qualified, nested,
+    fallback).
   - `tests/tools.rs`: the MCP tools and the CLI expose the same options, and `docs/tools.md`
     matches the tool list.
   - `tests/types_doc.rs`: every row of `docs/types.md` matches what the type mappings give. Update
     the table there when a mapping changes.
   - `tests/plugin.rs`: the plugin ships the same skill and MCP server, at the crate version.
+  - `tests/skill.rs`: every command the skill names exists in the CLI.
   - `tests/recording.rs`, `tests/record_cwd.rs` and `tests/record_timeout.rs`: `record` flags a
     stale recording, leaves the working directory alone, and stops a case that never returns.
   - `tests/float_files.rs`: float files compared within the tolerance.

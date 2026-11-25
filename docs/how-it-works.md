@@ -35,11 +35,11 @@ analyze --whole-app ──> app record ──> app front-door ──> per unit: 
 | 2. Bridge | `rust-anything bridge <repo> <unit>` | Crate with the bindings (`lib.rs`, plus the wrapper the source language loads) and stubs to port (`port.rs`); `--batch fn:param` adds a class that keeps many `param` values in Rust; `--as-json T` bridges a type parameter the app only fills with data as JSON values |
 | 3. Record | `rust-anything record <crate>` | Runs the original on generated edge cases (non-ASCII, emoji, `-0`, `NaN`, ints where floats are expected, ...) and on every semantic trap in every parameter (string length and case, signed division, overflow edges, float printing, map and sort order), and saves `cases.jsonl`; `--from-tests -- npx jest` (or `-- pytest`) also records every call the original's own test suite makes; `--float-tolerance 1e-9` lets floats match within that share for numeric code; `--pin-clock` (TS/JS, Python) fixes the clock and random numbers during record and diff, and `src/port/pinned.rs` gives the port the same ones |
 | 3. Build | `rust-anything build <crate>` | Builds the Rust side: `.node`, wasm package, Python extension or shared library |
-| 3. Diff | `rust-anything diff <crate>` | Replays the recorded cases against Rust, called the way the original's callers call it; lists mismatches |
+| 3. Diff | `rust-anything diff <crate>` | Replays the recorded cases against Rust, called the way the original's callers call it; lists mismatches, each with where it first differs (`return`, `throw` or `call N`, the JSON path such as `$.items[2].name`, the kind of difference, and for text the character with a little context), and the distinct differences with how many cases each covers under a short stable id, so 40 failing cases from one bug read as one line; `--redact` prints all of it as shapes only (types, lengths and hashes, no values or arguments), safe to paste into an issue or hand to another agent |
 | 3. Fuzz | `rust-anything fuzz <crate>` | Fresh inputs from a new seed (`--seed`, `--cases`, `--time`) through the original and Rust; reports what the recording missed, and `--keep` adds those cases to it |
 | 3. Bench | `rust-anything bench <crate>` | Times the recorded cases on the original and on Rust, bridge included |
 | 4. Shadow | `rust-anything shadow <crate>` | Drop-in that runs both, returns the original's result, reports mismatches; `RUST_ANYTHING_MODE=old\|shadow\|new` |
-| 5. Gate | `rust-anything gate <crate>` | fmt, clippy `-D warnings`, tests, `unsafe` audit, nothing unported, a recorded failing case for every error path of the original, no `unwrap`/`expect`/`panic!` where the original returns an error (unless marked `// INFALLIBLE: <why>`), build, API, behavior |
+| 5. Gate | `rust-anything gate <crate>` | fmt, clippy `-D warnings`, tests, `unsafe` audit, nothing unported, a recorded failing case for every error path of the original, no `unwrap`/`expect`/`panic!` where the original returns an error (unless marked `// INFALLIBLE: <why>`), build, API, behavior, and the [cheat guard](#what-gate-refuses-to-count) |
 | 6. Switch | `rust-anything enable <crate>` / `disable <crate>` | Turns a gated TS/JS, Python or PowerShell port on for every caller, and off again byte for byte ([Switch a port on and off](#switch-a-port-on-and-off)) |
 | 7. Report | `rust-anything report <crate>` | `report/REPORT.md` and `report/card.svg` for a pull request: recorded cases matched, speedup from `bench`, fallback rate, on or off, the machine and its cores |
 | Cache | `rust-anything clean` | Removes the build folder every port and bridge shares ([One build cache](#one-build-cache)) |
@@ -220,6 +220,33 @@ bad it usually is and gives one example. The severities are the ones `analyze` s
 These are the same 28 titles `analyze` can emit, with the severities it scores them at;
 `src/risks.rs` is the list.
 
+## What gate refuses to count
+
+A port can pass `diff` without porting anything: answer the recorded cases from a table, delete
+the tests that fail, or edit `cases.jsonl` until it agrees. `gate` checks for each of these.
+
+- **`literals`**: string literals of 8 or more characters and numbers with 5 or more significant
+  digits in the port's own files (not the bindings, not its `#[cfg(test)]` code) that equal a
+  recorded argument or result, while the original's source never spells them out. One or two are
+  named and pass; three or more fail, and so does any mention of `cases.jsonl`,
+  `known-diffs.jsonl` or `recorded-from.json`. Powers of two and ten and the float limits are
+  never counted. A constant the original really takes from a library stays with a
+  `// recorded-literal: <reason>` comment on its line.
+- **`tests`**: the crate's `#[test]` functions, assertions and `#[ignore]`s (in `src/` and
+  `tests/`) are saved to `.rust-anything/tests.json` each time `gate` passes. Fewer tests or
+  assertions, or more ignored, fail the next run; when the change is intended, delete that file.
+- **`recording`**: `record` saves the number of lines in `cases.jsonl` and their hash in
+  `recorded-from.json`. A recorded line edited or removed fails; cases appended after them
+  (`fuzz --keep`) are fine.
+
+## Port rules
+
+Corrections the user makes during a port ("dates print in local time", "an empty input prints
+nothing") are kept in `rust/RULES.md`, committed with the port. `rust-anything rules <repo>`
+lists them and `rules <repo> --add "<rule>"` appends one (an exact duplicate is skipped; a crate
+folder stands for its repository). `go` puts them in `TASK.md`, and the MCP server's prompts and
+instructions carry them, so every later unit and every agent keeps them.
+
 ## What it can't catch
 
 Passing means the Rust matches every case that was recorded, nothing more. What bites rewrites
@@ -303,4 +330,9 @@ while any recording is stale, for CI.
 
 After an upstream change: pull it, run `map`, and for each port marked **changed** run `record`
 again, then `diff`. The new mismatches are exactly what changed upstream; port those.
+
+For a whole CLI or server, `app drift` replays the original and the build against the recorded
+cases and lists documented examples no case records; see
+[Keep up with the original](whole-apps.md#keep-up-with-the-original) for it and a GitHub Actions
+workflow that runs it.
 

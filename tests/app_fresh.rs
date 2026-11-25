@@ -56,14 +56,15 @@ fn record(repo: &Path) -> app::RecordOutcome {
         name: Some("tool"),
         traps: false,
         timeout_secs: None,
-        http: false,
-        server_args: &[],
-        fresh: &["fixtures/project/".to_string()],
+        http: None,
+        server_args: None,
+        fresh: Some(&["fixtures/project/".to_string()]),
         pace_ms: None,
         port: None,
         float_tolerance: None,
         float_files: &[],
         effects: None,
+        ready_secs: None,
     })
     .unwrap()
 }

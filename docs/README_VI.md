@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · Tiếng Việt · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · Tiếng Việt · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a> · <a href="README_TH.md">ไทย</a> · <a href="https://github.com/erkamyaman/rust-anything/issues/425">+ add yours</a></sub></p>
 <p align="center"><sub>Bản dịch này do cộng đồng duy trì và có thể chậm hơn <a href="../README.md">README tiếng Anh</a>.</sub></p>
 
 <p align="center"><b>Viết lại ứng dụng bằng Rust, và chứng minh nó vẫn hoạt động y như cũ.</b><br>
@@ -41,7 +41,7 @@ Làm tại Thổ Nhĩ Kỳ 🇹🇷 bởi <a href="https://github.com/erkamyaman
   <sub>Prettier so với bản port Rust trên 59 file thực tế lấy từ ms, Fuse.js và json-server (Apple M4). Đầu ra giống nhau đến từng byte. <a href="real-world.md#prettier">Cách đo</a>.</sub>
 </p>
 
-<p align="center"><sub>PHP và C#: port từng đơn vị qua FFI và P/Invoke.</sub></p>
+<p align="center"><sub>PHP, C# và PowerShell: port từng đơn vị qua FFI và P/Invoke.</sub></p>
 
 <table>
   <tr>
@@ -167,7 +167,7 @@ Hoặc tự chạy từng bước:
 ```sh
 rust-anything profile . -- node bench.mjs              # what is hot, and who calls it
 rust-anything bridge . src/fuzzy.ts --batch fuzzyScore:text
-# write src/port.rs (or let your agent), then:
+# viết src/port.rs (hoặc để agent của bạn viết), sau đó:
 rust-anything record rust/fuzzy-rs && rust-anything build rust/fuzzy-rs
 rust-anything diff rust/fuzzy-rs                       # every recorded case must match
 rust-anything bench rust/fuzzy-rs                      # faster? the verdict says
@@ -201,7 +201,7 @@ rust-anything không tự dịch code: bạn hoặc coding agent (Claude Code, C
 
 Mọi ngôn ngữ trừ C, PHP, C# và PowerShell đều có thêm batch class (`--batch`): dữ liệu chỉ qua cầu nối một lần rồi nằm trong Rust, mỗi lần gọi sẽ xử lý cả lô trên mọi core.
 
-Công cụ nhận diện ngôn ngữ qua repo dựa trên các file như `go.mod`, `pom.xml`, `.csproj`, `.sln`, `pyproject.toml`, `Gemfile`, `composer.json`, `package.json` hoặc phần mở rộng xuất hiện nhiều nhất. Muốn chỉ định ngôn ngữ, dùng `--lang`. Kiểu dữ liệu được đọc từ source: type của TypeScript, type hint của Python, chữ ký hàm của C, Go, Java và C#, YARD tag của Ruby, type và phpdoc của PHP. Tham số không khai báo kiểu nhưng được dùng như số sẽ được suy luận là kiểu số.
+Công cụ nhận diện ngôn ngữ qua repo dựa trên các file như `go.mod`, `pom.xml`, `build.gradle`/`build.gradle.kts`, `.csproj`, `.sln`, `pyproject.toml`, `Gemfile`, `composer.json`, `package.json` hoặc phần mở rộng xuất hiện nhiều nhất; một module Gradle chứa mã nguồn `.kt` và không có mã nguồn `.java` là Kotlin, các module hỗn hợp vẫn là Java. Muốn chỉ định ngôn ngữ, dùng `--lang`. Kiểu dữ liệu được đọc từ source: type của TypeScript, type hint của Python, chữ ký hàm của C, Go, Java, Kotlin và C#, YARD tag của Ruby, type và phpdoc của PHP. Tham số không khai báo kiểu nhưng được dùng như số sẽ được suy luận là kiểu số.
 
 Với PHP, `analyze` lập kế hoạch chuyển app PHP, gồm package Composer và PSR-4 autoloading, các rủi ro như so sánh lỏng lẻo hay tràn số nguyên thành float, và ánh xạ package Composer sang crate. Hiện có thể ghi lại, replay và đặt Rust front door trước CLI hoặc server PHP. Các function cấp cao nhất của một unit, với tham số kiểu scalar, string, list và mảng kết hợp, được nối qua extension FFI của PHP (`php` có `ext-ffi`, bật sẵn cho CLI): khi `diff` đã pass, hãy require file `php/<crate>.php` được tạo ra (tên crate với `-` đổi thành `_`, nên `foo-rs` thành `php/foo_rs.php`) ở chỗ app đang require file gốc, và để cả hai file ở nguyên chỗ, vì wrapper nạp native library theo đường dẫn tương đối với thư mục của nó, nên dời nó đi sẽ làm hỏng việc nạp. Wrapper khai báo từng function được nối một cách vô điều kiện, không có guard `function_exists`, nên nó thay thế file gốc chứ không dùng chung với file đó. Những gì khác trong file gốc không đi theo: class, method `public static`, các function mà cầu nối giữ lại trong PHP (ví dụ có tham số `callable` hay `Closure`) và các câu lệnh cấp cao nhất như `define('FEATURE_ENABLED', true)` đều không có trong wrapper, và require cả hai file sẽ khai báo lại các function đã nối. Hãy để những phần đó trong một file vẫn được require. Mỗi lời gọi đi qua cầu nối dưới dạng JSON, mất khoảng 1 µs, nên `bench` sẽ cho thấy các function nhỏ chậm hơn PHP; PHP chưa có `shadow` ([issue #200](https://github.com/erkamyaman/rust-anything/issues/200)).
 

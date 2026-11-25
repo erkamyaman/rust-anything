@@ -123,7 +123,9 @@ installs each one:
 | Android NDK, `adb`, `d8`, `kotlinc` and the three Rust Android targets | `build`/`record`/`diff --profile android` |
 | `wasm32-unknown-unknown` and the matching `wasm-bindgen` CLI | `bridge --kind wasm`, and the wasm demo |
 | A Node that allows `--cpu-prof` in `NODE_OPTIONS` (22.23 and 24 do, 22.14 does not) | `profile` through `npx` or `npm run` (22.6+ runs everything else, `profile -- node ...` included) |
-| PHP, the .NET SDK | the PHP and C# whole-app paths |
+| PHP 8+ with the FFI extension (`ext-ffi`) | PHP units (record, diff and the generated `php/` wrapper), and the PHP whole-app path |
+| The .NET SDK (`dotnet`) | C# units (record, diff and the generated `cs/` wrapper), and the C# whole-app path |
+| PowerShell 7.4+ (`pwsh`) | PowerShell units (record, diff and the generated `pwsh` driver) |
 
 A missing optional runtime skips its tests instead of failing them; `RUST_ANYTHING_REQUIRE` makes
 them fail. See [Install](install.md#install).

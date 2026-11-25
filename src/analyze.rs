@@ -1096,12 +1096,11 @@ fn resolve_base(base: &str, index: &HashMap<&str, usize>) -> Option<usize> {
             candidates.push(format!("{stem}{ts}"));
         }
     }
-    for ext in [
+    let extensions = [
         "ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs", "vue", "svelte", "astro",
-    ] {
-        candidates.push(format!("{base}.{ext}"));
-        candidates.push(format!("{base}/index.{ext}"));
-    }
+    ];
+    candidates.extend(extensions.iter().map(|ext| format!("{base}.{ext}")));
+    candidates.extend(extensions.iter().map(|ext| format!("{base}/index.{ext}")));
     candidates
         .iter()
         .find_map(|c| index.get(c.as_str()).copied())
@@ -1219,6 +1218,14 @@ fn topological(deps_of: &[Vec<usize>]) -> Vec<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resolves_sibling_file_before_directory_index() {
+        let mut index = HashMap::from([("choice.js", 0), ("choice/index.ts", 1)]);
+        assert_eq!(resolve_base("choice", &index), Some(0));
+        index.remove("choice.js");
+        assert_eq!(resolve_base("choice", &index), Some(1));
+    }
 
     #[test]
     fn normalizes_paths() {

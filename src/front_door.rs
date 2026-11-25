@@ -647,7 +647,11 @@ pub fn front_door(opts: &FrontDoorOptions) -> Result<FrontDoorOutcome> {
             ("src/main.rs", http_door::main_rs()),
             (
                 "src/original.rs",
-                http_door::original_rs(&config.run, http.fresh.is_empty()),
+                http_door::original_rs(
+                    &config.run,
+                    http.fresh.is_empty(),
+                    http.ready_secs.unwrap_or(60),
+                ),
             ),
             ("src/units/mod.rs", http_door::units_rs(&state, false)),
         ];

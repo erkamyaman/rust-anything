@@ -16,7 +16,9 @@ const WORK_DIR: &str = ".rust-anything";
 
 fn run(cmd: &mut Command, what: &str) -> Result<()> {
     let _scratch = crate::harness::scratch_cwd(cmd)?;
-    let output = cmd.output().with_context(|| format!("running {what}"))?;
+    let output = cmd
+        .output()
+        .map_err(|e| crate::process::spawn_error(cmd, what, e))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let tail: Vec<&str> = stderr.lines().rev().take(25).collect();
@@ -922,3 +924,20 @@ if __name__ == "__main__":
     elif mode == "bench":
         bench(rest[0], rest[1], rest[2], rest[3], rest[4], int(rest[5]))
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn c_literal_escapes_quotes_question_marks_and_non_ascii_bytes() {
+        assert_eq!(c_literal("abc"), r#""abc""#);
+        assert_eq!(c_literal(r#"say "hi""#), r#""say \"hi\"""#);
+        assert_eq!(c_literal(r"a\b"), r#""a\\b""#);
+        assert_eq!(c_literal("??="), r#""\077\077=""#);
+        assert_eq!(c_literal("a\nb"), r#""a\012b""#);
+        assert_eq!(c_literal("é"), r#""\303\251""#);
+        assert_eq!(c_literal("\t\u{7f}"), r#""\011\177""#);
+        assert_eq!(c_literal(""), r#""""#);
+    }
+}

@@ -199,6 +199,15 @@ pub(crate) fn pending(state: &State) -> Vec<String> {
 /// The recorded cases of every wired unit, through its bindings (`diff`), and the share of the
 /// API still answered by the original.
 pub(crate) fn replay(repo: &Path, state: &State, unit: Option<&str>) -> Result<ReplayOutcome> {
+    crate::app::write_report(crate::app::grouped(replay_unwritten(repo, state, unit)?))
+}
+
+/// `replay` without writing the report.
+pub(crate) fn replay_unwritten(
+    repo: &Path,
+    state: &State,
+    unit: Option<&str>,
+) -> Result<ReplayOutcome> {
     let app_dir = repo.join(APP_DIR);
     let mut outcome = ReplayOutcome {
         build: vec!["the units' bindings".to_string()],
@@ -208,6 +217,7 @@ pub(crate) fn replay(repo: &Path, state: &State, unit: Option<&str>) -> Result<R
         failures: Vec::new(),
         fallback: None,
         report: app_dir.join(crate::app::REPORT_FILE),
+        groups: Vec::new(),
     };
     let units = crate::app::only_case(state.units.iter().collect(), unit, |u| &u.name)?;
     for unit in units {
@@ -230,9 +240,15 @@ pub(crate) fn replay(repo: &Path, state: &State, unit: Option<&str>) -> Result<R
                     outcome.failures.push(Failure {
                         case: format!("{}: {}", unit.name, m["fn"].as_str().unwrap_or("?")),
                         args,
-                        problems: vec![Problem {
-                            field: "result".to_string(),
-                            detail: format!("- {}\n+ {}\n", m["expected"], m["actual"]),
+                        problems: vec![{
+                            let p = Problem::new(
+                                "result",
+                                format!("- {}\n+ {}\n", m["expected"], m["actual"]),
+                            );
+                            match serde_json::from_value(m["at"].clone()) {
+                                Ok(at) => p.at(at),
+                                Err(_) => p,
+                            }
                         }],
                     });
                 }
@@ -241,10 +257,10 @@ pub(crate) fn replay(repo: &Path, state: &State, unit: Option<&str>) -> Result<R
                     outcome.failures.push(Failure {
                         case: format!("{}: api", unit.name),
                         args: Vec::new(),
-                        problems: vec![Problem {
-                            field: "exports".to_string(),
-                            detail: format!("missing: {}\n", d.missing.join(", ")),
-                        }],
+                        problems: vec![
+                            Problem::new("exports", format!("missing: {}\n", d.missing.join(", ")))
+                                .at(crate::mismatch::At::new("missing key")),
+                        ],
                     });
                 }
             }
@@ -253,13 +269,16 @@ pub(crate) fn replay(repo: &Path, state: &State, unit: Option<&str>) -> Result<R
                 outcome.failures.push(Failure {
                     case: unit.name.clone(),
                     args: Vec::new(),
-                    problems: vec![Problem {
-                        field: "replay".to_string(),
-                        detail: format!(
-                            "{e:#}\n(build it first: rust-anything build {})\n",
-                            crate_dir.display()
-                        ),
-                    }],
+                    problems: vec![
+                        Problem::new(
+                            "replay",
+                            format!(
+                                "{e:#}\n(build it first: rust-anything build {})\n",
+                                crate_dir.display()
+                            ),
+                        )
+                        .at(crate::mismatch::At::new("no response")),
+                    ],
                 });
             }
         }
@@ -272,8 +291,6 @@ pub(crate) fn replay(repo: &Path, state: &State, unit: Option<&str>) -> Result<R
         rate: names.len() as f64 / exports.max(1) as f64,
         names,
     });
-    std::fs::write(&outcome.report, crate::app::report_markdown(&outcome))
-        .with_context(|| format!("writing {}", outcome.report.display()))?;
     Ok(outcome)
 }
 

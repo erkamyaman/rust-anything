@@ -252,3 +252,21 @@ pub fn bench(crate_dir: &Path, m: &Manifest, min_ms: u64) -> Result<Vec<BenchRow
     }
     Ok(crate::harness::bench_rows(m, &timings[0], &timings[1]))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn local_module_version_follows_the_major_version_in_the_path() {
+        for (module, version) in [
+            ("example.com/m", "v0.0.0"),
+            ("example.com/m/v2", "v2.0.0"),
+            ("gopkg.in/yaml.v3", "v3.0.0"),
+            ("gopkg.in/check.v1-unstable", "v1.0.0"),
+            ("example.com/v2ray", "v0.0.0"),
+        ] {
+            assert_eq!(local_module_version(module), version, "{module}");
+        }
+    }
+}

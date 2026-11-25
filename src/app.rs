@@ -121,6 +121,14 @@ pub(crate) fn default_timeout() -> u64 {
     30
 }
 
+pub(crate) fn check_timeout(timeout_secs: Option<u64>) -> Result<()> {
+    ensure!(
+        timeout_secs != Some(0),
+        "--timeout must be at least 1 second"
+    );
+    Ok(())
+}
+
 impl Config {
     pub fn load(repo: &Path) -> Result<Option<Config>> {
         let path = cases_dir(repo).join(CONFIG_FILE);
@@ -232,7 +240,7 @@ pub(crate) struct Normalizers {
 }
 
 impl Normalizers {
-    fn new(config: &Config) -> Result<Self> {
+    pub(crate) fn new(config: &Config) -> Result<Self> {
         let mut sources: Vec<(&str, &str)> = Vec::new();
         let mut key_order = false;
         for name in &config.normalize {
@@ -1223,6 +1231,31 @@ fn find_examples(repo: &Path, names: &[String]) -> Vec<Case> {
     })
 }
 
+/// The documented examples no recorded case runs, as the command line the docs show.
+pub(crate) fn unrecorded_examples(repo: &Path, config: &Config) -> Result<Vec<String>> {
+    if config.http.is_some() {
+        return crate::http::unrecorded_examples(repo);
+    }
+    let recorded: BTreeSet<String> = load_specs(&cases_dir(repo))?
+        .iter()
+        .map(|s| s.case.key())
+        .collect();
+    let mut seen = BTreeSet::new();
+    Ok(
+        find_examples(repo, &app_names(repo, &config.run, Some(&config.name)))
+            .into_iter()
+            .filter(|case| !recorded.contains(&case.key()) && seen.insert(case.key()))
+            .map(|case| {
+                std::iter::once(config.name.as_str())
+                    .chain(case.args.iter().map(String::as_str))
+                    .map(shell_quote)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            })
+            .collect(),
+    )
+}
+
 /// Shell lines in the repository's Markdown code blocks and `.sh` files, each given to `parse`
 /// with the folder of the file it came from.
 pub(crate) fn scan_examples<T>(repo: &Path, parse: impl Fn(&str, &Path) -> Option<T>) -> Vec<T> {
@@ -1540,17 +1573,19 @@ pub struct RecordOptions<'a> {
     pub name: Option<&'a str>,
     pub traps: bool,
     pub timeout_secs: Option<u64>,
-    /// The app is a server: record requests instead of command lines.
-    pub http: bool,
-    /// The port a server always listens on (implies `http`); unset, it gets a free one through
-    /// `PORT` and `{port}`.
+    /// `Some(true)` records as a server, `Some(false)` drops any saved server setting and records
+    /// as a CLI, and `None` keeps the saved mode (or enables server mode if server-only options
+    /// such as `port`, non-empty `server_args`, or `pace_ms` are given).
+    pub http: Option<bool>,
+    /// The port a server always listens on (implies `http`); unset keeps the saved port, `Some(0)`
+    /// removes it so the server gets a free port through `PORT` and `{port}`.
     pub port: Option<u16>,
     /// Servers: arguments every start gets after its command, the original's and every build's
-    /// (implies `http`); kept from the last recording when empty.
-    pub server_args: &'a [String],
-    /// Servers: repository files or folders copied into a fresh working directory before every
-    /// start (implies `http`); kept from the last recording when empty.
-    pub fresh: &'a [String],
+    /// (non-empty implies `http`); `None` keeps the saved list, `Some(&[])` clears it.
+    pub server_args: Option<&'a [String]>,
+    /// Repository files or folders copied into a fresh working directory before every case (CLIs)
+    /// or start (servers); `None` keeps the saved list, `Some(&[])` clears it.
+    pub fresh: Option<&'a [String]>,
     /// Servers: milliseconds to wait after each response, for work the server does after
     /// answering (a file watcher, a write-behind); kept from the last recording when `None`.
     pub pace_ms: Option<u64>,
@@ -1561,6 +1596,9 @@ pub struct RecordOptions<'a> {
     /// when empty.
     pub float_files: &'a [String],
     pub effects: Option<crate::effects::EffectsConfig>,
+    /// Servers: seconds to wait for the port before giving up; kept from the last recording when
+    /// `None`; 0 restores the default, a minute.
+    pub ready_secs: Option<u64>,
 }
 
 fn is_zero(n: &usize) -> bool {
@@ -1634,9 +1672,7 @@ pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Re
             // written: `two.in/sub`, `../app-cases/two.in/sub` (resolved) and `two.in/../shared`
             // (on Unix only found while `two.in` exists) all keep `two.in`.
             let resolved = path.canonicalize().ok();
-            if read.iter().any(|base| {
-                base.starts_with(&path) || resolved.as_ref().is_some_and(|r| base.starts_with(r))
-            }) {
+            if any_base_reads(&read, &path, resolved.as_deref()) {
                 continue;
             }
             if path.is_dir() {
@@ -1660,6 +1696,11 @@ pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Re
     outcome.stale = stale;
     outcome.kept = kept;
     Ok(())
+}
+
+fn any_base_reads(read: &BTreeSet<PathBuf>, path: &Path, resolved: Option<&Path>) -> bool {
+    read.iter()
+        .any(|base| base.starts_with(path) || resolved.is_some_and(|r| base.starts_with(r)))
 }
 
 /// The `fs.base` folders that the cases in `dir` other than `going` read, each as written (joined
@@ -1920,6 +1961,7 @@ pub(crate) fn reserve_case_name(
 }
 
 pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
+    check_timeout(opts.timeout_secs)?;
     let repo = opts
         .repo
         .canonical()
@@ -1955,11 +1997,27 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
             normalize.push(n.clone());
         }
     }
-    let explicit = opts
-        .name
-        .map(str::to_string)
-        .or_else(|| existing.as_ref().map(|c| c.name.clone()));
+    let inferred = |run: &[String]| {
+        app_names(&repo, run, None)
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| "app".to_string())
+    };
+    let explicit = opts.name.map(str::to_string).or_else(|| {
+        existing
+            .as_ref()
+            .filter(|c| opts.run.is_empty() || c.run == opts.run || c.name != inferred(&c.run))
+            .map(|c| c.name.clone())
+    });
     let names = app_names(&repo, &run, explicit.as_deref());
+    let timeout_secs = opts
+        .timeout_secs
+        .or(existing.as_ref().map(|c| c.timeout_secs))
+        .unwrap_or_else(default_timeout);
+    ensure!(
+        timeout_secs >= 1,
+        "--timeout must be at least 1 second (saved timeout_secs in {CONFIG_FILE} is 0; pass --timeout 1 or higher)"
+    );
     let mut config = Config {
         schema: SCHEMA.to_string(),
         name: explicit
@@ -1968,11 +2026,8 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
         run,
         normalize,
         normalizers,
-        timeout_secs: opts
-            .timeout_secs
-            .or(existing.as_ref().map(|c| c.timeout_secs))
-            .unwrap_or_else(default_timeout),
-        http: crate::http::merge_config(existing.as_ref().and_then(|c| c.http.clone()), opts),
+        timeout_secs,
+        http: crate::http::merge_config(existing.as_ref().and_then(|c| c.http.clone()), opts)?,
         float_tolerance: match opts.float_tolerance {
             Some(t) => (crate::tolerance::check(t)? > 0.0).then_some(t),
             None => existing.as_ref().and_then(|c| c.float_tolerance),
@@ -2003,11 +2058,11 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
         recorded: Vec::new(),
     };
     if let Some(http) = config.http.as_mut() {
-        if !opts.fresh.is_empty() {
-            http.fresh = opts.fresh.to_vec();
+        if let Some(fresh) = opts.fresh {
+            http.fresh = fresh.to_vec();
         }
-    } else if !opts.fresh.is_empty() {
-        config.fresh = opts.fresh.to_vec();
+    } else if let Some(fresh) = opts.fresh {
+        config.fresh = fresh.to_vec();
     } else if let Some(c) = &existing {
         config.fresh = c.fresh.clone();
     }
@@ -2021,6 +2076,13 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
             cases_dir(&repo).join(CONFIG_FILE),
             serde_json::to_string_pretty(&config)? + "\n",
         )?;
+        if config.http.as_ref().is_some_and(|h| h.fresh.is_empty()) {
+            let _ = std::fs::remove_dir_all(
+                cases_dir(&repo)
+                    .join(crate::http::HTTP_DIR)
+                    .join(crate::http::FILES_DIR),
+            );
+        }
         return Ok(outcome);
     }
 
@@ -2140,6 +2202,14 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
         dir.join(CONFIG_FILE),
         serde_json::to_string_pretty(&config)? + "\n",
     )?;
+    if config.fresh.is_empty() {
+        let fresh_dir = dir.join(FRESH_DIR);
+        let retained_reads = bases_read(&dir, &BTreeSet::new());
+        let resolved = fresh_dir.canonicalize().ok();
+        if !any_base_reads(&retained_reads, &fresh_dir, resolved.as_deref()) {
+            let _ = std::fs::remove_dir_all(&fresh_dir);
+        }
+    }
     Ok(outcome)
 }
 
@@ -2371,6 +2441,105 @@ pub(crate) fn compare(
     })
 }
 
+/// Where `compare` found the outputs to part: the first changed line and the column where its
+/// literal text stops matching, or the first difference inside JSON; the channel is left to the
+/// caller.
+pub(crate) fn locate(
+    norm: &Normalizers,
+    expected: &[u8],
+    actual: &[u8],
+    binary: bool,
+    unordered: bool,
+) -> crate::mismatch::At {
+    use crate::mismatch::{At, text_at};
+    let (false, Ok(e), Ok(a)) = (
+        binary,
+        std::str::from_utf8(expected),
+        std::str::from_utf8(actual),
+    ) else {
+        return At {
+            expected_len: Some(expected.len()),
+            actual_len: Some(actual.len()),
+            ..At::new("binary")
+        };
+    };
+    let e = norm.canonical(&norm.apply(e));
+    let a = norm.canonical(&norm.apply(a));
+    let structured = |v: &serde_json::Value| v.is_object() || v.is_array();
+    if !unordered
+        && let (Ok(ej), Ok(aj)) = (
+            serde_json::from_str::<serde_json::Value>(&e),
+            serde_json::from_str::<serde_json::Value>(&a),
+        )
+        && structured(&ej)
+        && structured(&aj)
+    {
+        return crate::mismatch::locate_in(&ej, &aj);
+    }
+    let tol = norm.float_tolerance;
+    let (mut el, mut al) = (lines(&e), lines(&a));
+    if unordered {
+        el.sort_unstable();
+        al.sort_unstable();
+    }
+    let ops = diff_ops(&el, &al, |x, y| line_matches_within(x, y, tol));
+    let lengths = |at: At| At {
+        expected_len: Some(e.chars().count()),
+        actual_len: Some(a.chars().count()),
+        ..at
+    };
+    let changed = ops.iter().position(|op| !matches!(op, Op::Equal(..)));
+    let Some(first) = changed else {
+        let trail = |s: &str| s.ends_with('\n') || s.is_empty();
+        let kind = if trail(&e) == trail(&a) {
+            "text"
+        } else {
+            "trailing newline"
+        };
+        return lengths(At {
+            line: Some(el.len().max(1)),
+            ..At::new(kind)
+        });
+    };
+    match ops[first] {
+        Op::Delete(i) => {
+            let insert = ops[first..]
+                .iter()
+                .take_while(|op| !matches!(op, Op::Equal(..)))
+                .find_map(|op| match op {
+                    Op::Insert(j) => Some(*j),
+                    _ => None,
+                });
+            let Some(j) = insert else {
+                return lengths(At {
+                    line: Some(i + 1),
+                    ..At::new("lines missing")
+                });
+            };
+            let literal = el[i].split("[..]").next().unwrap_or_default();
+            let at = text_at("text", literal, al[j]);
+            let column = at.column.unwrap_or(1);
+            let before: usize = el[..i].iter().map(|l| l.chars().count() + 1).sum();
+            let before_bytes: usize = el[..i].iter().map(|l| l.len() + 1).sum();
+            let offset = at.offset.unwrap_or_default();
+            lengths(At {
+                line: Some(i + 1),
+                column: Some(column),
+                offset: Some(crate::mismatch::Offset {
+                    char: before + offset.char,
+                    byte: before_bytes + offset.byte,
+                }),
+                context: at.context,
+                ..At::new("text")
+            })
+        }
+        Op::Insert(j) | Op::Equal(_, j) => lengths(At {
+            line: Some(j + 1),
+            ..At::new("lines added")
+        }),
+    }
+}
+
 pub struct ReplayOptions<'a> {
     pub repo: &'a Path,
     /// Command line of the build to test; the original's command when `None`.
@@ -2404,6 +2573,28 @@ pub(crate) fn only_case<T>(
 pub struct Problem {
     pub field: String,
     pub detail: String,
+    /// Where the output first differs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub at: Option<crate::mismatch::At>,
+}
+
+impl Problem {
+    pub fn new(field: impl Into<String>, detail: impl Into<String>) -> Problem {
+        Problem {
+            field: field.into(),
+            detail: detail.into(),
+            at: None,
+        }
+    }
+
+    /// With the first difference, its channel the field when it has none.
+    pub fn at(mut self, mut at: crate::mismatch::At) -> Problem {
+        if at.channel.is_empty() {
+            at.channel.clone_from(&self.field);
+        }
+        self.at = Some(at);
+        self
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -2433,6 +2624,9 @@ pub struct ReplayOutcome {
     pub failures: Vec<Failure>,
     pub fallback: Option<Fallback>,
     pub report: PathBuf,
+    /// The distinct differences among the failing cases, most cases first.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<crate::mismatch::Group>,
 }
 
 fn check(
@@ -2459,10 +2653,24 @@ fn check(
             Expect::Killed => "killed by a signal".to_string(),
             Expect::Skip => String::new(),
         };
-        problems.push(Problem {
-            field: "status".to_string(),
-            detail: format!("expected {expected}, got {}\n", run.status),
-        });
+        let short = |s: &str| s.trim_start_matches("exit code ").to_string();
+        let kind = match &spec.status {
+            Expect::Failed => "non-zero".to_string(),
+            Expect::Killed => "killed".to_string(),
+            _ => short(&expected),
+        } + "→"
+            + &match run.status {
+                Status::Killed => "killed".to_string(),
+                Status::Timeout => "timeout".to_string(),
+                Status::Code(c) => c.to_string(),
+            };
+        problems.push(
+            Problem::new(
+                "status",
+                format!("expected {expected}, got {}\n", run.status),
+            )
+            .at(crate::mismatch::At::new(&kind)),
+        );
     }
     let no_effects = Vec::new();
     for (field, expected, actual) in [
@@ -2474,19 +2682,17 @@ fn check(
             run.effects.as_ref().unwrap_or(&no_effects),
         ),
     ] {
+        let unordered = norm.unordered(&spec.name, field);
         if let Some(expected) = expected
-            && let Some(detail) = compare(
+            && let Some(detail) = compare(norm, expected, actual, spec.binary, unordered)
+        {
+            problems.push(Problem::new(field, detail).at(locate(
                 norm,
                 expected,
                 actual,
                 spec.binary,
-                norm.unordered(&spec.name, field),
-            )
-        {
-            problems.push(Problem {
-                field: field.to_string(),
-                detail,
-            });
+                unordered,
+            )));
         }
     }
     if let Some(expected) = &spec.removed
@@ -2498,33 +2704,45 @@ fn check(
                 .map(|p| format!("  {}\n", p.display()))
                 .collect()
         };
-        problems.push(Problem {
-            field: "removed files".to_string(),
-            detail: format!(
-                "expected removed:\n{}got removed:\n{}",
-                list(expected),
-                list(&run.removed)
-            ),
-        });
+        problems.push(
+            Problem::new(
+                "removed files",
+                format!(
+                    "expected removed:\n{}got removed:\n{}",
+                    list(expected),
+                    list(&run.removed)
+                ),
+            )
+            .at(crate::mismatch::At {
+                expected_len: Some(expected.len()),
+                actual_len: Some(run.removed.len()),
+                ..crate::mismatch::At::new("value")
+            }),
+        );
     }
     if let Some(out_dir) = &spec.out_dir {
         for (path, expected) in read_files(out_dir) {
             let field = format!("file {}", path.display());
             match run.files.get(&path) {
-                None => problems.push(Problem {
-                    field,
-                    detail: "not written\n".to_string(),
-                }),
+                None => problems.push(
+                    Problem::new(field, "not written\n")
+                        .at(crate::mismatch::At::new("not written")),
+                ),
                 Some(actual) => {
                     let unordered = norm.unordered(&spec.name, &field);
-                    let detail = match norm.float_files.get(&path) {
-                        Some(&width) => {
+                    let width = norm.float_files.get(&path).copied();
+                    let detail = match width {
+                        Some(width) => {
                             compare_floats(&expected, actual, width, norm.float_tolerance)
                         }
                         None => compare(norm, &expected, actual, false, unordered),
                     };
                     if let Some(detail) = detail {
-                        problems.push(Problem { field, detail });
+                        let at = match width {
+                            Some(_) => crate::mismatch::At::new("value"),
+                            None => locate(norm, &expected, actual, false, unordered),
+                        };
+                        problems.push(Problem::new(field, detail).at(at));
                     }
                 }
             }
@@ -2539,7 +2757,7 @@ pub(crate) fn report_markdown(outcome: &ReplayOutcome) -> String {
 
 /// The report with the per-run sandbox paths replaced, so two replays of the same build write the
 /// same file and CI can commit it and fail on `git diff --exit-code`.
-fn stable_paths(text: &str) -> String {
+pub(crate) fn stable_paths(text: &str) -> String {
     static SANDBOX: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
     let tmp = std::env::temp_dir();
     let tmp = tmp.to_string_lossy();
@@ -2583,6 +2801,23 @@ fn report_body(outcome: &ReplayOutcome) -> String {
         out += "Every case matches.\n";
         return out;
     }
+    if !outcome.groups.is_empty() {
+        out += "## Distinct differences\n\n| Cases | Id | Where | Kind |\n| ---: | --- | --- | --- |\n";
+        for g in &outcome.groups {
+            let place = match &g.path {
+                Some(path) => format!("{} {path}", g.channel),
+                None => g.channel.clone(),
+            };
+            out += &format!(
+                "| {} | `{}` | `{}` | {} |\n",
+                g.cases,
+                g.id,
+                place.replace('`', "'").replace('|', "\\|"),
+                g.kind
+            );
+        }
+        out += "\n";
+    }
     out += "## Failing cases\n";
     for f in &outcome.failures {
         out += &format!(
@@ -2595,6 +2830,9 @@ fn report_body(outcome: &ReplayOutcome) -> String {
                 .join(" ")
         );
         for p in &f.problems {
+            if let Some(at) = &p.at {
+                out += &format!("\n{}\n", at.describe().replace("```", "`\u{200b}``"));
+            }
             out += &format!(
                 "\n{}:\n\n```diff\n{}```\n",
                 p.field,
@@ -2639,6 +2877,40 @@ pub(crate) fn recorded_args(repo: &Path) -> Result<Vec<(Vec<String>, bool)>> {
 }
 
 pub fn replay(opts: &ReplayOptions) -> Result<ReplayOutcome> {
+    write_report(replay_unwritten(opts)?)
+}
+
+/// `replay` with `--redact`: the report is only ever written as shapes.
+pub fn replay_redacted(opts: &ReplayOptions) -> Result<ReplayOutcome> {
+    redacted(replay_unwritten(opts)?)
+}
+
+/// Writes the outcome's report (`replay-report.md`).
+pub(crate) fn write_report(outcome: ReplayOutcome) -> Result<ReplayOutcome> {
+    std::fs::write(&outcome.report, report_markdown(&outcome))
+        .with_context(|| format!("writing {}", outcome.report.display()))?;
+    Ok(outcome)
+}
+
+/// The outcome as shapes only (`--redact`), its report written again from them.
+pub fn redacted(mut outcome: ReplayOutcome) -> Result<ReplayOutcome> {
+    crate::mismatch::redact_replay(&mut outcome);
+    write_report(outcome)
+}
+
+/// The outcome with its distinct differences counted.
+pub(crate) fn grouped(mut outcome: ReplayOutcome) -> ReplayOutcome {
+    outcome.groups = crate::mismatch::replay_groups(&outcome.failures);
+    outcome
+}
+
+/// `replay` without writing the report, for a caller that must leave the last one in place.
+pub(crate) fn replay_unwritten(opts: &ReplayOptions) -> Result<ReplayOutcome> {
+    replay_cases(opts).map(grouped)
+}
+
+fn replay_cases(opts: &ReplayOptions) -> Result<ReplayOutcome> {
+    check_timeout(opts.timeout_secs)?;
     let repo = opts
         .repo
         .canonical()
@@ -2654,7 +2926,7 @@ pub fn replay(opts: &ReplayOptions) -> Result<ReplayOutcome> {
             "{} is a library: its cases replay through each unit's bindings, so --build does not apply",
             state.name
         );
-        return crate::library::replay(&repo, &state, opts.case);
+        return crate::library::replay_unwritten(&repo, &state, opts.case);
     }
     let command = match (opts.build, &config) {
         (Some(build), _) => shell_split(build)?,
@@ -2682,7 +2954,12 @@ pub fn replay(opts: &ReplayOptions) -> Result<ReplayOutcome> {
         recorded: Vec::new(),
     });
     let norm = Normalizers::new(&config)?;
-    let timeout = Duration::from_secs(opts.timeout_secs.unwrap_or(config.timeout_secs));
+    let timeout_secs = opts.timeout_secs.unwrap_or(config.timeout_secs);
+    ensure!(
+        timeout_secs >= 1,
+        "--timeout must be at least 1 second (saved timeout_secs in {CONFIG_FILE} is 0; pass --timeout 1 or higher)"
+    );
+    let timeout = Duration::from_secs(timeout_secs);
     if config.http.is_some() {
         return crate::http::replay(
             &repo, &config, &norm, &command, opts.port, opts.case, timeout,
@@ -2728,6 +3005,7 @@ pub fn replay(opts: &ReplayOptions) -> Result<ReplayOutcome> {
         failures: Vec::new(),
         fallback: None,
         report: dir.join(REPORT_FILE),
+        groups: Vec::new(),
     };
     let (mut reported, mut fell_back) = (false, Vec::new());
     for (spec, result) in specs.iter().zip(results) {
@@ -2759,14 +3037,31 @@ pub fn replay(opts: &ReplayOptions) -> Result<ReplayOutcome> {
             names: fell_back,
         });
     }
-    std::fs::write(&outcome.report, report_markdown(&outcome))
-        .with_context(|| format!("writing {}", outcome.report.display()))?;
     Ok(outcome)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shell_quote_leaves_plain_words_and_quotes_the_rest() {
+        for plain in [
+            "cargo",
+            "./target/release/app",
+            "a=b",
+            "--flag",
+            "user@host:1,2+3%",
+        ] {
+            assert_eq!(shell_quote(plain), plain);
+        }
+        assert_eq!(shell_quote(""), "''");
+        assert_eq!(shell_quote("my app/bin"), "'my app/bin'");
+        assert_eq!(shell_quote("it's"), r"'it'\''s'");
+        assert_eq!(shell_quote("$HOME"), "'$HOME'");
+        assert_eq!(shell_quote("*.rs"), "'*.rs'");
+        assert_eq!(shell_quote("a;b"), "'a;b'");
+    }
 
     #[test]
     fn given_names_keep_their_tail() {
@@ -2948,14 +3243,15 @@ mod tests {
             name: None,
             traps: false,
             timeout_secs: None,
-            http: false,
-            server_args: &[],
-            fresh: &[],
+            http: None,
+            server_args: None,
+            fresh: None,
             pace_ms: None,
             port: None,
             float_tolerance: None,
             float_files: &[],
             effects: None,
+            ready_secs: None,
         })
         .unwrap();
         assert_eq!(recorded.cases, 1);
@@ -3235,14 +3531,15 @@ mod tests {
             name: None,
             traps: false,
             timeout_secs: None,
-            http: false,
-            server_args: &[],
-            fresh: &[],
+            http: None,
+            server_args: None,
+            fresh: None,
             pace_ms: None,
             port: None,
             float_tolerance: None,
             float_files: &[],
             effects: None,
+            ready_secs: None,
         })
         .unwrap();
         let read = |name: &str| std::fs::read_to_string(recorded.dir.join(name)).unwrap();
@@ -3251,6 +3548,42 @@ mod tests {
         assert_eq!(read("x-3.stdout"), "two\n");
         assert_eq!(read("x-4.stdout"), "three\n");
         std::fs::remove_dir_all(repo).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_new_run_command_renames_an_inferred_name_but_keeps_a_given_one() {
+        let repo = temp_dir("rename-on-new-run").unwrap();
+        std::fs::write(repo.join("one.sh"), "echo one\n").unwrap();
+        std::fs::write(repo.join("two.sh"), "echo two\n").unwrap();
+        let rec = |script: &str, name: Option<&str>| {
+            let run = ["/bin/sh".to_string(), script.to_string()];
+            record(&RecordOptions {
+                repo: &repo,
+                run: &run,
+                inputs: None,
+                normalize: &[],
+                name,
+                traps: false,
+                timeout_secs: None,
+                http: None,
+                server_args: None,
+                fresh: None,
+                pace_ms: None,
+                port: None,
+                float_tolerance: None,
+                float_files: &[],
+                effects: None,
+                ready_secs: None,
+            })
+            .unwrap();
+            Config::load(&repo).unwrap().unwrap().name
+        };
+        assert_eq!(rec("one.sh", None), "one");
+        assert_eq!(rec("two.sh", None), "two");
+        assert_eq!(rec("two.sh", Some("mytool")), "mytool");
+        assert_eq!(rec("one.sh", None), "mytool");
+        std::fs::remove_dir_all(&repo).unwrap();
     }
 
     #[test]
@@ -3304,5 +3637,82 @@ mod tests {
             [r"\\server\share\tool.exe", "--flag"]
         );
         assert_eq!(shell_split(r"echo one\\two").unwrap(), ["echo", r"one\two"]);
+    }
+
+    #[test]
+    fn record_and_replay_reject_zero_timeout_and_leave_cases_untouched() {
+        let repo = temp_dir("zero-timeout").unwrap();
+        let dir = cases_dir(&repo);
+        std::fs::create_dir_all(&dir).unwrap();
+        let sentinel_cfg = format!(
+            r#"{{"schema":"{SCHEMA}","name":"app","run":["echo","ok"],"timeout_secs":30,"recorded":["no-args"]}}"#
+        );
+        let cfg_path = dir.join(CONFIG_FILE);
+        let case_path = dir.join("no-args.toml");
+        std::fs::write(&cfg_path, &sentinel_cfg).unwrap();
+        std::fs::write(&case_path, "stdout = \"ok\\n\"\n").unwrap();
+
+        let rec_err = record(&RecordOptions {
+            repo: &repo,
+            run: &["definitely-not-run".to_string()],
+            inputs: None,
+            normalize: &[],
+            name: None,
+            traps: false,
+            timeout_secs: Some(0),
+            http: None,
+            server_args: None,
+            fresh: None,
+            pace_ms: None,
+            port: None,
+            float_tolerance: None,
+            float_files: &[],
+            effects: None,
+            ready_secs: None,
+        })
+        .unwrap_err();
+        let rec_msg = format!("{rec_err:#}");
+        assert!(
+            rec_msg.contains("--timeout") && rec_msg.contains("1 second"),
+            "{rec_msg}"
+        );
+
+        let rep_err = replay(&ReplayOptions {
+            repo: &repo,
+            build: None,
+            timeout_secs: Some(0),
+            port: None,
+            case: None,
+        })
+        .unwrap_err();
+        let rep_msg = format!("{rep_err:#}");
+        assert!(
+            rep_msg.contains("--timeout") && rep_msg.contains("1 second"),
+            "{rep_msg}"
+        );
+
+        assert_eq!(std::fs::read_to_string(&cfg_path).unwrap(), sentinel_cfg);
+        assert_eq!(
+            std::fs::read_to_string(&case_path).unwrap(),
+            "stdout = \"ok\\n\"\n"
+        );
+
+        let zero_cfg = sentinel_cfg.replace(r#""timeout_secs":30"#, r#""timeout_secs":0"#);
+        std::fs::write(&cfg_path, &zero_cfg).unwrap();
+        let saved_zero_err = replay(&ReplayOptions {
+            repo: &repo,
+            build: None,
+            timeout_secs: None,
+            port: None,
+            case: None,
+        })
+        .unwrap_err();
+        let saved_msg = format!("{saved_zero_err:#}");
+        assert!(
+            saved_msg.contains("--timeout") && saved_msg.contains("1 second"),
+            "{saved_msg}"
+        );
+
+        std::fs::remove_dir_all(repo).unwrap();
     }
 }

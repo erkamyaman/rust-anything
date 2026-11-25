@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · 한국어 · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · 한국어 · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a> · <a href="README_TH.md">ไทย</a> · <a href="https://github.com/erkamyaman/rust-anything/issues/425">+ add yours</a></sub></p>
 <p align="center"><sub>이 번역은 커뮤니티에서 관리하며 <a href="../README.md">영어 README</a>보다 늦게 반영될 수 있습니다.</sub></p>
 
 <p align="center"><b>앱을 Rust로 다시 작성하고, 여전히 똑같이 동작함을 증명하세요.</b><br>
@@ -41,7 +41,7 @@
   <sub>ms, Fuse.js, json-server의 실제 파일 59개에서 Prettier와 Rust 포팅 버전을 비교(Apple M4). 출력은 바이트 단위로 동일합니다. <a href="real-world.md#prettier">측정 방법</a>.</sub>
 </p>
 
-<p align="center"><sub>PHP와 C#: 현재는 기록, 재생, front door를 지원하며 유닛 포팅은 다음 단계입니다.</sub></p>
+<p align="center"><sub>PHP, C#, PowerShell: FFI 및 P/Invoke를 통한 유닛 포팅.</sub></p>
 
 <table>
   <tr>
@@ -202,16 +202,18 @@ rust-anything은 코드를 자동 번역하지 않습니다. Rust 코드는 코�
 
 C, PHP, C#, PowerShell을 제외한 모든 언어는 배치 클래스(`--batch`)도 지원합니다. 항목들이 한 번만 경계를 넘어 Rust 내부에 머무르며, 각 호출마다 모든 코어에서 전체 항목을 처리합니다.
 
-언어는 저장소 파일(`go.mod`, `pom.xml`, `build.gradle`/`build.gradle.kts`, `.csproj` 또는 `.sln`, `pyproject.toml`, `Gemfile`, `composer.json`, `package.json`, 그 외에는 가장 많은 소스 파일)로부터 자동 감지되며, `.kt` 소스가 있고 `.java` 소스가 없는 Gradle 모듈은 Kotlin으로, 혼합 모듈은 Java로 유지됩니다. `--lang`으로 재정의할 수 있습니다. 타입 정보는 소스에서 추출합니다(TS 타입, Python 힌트, C/Go/Java/Kotlin/C# 시그니처, Ruby YARD 태그, PHP 타입 및 phpdoc). 타입이 없는 매개변수라도 숫자로 사용되면 숫자로 추론됩니다.
+언어는 저장소 파일(`go.mod`, `pom.xml`, `build.gradle`/`build.gradle.kts`, `.csproj` 또는 `.sln`, `pyproject.toml`, `Gemfile`, `composer.json`, `package.json`, 그 외에는 가장 많은 소스 파일)로부터 자동 감지되며, `.kt` 소스가 있고 `.java` 소스가 없는 Gradle 모듈은 Kotlin으로, 혼합 모듈은 Java로 유지됩니다. `--lang`으로 재정의할 수 있습니다. 타입 정보는 소스에서 추출합니다(TS 타입, Python 힌트, C/Go/Java/Kotlin/C# 시그니처, Ruby YARD 태그, PHP 타입 및 phpdoc). 타입이 없는 매개변수라도 숫자로 사용되면 숫자로 추론됩니다. 각 타입이 포트에서 무엇이 되는지, 어떤 타입이 함수를 원래 언어에 남기는지는 [타입](types.md)에 정리되어 있습니다.
 
-PHP의 경우, `analyze`로 PHP 앱을 계획할 수 있고(Composer 패키지 및 PSR-4 오토로딩, 느슨한 비교나 정수의 float 오버플로 같은 위험 요소, Composer 패키지의 crate 매핑), PHP CLI나 서버를 기록·재실행하고 Rust 프론트 도어 뒤에 둘 수 있습니다. PHP FFI를 통해 유닛을 Rust로 포팅하는 작업이 다음 단계입니다([이슈 #2](https://github.com/erkamyaman/rust-anything/issues/2)).
+PHP의 경우, `analyze`로 PHP 앱을 계획할 수 있고(Composer 패키지 및 PSR-4 오토로딩, 느슨한 비교나 정수의 float 오버플로 같은 위험 요소, Composer 패키지의 crate 매핑), PHP CLI나 서버를 기록·재실행하고 Rust 프론트 도어 뒤에 둘 수 있습니다. 스칼라, 문자열, 리스트, 연관 배열 매개변수를 갖는 유닛의 최상위 함수는 PHP의 FFI 확장(CLI에서 기본 활성화된 `ext-ffi`가 포함된 `php`)을 통해 브리지됩니다. `diff`가 통과되면 원본 파일 대신 생성된 `php/<crate>.php`를 require하세요. 각 호출은 JSON으로 약 1 µs 동안 경계를 넘으므로, `bench`에서는 작은 함수가 PHP보다 느리게 나타납니다. PHP에는 아직 `shadow`가 없습니다([이슈 #200](https://github.com/erkamyaman/rust-anything/issues/200)).
 
-C#도 같은 방식으로 동작합니다. `analyze`가 `.csproj` 프로젝트와 NuGet 패키지(crate로 매핑)를 읽고 `using` 지시문을 폴더로 해석하며, C#의 고유한 동작 차이(`decimal`, `dynamic`, LINQ 지연 쿼리, `Task`, `lock`, 리플렉션)를 표시합니다. C# CLI나 ASP.NET 서버를 기록·재실행하고 Rust 프론트 도어 뒤에 둘 수 있으며, P/Invoke를 통한 유닛 포팅이 다음으로 지원될 예정입니다.
+C#도 같은 방식으로 동작합니다. `analyze`가 `.csproj` 프로젝트와 NuGet 패키지(crate로 매핑)를 읽고 `using` 지시문을 폴더로 해석하며, C#의 고유한 동작 차이(`decimal`, `dynamic`, LINQ 지연 쿼리, `Task`, `lock`, 리플렉션)를 표시합니다. C# CLI나 ASP.NET 서버를 기록·재실행하고 Rust 프론트 도어 뒤에 둘 수 있습니다. 스칼라, 문자열, 배열, 리스트, 딕셔너리, record 또는 일반 클래스 매개변수를 갖는 유닛의 public static 메서드는 P/Invoke(기록 및 diff를 위해 `PATH`에 `dotnet` 필요)를 통해 브리지됩니다. `diff`가 통과되면 생성된 `<namespace>.Rust` 클래스를 호출하거나 `using`으로 별칭을 지정하세요. 각 호출은 JSON으로 약 1-3 µs 동안 경계를 넘으므로, `bench`에서는 작은 메서드가 .NET보다 느리게 나타납니다. C#에는 아직 `shadow`가 없습니다([이슈 #200](https://github.com/erkamyaman/rust-anything/issues/200)).
 
 ## 더 알아보기
 
 - [작동 방식](how-it-works.md): 핵심 루프, `bridge`와 `analyze`가 결정하는 사항, 핫 패스, 잡아내지 못하는 부분, 실제 포팅에 필요한 것, 원본 변경 사항 따라가기(`map`)
+- [포트를 패키지로 배포하기](packaging.md): maturin wheel과 napi-rs 플랫폼별 npm 패키지, 그리고 이를 빌드하는 CI
 - [전체 앱 포팅하기](whole-apps.md): 서버, CLI, 라이브러리를 프론트 도어부터 `app lift`까지
+- [타입](types.md): 각 언어의 타입이 `port.rs`에서 무엇이 되는지, 그리고 타입이 거부되는 이유
 - [예제와 사례 연구](examples.md): x18n, 그리고 6개 언어의 실제 코드
 - [실제 포팅 사례](real-world.md): json-server, Fuse.js, vercel/ms와 벤치마크
 - [설치, 업데이트, 개발](install.md): 모든 설치 방법, Windows, 소스에서 빌드하기

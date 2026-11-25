@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use rust_anything::app::{self, RecordOptions, ReplayOptions};
+use rust_anything::drift::{self, DriftOptions};
 use rust_anything::front_door::{self, FrontDoorOptions, WireOptions};
 use rust_anything::lift::{self, LiftOptions};
 
@@ -66,14 +67,15 @@ fn record(repo: &Path, run: &str, traps: bool) -> app::RecordOutcome {
         name: None,
         traps,
         timeout_secs: None,
-        http: true,
-        server_args: &[],
-        fresh: &[],
+        http: Some(true),
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: None,
         float_tolerance: None,
         float_files: &[],
         effects: None,
+        ready_secs: None,
     })
     .unwrap()
 }
@@ -96,6 +98,162 @@ if sys.argv[1:] == ["exit"]:
 time.sleep(600)
 "#;
 
+/// A server that writes its own pid, so a test can ask whether it is gone afterwards.
+#[cfg(unix)]
+const PID_SERVER: &str = r#"import os, sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "server.pid"), "w").write(str(os.getpid()))
+
+
+class H(BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = b'{"ok":true}'
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+HTTPServer(("127.0.0.1", int(os.environ["PORT"])), H).serve_forever()
+"#;
+
+#[cfg(unix)]
+fn alive(pid: &str) -> bool {
+    // `kill -0` says the pid exists, which a zombie also does until its parent reaps it. Ask `ps`
+    // for the state and count only a process that can still run.
+    // A missing `ps` must fail the test instead of reading as "the server is gone".
+    let out = std::process::Command::new("ps")
+        .args(["-o", "stat=", "-p", pid])
+        .output()
+        .expect("running `ps` to ask whether the server is still there");
+    let stat = String::from_utf8_lossy(&out.stdout);
+    let stat = stat.trim();
+    // No line at all: the pid is gone.
+    !stat.is_empty() && !stat.starts_with('Z')
+}
+
+#[cfg(unix)]
+#[test]
+fn the_second_recording_gets_a_fresh_server_process() {
+    // Two recordings of the same crate must not share the first one's server: a reused process keeps
+    // the state of the run before it, so the second recording would compare against a half-used app.
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo =
+        std::env::temp_dir().join(format!("rust-anything-http-fresh-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("server.py"), PID_SERVER).unwrap();
+    std::fs::write(
+        repo.join("inputs.jsonl"),
+        "{\"name\":\"ok\",\"path\":\"/\"}\n",
+    )
+    .unwrap();
+    let pid_file = repo.join("server.pid");
+    let record = || {
+        let _ = std::fs::remove_file(&pid_file);
+        app::record(&RecordOptions {
+            repo: &repo,
+            run: &[python.to_string(), "server.py".to_string()],
+            inputs: Some(&repo.join("inputs.jsonl")),
+            normalize: &[],
+            name: None,
+            traps: false,
+            timeout_secs: None,
+            http: Some(true),
+            server_args: None,
+            fresh: None,
+            pace_ms: None,
+            port: None,
+            float_tolerance: None,
+            float_files: &[],
+            effects: None,
+            ready_secs: None,
+        })
+        .unwrap();
+        std::fs::read_to_string(&pid_file)
+            .unwrap_or_default()
+            .trim()
+            .to_string()
+    };
+    let first = record();
+    let second = record();
+    let first_alive = alive(&first);
+    if first_alive {
+        let _ = std::process::Command::new("kill")
+            .args(["-9", &first])
+            .status();
+    }
+    let _ = std::fs::remove_dir_all(&repo);
+    assert!(
+        !first.is_empty() && !second.is_empty(),
+        "both runs wrote a pid"
+    );
+    assert_ne!(first, second, "the second recording reused pid {first}");
+    assert!(
+        !first_alive,
+        "the first server (pid {first}) outlived its recording"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_server_started_through_a_shell_is_gone_after_record() {
+    // `sh -c "python3 server.py"` makes the server a grandchild. Recording must stop the whole tree,
+    // or a leftover process keeps answering replays and any build passes.
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = std::env::temp_dir().join(format!("rust-anything-http-fork-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("server.py"), PID_SERVER).unwrap();
+    std::fs::write(
+        repo.join("inputs.jsonl"),
+        "{\"name\":\"ok\",\"path\":\"/\"}\n",
+    )
+    .unwrap();
+    let out = app::record(&RecordOptions {
+        repo: &repo,
+        run: &[
+            "sh".to_string(),
+            "-c".to_string(),
+            // The trailing `:` keeps `sh` a process: with a single command some shells exec it,
+            // which would make the server the direct child and the test vacuous.
+            format!("{python} server.py; :"),
+        ],
+        inputs: Some(&repo.join("inputs.jsonl")),
+        normalize: &[],
+        name: None,
+        traps: false,
+        timeout_secs: None,
+        http: Some(true),
+        server_args: None,
+        fresh: None,
+        pace_ms: None,
+        port: None,
+        float_tolerance: None,
+        float_files: &[],
+        effects: None,
+        ready_secs: None,
+    })
+    .unwrap();
+    let pid = std::fs::read_to_string(repo.join("server.pid")).unwrap_or_default();
+    let _ = std::fs::remove_dir_all(&repo);
+    assert_eq!(out.cases, 1, "{out:?}");
+    assert!(!pid.is_empty(), "the fixture should have written its pid");
+    assert!(
+        !alive(pid.trim()),
+        "the server (pid {pid}) is still running after record"
+    );
+}
+
 #[test]
 fn a_port_that_is_taken_is_named_before_the_build_runs() {
     // Recording on a fixed port must say the port is busy, not spend the readiness timeout on it and
@@ -117,14 +275,15 @@ fn a_port_that_is_taken_is_named_before_the_build_runs() {
         name: None,
         traps: false,
         timeout_secs: None,
-        http: true,
-        server_args: &[],
-        fresh: &[],
+        http: Some(true),
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: Some(port),
         float_tolerance: None,
         float_files: &[],
         effects: None,
+        ready_secs: None,
     })
     .unwrap_err();
     let text = format!("{err:#}");
@@ -134,6 +293,50 @@ fn a_port_that_is_taken_is_named_before_the_build_runs() {
         text.contains(&format!("port {port} is already in use")),
         "{text}"
     );
+}
+
+#[test]
+fn a_ready_timeout_shortens_the_wait_for_a_server_that_never_listens() {
+    // A server that never listens used to cost the full minute. `--ready-timeout` makes that
+    // configurable, and the message names the wait it used.
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo =
+        std::env::temp_dir().join(format!("rust-anything-http-ready-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("server.py"), "import time\ntime.sleep(600)\n").unwrap();
+    let started = std::time::Instant::now();
+    let err = app::record(&RecordOptions {
+        repo: &repo,
+        run: &[python.to_string(), "server.py".to_string()],
+        inputs: None,
+        normalize: &[],
+        name: None,
+        traps: false,
+        timeout_secs: None,
+        http: Some(true),
+        server_args: None,
+        fresh: None,
+        pace_ms: None,
+        port: None,
+        float_tolerance: None,
+        float_files: &[],
+        effects: None,
+        ready_secs: Some(1),
+    })
+    .unwrap_err();
+    let waited = started.elapsed();
+    let text = format!("{err:#}");
+    let saved = std::fs::read_to_string(repo.join("rust/app-cases/rust-anything.json")).ok();
+    let _ = std::fs::remove_dir_all(&repo);
+    assert!(text.contains("did not listen within 1s"), "{text}");
+    assert!(
+        waited < std::time::Duration::from_secs(30),
+        "waited {waited:?}"
+    );
+    assert_eq!(saved, None, "a failed record writes no settings");
 }
 
 #[test]
@@ -157,14 +360,15 @@ fn a_build_that_exits_before_listening_says_so() {
         name: None,
         traps: false,
         timeout_secs: None,
-        http: true,
-        server_args: &[],
-        fresh: &[],
+        http: Some(true),
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: None,
         float_tolerance: None,
         float_files: &[],
         effects: None,
+        ready_secs: None,
     })
     .unwrap_err();
     let text = format!("{err:#}");
@@ -201,14 +405,15 @@ fn http_record_keeps_distinct_requests_with_the_same_name() {
         name: None,
         traps: false,
         timeout_secs: None,
-        http: true,
-        server_args: &[],
-        fresh: &[],
+        http: Some(true),
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: None,
         float_tolerance: None,
         float_files: &[],
         effects: None,
+        ready_secs: None,
     })
     .unwrap();
     let repeated = replay(&repo, None);
@@ -263,14 +468,15 @@ fn http_fresh_files_and_arguments_reach_every_start() {
         name: None,
         traps: false,
         timeout_secs: None,
-        http: false,
+        http: None,
         port: None,
-        server_args: &["data/count.txt".to_string()],
-        fresh: &["data".to_string()],
+        server_args: Some(&["data/count.txt".to_string()]),
+        fresh: Some(&["data".to_string()]),
         pace_ms: Some(5),
         float_tolerance: None,
         float_files: &[],
         effects: None,
+        ready_secs: None,
     })
     .unwrap();
     let body = std::fs::read_to_string(out.dir.join("a2.body")).unwrap();
@@ -327,14 +533,15 @@ fn http_rerecord_uses_the_existing_fixed_port() {
             name: None,
             traps: false,
             timeout_secs: None,
-            http: true,
-            server_args: &[],
-            fresh: &[],
+            http: Some(true),
+            server_args: None,
+            fresh: None,
             pace_ms: None,
             port,
             float_tolerance: None,
             float_files: &[],
             effects: None,
+            ready_secs: None,
         })
     };
     let first = record(Some(port));
@@ -508,7 +715,33 @@ fn check_language(lang: &Lang) {
     for f in &bug.failures {
         assert!(f.args[1].starts_with("/div/"), "{f:?}");
         assert!(f.problems.iter().all(|p| p.field == "body"), "{f:?}");
+        let at = f.problems[0].at.as_ref().unwrap();
+        assert_eq!((at.channel.as_str(), at.kind.as_str()), ("body", "text"));
+        assert_eq!((at.line, at.column), (Some(1), Some(12)), "{at:?}");
+        assert!(
+            at.context.as_ref().unwrap().actual.contains("divi⟨d⟩e"),
+            "{at:?}"
+        );
     }
+    assert_eq!(bug.groups.len(), 1, "{:?}", bug.groups);
+    assert_eq!(bug.groups[0].cases, bug.failures.len());
+    assert_eq!(bug.groups[0].label(), "body (text)");
+    let report = std::fs::read_to_string(&bug.report).unwrap();
+    assert!(report.contains("## Distinct differences"), "{report}");
+    assert!(
+        report.contains("at body, line 1, column 12, char 11: "),
+        "{report}"
+    );
+    let redacted = app::redacted(bug).unwrap();
+    let report = std::fs::read_to_string(&redacted.report).unwrap();
+    assert!(
+        !report.contains("zero") && !report.contains("/div/"),
+        "{report}"
+    );
+    assert!(
+        report.contains("body (text), line 1, column 12"),
+        "{report}"
+    );
     std::fs::remove_dir_all(&repo).unwrap();
 
     if !common::have("cargo") {
@@ -760,14 +993,15 @@ fn http_fixed_port_rejects_existing_listener_and_early_exit() {
         name: None,
         traps: false,
         timeout_secs: None,
-        http: true,
-        server_args: &[],
-        fresh: &[],
+        http: Some(true),
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: Some(port),
         float_tolerance: None,
         float_files: &[],
         effects: None,
+        ready_secs: None,
     })
     .unwrap_err();
     assert!(
@@ -787,14 +1021,15 @@ fn http_fixed_port_rejects_existing_listener_and_early_exit() {
         name: None,
         traps: false,
         timeout_secs: None,
-        http: true,
-        server_args: &[],
-        fresh: &[],
+        http: Some(true),
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: Some(port),
         float_tolerance: None,
         float_files: &[],
         effects: None,
+        ready_secs: None,
     })
     .unwrap();
     assert!(recorded.cases > 0);
@@ -878,14 +1113,15 @@ fn a_server_listening_only_on_ipv6_loopback_is_recorded_and_replayed() {
         name: None,
         traps: false,
         timeout_secs: None,
-        http: true,
-        server_args: &[],
-        fresh: &[],
+        http: Some(true),
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: None,
         float_tolerance: None,
         float_files: &[],
         effects: None,
+        ready_secs: None,
     })
     .unwrap();
     assert_eq!(out.cases, 1);
@@ -966,14 +1202,15 @@ fn a_server_started_through_a_wrapper_is_stopped_with_it() {
         name: None,
         traps: false,
         timeout_secs: None,
-        http: true,
-        server_args: &[],
-        fresh: &[],
+        http: Some(true),
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: Some(port),
         float_tolerance: None,
         float_files: &[],
         effects: None,
+        ready_secs: None,
     });
     let still_listening = std::net::TcpStream::connect_timeout(
         &std::net::SocketAddr::from(([127, 0, 0, 1], port)),
@@ -1195,14 +1432,15 @@ http.server.HTTPServer(("127.0.0.1", port), H).serve_forever()
         name: Some("upload"),
         traps: false,
         timeout_secs: Some(15),
-        http: true,
+        http: Some(true),
         port: None,
-        server_args: &[],
-        fresh: &[],
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         float_tolerance: None,
         float_files: &[],
         effects: None,
+        ready_secs: None,
     })
     .unwrap();
     assert_eq!(rec.cases, 3, "{rec:?}");
@@ -1223,5 +1461,409 @@ http.server.HTTPServer(("127.0.0.1", port), H).serve_forever()
     .unwrap();
     assert_eq!((rep.passed, rep.total), (3, 3), "{:?}", rep.failures);
 
+    std::fs::remove_dir_all(&repo).unwrap();
+}
+
+#[test]
+fn server_recording_can_clear_args_fresh_and_return_to_cli() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = std::env::temp_dir().join(format!(
+        "rust-anything-http-back-to-cli-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(repo.join("data")).unwrap();
+    std::fs::write(repo.join("data/msg.txt"), "hello").unwrap();
+    std::fs::write(
+        repo.join("server.py"),
+        r#"import http.server, os, sys
+arg = sys.argv[1] if len(sys.argv) > 1 else "none"
+has_data = os.path.isfile("data/msg.txt")
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = f"{arg}:{has_data}".encode()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *args):
+        pass
+http.server.HTTPServer(("127.0.0.1", int(os.environ["PORT"])), H).serve_forever()
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("cli.py"),
+        "import os, sys\nprint('cli:' + ':'.join(sys.argv[1:]) + f':{os.path.isfile(\"data/msg.txt\")}')\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("http_in.jsonl"),
+        "{\"name\":\"root\",\"path\":\"/\"}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("cli_in.jsonl"),
+        "{\"name\":\"greet\",\"args\":[\"hi\"]}\n",
+    )
+    .unwrap();
+
+    // 1. Record as a server with --arg, --fresh, and a fixed port.
+    let port = rust_anything::http::free_port().unwrap();
+    let rec1 = app::record(&RecordOptions {
+        repo: &repo,
+        run: &[python.to_string(), "server.py".to_string()],
+        inputs: Some(&repo.join("http_in.jsonl")),
+        normalize: &[],
+        name: None,
+        traps: false,
+        timeout_secs: Some(15),
+        http: Some(true),
+        port: Some(port),
+        server_args: Some(&["mode-a".to_string()]),
+        fresh: Some(&["data".to_string()]),
+        pace_ms: None,
+        float_tolerance: None,
+        float_files: &[],
+        effects: None,
+        ready_secs: None,
+    })
+    .unwrap();
+    assert_eq!(rec1.cases, 1);
+    assert_eq!(
+        std::fs::read_to_string(rec1.dir.join("root.body")).unwrap(),
+        "mode-a:True"
+    );
+    assert!(
+        app::cases_dir(&repo)
+            .join("http/files/data/msg.txt")
+            .is_file()
+    );
+    let cfg1 = app::Config::load(&repo).unwrap().unwrap();
+    assert_eq!(cfg1.name, "server");
+    let http1 = cfg1.http.unwrap();
+    assert_eq!(http1.port, Some(port));
+    assert_eq!(http1.args, ["mode-a"]);
+    assert_eq!(http1.fresh, ["data"]);
+
+    // 2. Clear saved --arg, --fresh, and fixed --port on the server via CLI flags.
+    let status = std::process::Command::new(env!("CARGO_BIN_EXE_rust-anything"))
+        .args(["app", "record"])
+        .arg(&repo)
+        .args([
+            "--no-traps",
+            "--no-args",
+            "--no-fresh",
+            "--port",
+            "0",
+            "--inputs",
+        ])
+        .arg(repo.join("http_in.jsonl"))
+        .output()
+        .unwrap();
+    assert!(
+        status.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&status.stdout),
+        String::from_utf8_lossy(&status.stderr)
+    );
+    let cfg2 = app::Config::load(&repo).unwrap().unwrap();
+    let http2 = cfg2.http.unwrap();
+    assert_eq!(http2.port, None);
+    assert!(http2.args.is_empty(), "{:?}", http2.args);
+    assert!(http2.fresh.is_empty(), "{:?}", http2.fresh);
+    assert!(!app::cases_dir(&repo).join("http/files").exists());
+    assert_eq!(
+        std::fs::read_to_string(app::cases_dir(&repo).join("http/root.body")).unwrap(),
+        "none:True"
+    );
+
+    // 3. Switch the same repo back to a CLI with --no-http and a CLI --fresh, then clear --fresh.
+    let back = std::process::Command::new(env!("CARGO_BIN_EXE_rust-anything"))
+        .args(["app", "record"])
+        .arg(&repo)
+        .args(["--no-http", "--no-traps", "--fresh", "data", "--inputs"])
+        .arg(repo.join("cli_in.jsonl"))
+        .args(["--", python, "cli.py"])
+        .output()
+        .unwrap();
+    assert!(
+        back.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&back.stdout),
+        String::from_utf8_lossy(&back.stderr)
+    );
+    let cfg3 = app::Config::load(&repo).unwrap().unwrap();
+    assert!(cfg3.http.is_none(), "{:?}", cfg3.http);
+    assert_eq!(cfg3.name, "cli");
+    assert_eq!(cfg3.fresh, ["data"]);
+    assert!(app::cases_dir(&repo).join("files/data/msg.txt").is_file());
+    assert_eq!(
+        std::fs::read_to_string(app::cases_dir(&repo).join("greet.stdout"))
+            .unwrap()
+            .trim(),
+        "cli:hi:True"
+    );
+    let rep3 = replay(&repo, None);
+    assert_eq!((rep3.passed, rep3.total), (1, 1), "{:?}", rep3.failures);
+
+    // 3b. A failed recording with `--no-fresh` must leave the previous snapshot replayable.
+    let failed_clear = app::record(&RecordOptions {
+        repo: &repo,
+        run: &["nonexistent-rust-anything-binary-for-test".to_string()],
+        inputs: Some(&repo.join("cli_in.jsonl")),
+        normalize: &[],
+        name: None,
+        traps: false,
+        timeout_secs: Some(15),
+        http: None,
+        port: None,
+        server_args: None,
+        fresh: Some(&[]),
+        pace_ms: None,
+        float_tolerance: None,
+        float_files: &[],
+        effects: None,
+        ready_secs: None,
+    });
+    assert!(failed_clear.is_err());
+    assert!(app::cases_dir(&repo).join("files/data/msg.txt").is_file());
+    let rep3b = replay(&repo, None);
+    assert_eq!((rep3b.passed, rep3b.total), (1, 1), "{:?}", rep3b.failures);
+
+    // 4. Clear the CLI --fresh list and verify the snapshot folder is removed.
+    let clear_cli_fresh = std::process::Command::new(env!("CARGO_BIN_EXE_rust-anything"))
+        .args(["app", "record"])
+        .arg(&repo)
+        .args(["--no-traps", "--no-fresh", "--inputs"])
+        .arg(repo.join("cli_in.jsonl"))
+        .output()
+        .unwrap();
+    assert!(
+        clear_cli_fresh.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&clear_cli_fresh.stdout),
+        String::from_utf8_lossy(&clear_cli_fresh.stderr)
+    );
+    let cfg4 = app::Config::load(&repo).unwrap().unwrap();
+    assert!(cfg4.http.is_none());
+    assert!(cfg4.fresh.is_empty(), "{:?}", cfg4.fresh);
+    assert!(!app::cases_dir(&repo).join("files").exists());
+    assert_eq!(
+        std::fs::read_to_string(app::cases_dir(&repo).join("greet.stdout"))
+            .unwrap()
+            .trim(),
+        "cli:hi:False"
+    );
+    let rep4 = replay(&repo, None);
+    assert_eq!((rep4.passed, rep4.total), (1, 1), "{:?}", rep4.failures);
+
+    // 5. A handwritten case whose `fs.base` points at `files` must keep `cases/files` intact
+    // when recording without `--fresh`.
+    let dir = app::cases_dir(&repo);
+    std::fs::create_dir_all(dir.join("files")).unwrap();
+    std::fs::write(dir.join("files/keep.txt"), "kept\n").unwrap();
+    std::fs::copy(dir.join("greet.toml"), dir.join("hand.toml")).unwrap();
+    let hand_toml = std::fs::read_to_string(dir.join("hand.toml")).unwrap();
+    std::fs::write(
+        dir.join("hand.toml"),
+        hand_toml.replace(
+            "fs.sandbox = true",
+            "fs.sandbox = true\nfs.base = \"files\"",
+        ),
+    )
+    .unwrap();
+    std::fs::copy(dir.join("greet.stdout"), dir.join("hand.stdout")).unwrap();
+    std::fs::copy(dir.join("greet.stderr"), dir.join("hand.stderr")).unwrap();
+    let keep_hand = std::process::Command::new(env!("CARGO_BIN_EXE_rust-anything"))
+        .args(["app", "record"])
+        .arg(&repo)
+        .args(["--no-traps", "--no-fresh", "--inputs"])
+        .arg(repo.join("cli_in.jsonl"))
+        .output()
+        .unwrap();
+    assert!(
+        keep_hand.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&keep_hand.stdout),
+        String::from_utf8_lossy(&keep_hand.stderr)
+    );
+    assert!(
+        dir.join("files/keep.txt").is_file(),
+        "handwritten case reading `files` via fs.base lost its inputs"
+    );
+    let rep5 = replay(&repo, None);
+    assert_eq!((rep5.passed, rep5.total), (2, 2), "{:?}", rep5.failures);
+
+    std::fs::remove_dir_all(&repo).unwrap();
+}
+
+#[test]
+fn drift_on_a_server_finds_a_port_regression_and_a_new_curl_example() {
+    if !common::have("node") {
+        return;
+    }
+    let repo = fixture("ts", "drift");
+    record(&repo, "node server.js", false);
+    let text = std::fs::read_to_string(repo.join("server.js")).unwrap();
+    std::fs::write(
+        repo.join("server_bug.js"),
+        text.replace("division by zero", "divide by zero"),
+    )
+    .unwrap();
+    let readme = std::fs::read_to_string(repo.join("README.md")).unwrap();
+    std::fs::write(
+        repo.join("README.md"),
+        readme.replace(
+            "$ curl http://localhost:8080/missing\n",
+            "$ curl http://localhost:8080/missing\n$ curl http://localhost:8080/div/9/3\n",
+        ),
+    )
+    .unwrap();
+    let outcome = drift::drift(&DriftOptions {
+        repo: &repo,
+        build: Some("node server_bug.js"),
+        timeout_secs: None,
+    })
+    .unwrap();
+    std::fs::remove_dir_all(&repo).unwrap();
+    assert!(outcome.drifted);
+    assert!(outcome.changed.is_empty(), "{outcome:?}");
+    assert_eq!(
+        outcome
+            .failing
+            .iter()
+            .map(|f| (f.case.as_str(), f.verdict.as_str()))
+            .collect::<Vec<_>>(),
+        [("example-004-get-div", "port regression")],
+        "{outcome:?}"
+    );
+    assert_eq!(outcome.new, ["GET /div/9/3"]);
+}
+
+/// Sends one raw request to `port`, retrying while the proxy is not accepting yet, and returns
+/// the whole answer.
+fn ask(port: u16, raw: &str) -> String {
+    use std::io::{Read, Write};
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    loop {
+        if let Ok(mut stream) = std::net::TcpStream::connect(("127.0.0.1", port)) {
+            stream.write_all(raw.as_bytes()).unwrap();
+            let mut out = String::new();
+            stream.read_to_string(&mut out).unwrap();
+            return out;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the proxy never listened"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
+#[test]
+fn shadow_answers_with_the_original_and_logs_the_build_mismatch_as_a_shape() {
+    if !common::have_with("node", &["--version"], "was not found") {
+        return;
+    }
+    let repo = fixture("ts", "shadow");
+    let source = std::fs::read_to_string(repo.join("server.js")).unwrap();
+    std::fs::write(
+        repo.join("server_bug.js"),
+        source.replace("division by zero", "divide by zero"),
+    )
+    .unwrap();
+    record(&repo, "node server.js", false);
+
+    let port = rust_anything::http::free_port().unwrap();
+    let shadow = {
+        let repo = repo.clone();
+        std::thread::spawn(move || {
+            rust_anything::app_shadow::shadow(&rust_anything::app_shadow::ShadowOptions {
+                repo: &repo,
+                build: "node server_bug.js",
+                listen: Some(port),
+                upstream: None,
+                requests: Some(3),
+                timeout_secs: None,
+                keep: true,
+                progress: None,
+            })
+            .unwrap()
+        })
+    };
+    let hello = ask(
+        port,
+        "GET /hello HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    assert!(hello.contains("{\"message\":\"hello\"}"), "{hello}");
+    let upper = ask(
+        port,
+        "POST /upper HTTP/1.1\r\nHost: localhost\r\nContent-Length: 11\r\nConnection: close\r\n\r\nhello world",
+    );
+    assert!(upper.contains("HELLO WORLD"), "{upper}");
+    let div = ask(
+        port,
+        "GET /div/5/0 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    assert!(div.starts_with("HTTP/1.1 400"), "{div}");
+    assert!(div.contains("error: division by zero"), "{div}");
+
+    let outcome = shadow.join().unwrap();
+    assert_eq!((outcome.requests, outcome.matched), (3, 2), "{outcome:?}");
+    assert_eq!(outcome.mismatches.len(), 1, "{outcome:?}");
+    let fields: Vec<&str> = outcome.mismatches[0]
+        .problems
+        .iter()
+        .map(|p| p.field.as_str())
+        .collect();
+    assert_eq!(fields, ["body"]);
+    let at = outcome.mismatches[0].problems[0].at.as_ref().unwrap();
+    assert_eq!((at.channel.as_str(), at.kind.as_str()), ("body", "text"));
+    assert!(at.context.is_none(), "{at:?}");
+    assert_eq!(outcome.groups.len(), 1, "{outcome:?}");
+    let outcome_text = format!("{outcome:?}");
+    assert!(!outcome_text.contains("zero"), "{outcome_text}");
+    assert!(!outcome_text.contains("/div"), "{outcome_text}");
+
+    let log = std::fs::read_to_string(&outcome.log).unwrap();
+    assert_eq!(log.lines().count(), 1, "{log}");
+    assert!(log.contains("\"body\""), "{log}");
+    assert!(log.contains("\"kind\":\"text\""), "{log}");
+    assert!(log.starts_with("{\"case\":\"GET "), "{log}");
+    assert!(!log.contains("zero") && !log.contains("/div"), "{log}");
+
+    let kept = outcome.inputs.clone().unwrap();
+    let inputs = std::fs::read_to_string(&kept).unwrap();
+    assert_eq!(inputs.lines().count(), 1, "{inputs}");
+    assert!(inputs.contains("\"path\":\"/div/5/0\""), "{inputs}");
+    let rerecorded = app::record(&RecordOptions {
+        repo: &repo,
+        run: &[],
+        inputs: Some(&kept),
+        normalize: &[],
+        name: None,
+        traps: false,
+        timeout_secs: None,
+        http: None,
+        server_args: None,
+        fresh: None,
+        pace_ms: None,
+        port: None,
+        float_tolerance: None,
+        float_files: &[],
+        effects: None,
+        ready_secs: None,
+    })
+    .unwrap();
+    assert_eq!(rerecorded.inputs, 1, "{rerecorded:?}");
+    let bug = replay(&repo, Some("node server_bug.js"));
+    assert!(
+        bug.failures.iter().any(|f| f.case.starts_with("input-")),
+        "{:?}",
+        bug.failures
+    );
     std::fs::remove_dir_all(&repo).unwrap();
 }

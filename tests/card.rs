@@ -212,6 +212,15 @@ fn report_on_a_built_crate_writes_markdown_and_svg_and_reflects_enable() {
     );
     assert!(md_before.contains("| Switched on | off |"), "{md_before}");
     assert!(md_before.contains("| `add` |"), "{md_before}");
+    assert!(
+        md_before.contains("### Remaining differences"),
+        "{md_before}"
+    );
+    assert!(
+        md_before.contains("`mul: return (no response)`"),
+        "{md_before}"
+    );
+    assert_eq!(card_before.differences.len(), 1);
 
     let svg = std::fs::read_to_string(&card_before.svg).unwrap();
     assert_valid_svg_xml(&svg);

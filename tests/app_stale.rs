@@ -33,14 +33,15 @@ fn record_within(
         name: None,
         traps: false,
         timeout_secs,
-        http,
-        server_args: &[],
-        fresh: &[],
+        http: http.then_some(true),
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: None,
         float_tolerance: None,
         float_files: &[],
         effects: None,
+        ready_secs: None,
     })
     .unwrap()
 }

@@ -56,14 +56,31 @@ pub fn fingerprint(m: &Manifest) -> Option<(String, usize)> {
     Some((format!("{hash:016x}"), files.len()))
 }
 
+/// FNV-1a over the first `n` lines of `cases.jsonl`, each with its line end.
+fn cases_hash(text: &str, n: usize) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for line in text.lines().take(n) {
+        for b in line.bytes().chain(*b"\n") {
+            hash ^= u64::from(b);
+            hash = hash.wrapping_mul(0x0100_0000_01b3);
+        }
+    }
+    format!("{hash:016x}")
+}
+
 /// Saves the fingerprint of the original next to `cases.jsonl`, with how much of it the recorded
-/// cases ran when that was measured.
+/// cases ran when that was measured, and the recorded cases' own hash.
 pub fn save_fingerprint(crate_dir: &Path, m: &Manifest, coverage: Option<&Value>) -> Result<()> {
     let path = crate_dir.join(RECORDED_FROM);
     let Some((hash, files)) = fingerprint(m) else {
         return Ok(());
     };
     let mut saved = json!({ "unit": m.unit, "files": files, "fingerprint": hash });
+    if let Ok(text) = std::fs::read_to_string(crate_dir.join(crate::harness::CASES)) {
+        let n = text.lines().count();
+        saved["cases"] = json!(n);
+        saved["cases_hash"] = json!(cases_hash(&text, n));
+    }
     if let Some(c) = coverage {
         saved["coverage"] = c.clone();
     }
@@ -291,6 +308,25 @@ pub fn stale(crate_dir: &Path, m: &Manifest) -> Option<String> {
              checked against what the original does now",
             m.unit,
             crate_dir.display()
+        )
+    })
+}
+
+/// Why `cases.jsonl` is no longer what `record` wrote, if it is not: its recorded lines were
+/// edited or removed. Cases appended after them (`fuzz --keep`) are fine. `None` for a recording
+/// made before cases were hashed.
+pub fn cases_tampered(crate_dir: &Path) -> Option<String> {
+    let saved: Value =
+        serde_json::from_str(&std::fs::read_to_string(crate_dir.join(RECORDED_FROM)).ok()?).ok()?;
+    let n = usize::try_from(saved["cases"].as_u64()?).ok()?;
+    let hash = saved["cases_hash"].as_str()?;
+    let text = std::fs::read_to_string(crate_dir.join(crate::harness::CASES)).unwrap_or_default();
+    (text.lines().count() < n || cases_hash(&text, n) != hash).then(|| {
+        format!(
+            "{} changed since `record` wrote it: its {} recorded lines were edited or removed \
+             (appending cases is fine); record again instead of editing the recording",
+            crate::harness::CASES,
+            n
         )
     })
 }

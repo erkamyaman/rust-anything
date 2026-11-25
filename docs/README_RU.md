@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · Русский · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · Русский · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a> · <a href="README_TH.md">ไทย</a> · <a href="https://github.com/erkamyaman/rust-anything/issues/425">+ add yours</a></sub></p>
 <p align="center"><sub>Этот перевод поддерживается сообществом и может отставать от <a href="../README.md">английского README</a>.</sub></p>
 
 <p align="center"><b>Перепишите своё приложение на Rust и докажите, что оно ведёт себя так же.</b><br>
@@ -41,7 +41,7 @@
   <sub>Prettier против своего порта на Rust на 59 реальных файлах из ms, Fuse.js и json-server (Apple M4). Одинаковый вывод, байт в байт. <a href="real-world.md#prettier">Как измеряли</a>.</sub>
 </p>
 
-<p align="center"><sub>PHP и C#: перенос отдельных модулей через FFI и P/Invoke.</sub></p>
+<p align="center"><sub>PHP, C# и PowerShell: перенос отдельных модулей через FFI и P/Invoke.</sub></p>
 
 <table>
   <tr>
@@ -203,7 +203,7 @@ rust-anything не переводит код: код на Rust пишете вы
 
 Для каждого языка, кроме C, PHP, C# и PowerShell, также генерируются пакетные классы (`--batch`): элементы пересекают границу один раз и остаются в Rust, а каждый вызов обрабатывает их все на всех ядрах.
 
-Язык определяется по репозиторию (`go.mod`, `pom.xml`, `build.gradle`/`build.gradle.kts`, `.csproj` или `.sln`, `pyproject.toml`, `Gemfile`, `composer.json`, `package.json`, иначе по преобладающим исходным файлам); модуль Gradle с исходниками `.kt` и без исходников `.java` считается Kotlin, смешанные модули остаются Java. Флаг `--lang` переопределяет автоопределение. Типы берутся из исходного кода: типы TS, аннотации типов Python, сигнатуры C, Go, Java, Kotlin и C#, теги YARD в Ruby, типы и phpdoc в PHP; нетипизированные параметры, используемые как числа, выводятся как числовые.
+Язык определяется по репозиторию (`go.mod`, `pom.xml`, `build.gradle`/`build.gradle.kts`, `.csproj` или `.sln`, `pyproject.toml`, `Gemfile`, `composer.json`, `package.json`, иначе по преобладающим исходным файлам); модуль Gradle с исходниками `.kt` и без исходников `.java` считается Kotlin, смешанные модули остаются Java. Флаг `--lang` переопределяет автоопределение. Типы берутся из исходного кода: типы TS, аннотации типов Python, сигнатуры C, Go, Java, Kotlin и C#, теги YARD в Ruby, типы и phpdoc в PHP; нетипизированные параметры, используемые как числа, выводятся как числовые. В разделе [Типы](types.md) описано, во что превращается каждый из них в порте и какие оставляют функцию на исходном языке.
 
 Для PHP `analyze` планирует PHP-приложение (пакеты Composer и автозагрузка PSR-4, риски вроде нестрогого сравнения и переполнения целых чисел во float, сопоставление пакетов Composer с крейтами), а PHP CLI или сервер можно записать, воспроизвести и поставить за входную точку на Rust. Функции верхнего уровня модуля со скалярными, строковыми, списочными и ассоциативными параметрами переносятся через расширение FFI (`php` с `ext-ffi`, в CLI включено по умолчанию): когда `diff` проходит, подключите сгенерированный `php/<crate>.php` (имя крейта, где `-` заменён на `_`, то есть `foo-rs` даёт `php/foo_rs.php`) там, где приложение подключало исходный файл, и оставьте оба файла на месте: обёртка загружает нативную библиотеку относительно своей папки. Обёртка объявляет каждую перенесённую функцию без проверки `function_exists`, поэтому она заменяет исходный файл, а не дополняет его. Всё остальное из этого файла (классы, методы `public static`, функции, которые мост оставляет в PHP, и инструкции верхнего уровня вроде `define(...)`) в обёртку не попадает, а подключение обоих файлов повторно объявляет функции. Держите это в файле, который остаётся подключённым. Каждый вызов пересекает границу в виде JSON, примерно за 1 мкс, поэтому `bench` показывает маленькие функции медленнее, чем в PHP; `shadow` для PHP пока нет ([issue #200](https://github.com/erkamyaman/rust-anything/issues/200)).
 
@@ -212,7 +212,9 @@ C# работает аналогичным образом: `analyze` читае�
 ## Подробнее
 
 - [Как это работает](how-it-works.md): цикл работы, что решают `bridge` и `analyze`, горячие пути, что инструмент не может отловить, чего требует реальный порт и как не отставать от оригинала (`map`)
+- [Публикация порта как пакета](packaging.md): wheel-пакеты maturin и npm-пакеты napi-rs для каждой платформы, с CI, который их собирает
 - [Портирование целого приложения](whole-apps.md): серверы, CLI и библиотеки, от входной точки до `app lift`
+- [Типы](types.md): во что превращаются типы каждого языка в `port.rs` и почему тип может быть отклонён
 - [Примеры и разборы кейсов](examples.md): x18n и реальный код на шести языках
 - [Реальные порты](real-world.md): json-server, Fuse.js, vercel/ms, с бенчмарками
 - [Установка, обновление и разработка](install.md): все способы установки, Windows и сборка из исходников

@@ -921,10 +921,12 @@ unsafe fn fail(err: *mut *mut c_char, message: String) -> i32 {
         }
         params.push("err: *mut *mut c_char".into());
         let call = format!("port::{}({})", f.rust_name, args.join(", "));
-        let call = if f.fallible {
-            call
+        let run_call = if args.is_empty() && f.fallible {
+            format!("run(port::{})", f.rust_name)
+        } else if f.fallible {
+            format!("run(|| {call})")
         } else {
-            format!("Ok({call})")
+            format!("run(|| Ok({call}))")
         };
         let ok = match rt.as_ref().map(|t| t.c) {
             Some("string") => "{\n            let bytes = value.as_bytes();\n            \
@@ -940,7 +942,7 @@ unsafe fn fail(err: *mut *mut c_char, message: String) -> i32 {
              // SAFETY: exported unmangled under a name only rust-anything defines.\n#[unsafe(no_mangle)]\n\
              // SAFETY: callers uphold the contract under `# Safety`.\n\
              pub unsafe extern \"C\" fn rust_anything_t_{name}({params}) -> i32 {{\n{convert}    \
-             match run(|| {call}) {{\n        Ok(value) => {ok}\n        \
+             match {run_call} {{\n        Ok(value) => {ok}\n        \
              // SAFETY: Go passes a valid `err`.\n        Err(message) => unsafe {{ fail(err, message) }},\n    }}\n}}",
             proto = e.prototype.as_deref().unwrap_or(&e.name),
             name = f.js_name,
@@ -2052,5 +2054,43 @@ func Lookup(id int) (string, error) {
         );
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn typed_rs_avoids_redundant_closure_for_zero_arg_fallible_functions() {
+        let src = r#"package ping
+
+func Pong() (string, error) { return "pong", nil }
+func PurePong() string { return "pong" }
+func Echo(s string) (string, error) { return s, nil }
+"#;
+        let exports = crate::lang::go::exports("ping.go", src);
+        let manifest = Manifest {
+            schema: String::new(),
+            root: std::path::PathBuf::new(),
+            root_written: None,
+            unit: "ping".into(),
+            language: crate::lang::Lang::Go,
+            kind: crate::bridge::Kind::Ffi,
+            crate_name: "ping-rs".into(),
+            exports,
+            classes: vec![],
+            js_only: vec![],
+            batches: vec![],
+            allocator: Default::default(),
+            float_tolerance: None,
+            ignore_key_order: false,
+        };
+        let mut api = crate::codegen::parse_port(
+            "pub fn pong() -> Result<String, String> { Ok(\"pong\".into()) }\n\
+             pub fn pure_pong() -> String { \"pong\".into() }\n\
+             pub fn echo(s: String) -> Result<String, String> { Ok(s) }\n",
+        );
+        crate::bridge::match_export_names(&manifest, &mut api);
+        let rs = typed_rs(&manifest, &api);
+        assert!(rs.contains("match run(port::pong)"), "{rs}");
+        assert!(!rs.contains("run(|| port::pong())"), "{rs}");
+        assert!(rs.contains("match run(|| Ok(port::pure_pong()))"), "{rs}");
+        assert!(rs.contains("match run(|| port::echo(ra_arg0))"), "{rs}");
     }
 }

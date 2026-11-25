@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · Azərbaycanca · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · <a href="README_FR.md">Français</a> · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · Azərbaycanca · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a> · <a href="README_TH.md">ไทย</a> · <a href="https://github.com/erkamyaman/rust-anything/issues/425">+ add yours</a></sub></p>
 <p align="center"><sub>Bu tərcümə icma tərəfindən dəstəklənir və <a href="../README.md">ingiliscə README</a>-dən geri qala bilər.</sub></p>
 
 <p align="center"><b>Tətbiqinizi Rust-da yenidən yazın və onun hələ də eyni davrandığını sübut edin.</b><br>
@@ -41,7 +41,7 @@ Türkiyədə 🇹🇷 <a href="https://github.com/erkamyaman">erKam Yaman</a> t�
   <sub>ms, Fuse.js və json-server-dən götürülmüş 59 real faylda Prettier onun Rust portuna qarşı (Apple M4). Bayt-bayt eyni çıxış. <a href="real-world.md#prettier">Necə ölçülüb</a>.</sub>
 </p>
 
-<p align="center"><sub>PHP və C#: bu gün qeyd, təkrar və front door; vahid portları növbədədir.</sub></p>
+<p align="center"><sub>PHP, C# və PowerShell: FFI və P/Invoke vasitəsilə vahid portları.</sub></p>
 
 <table>
   <tr>
@@ -238,23 +238,33 @@ Eyni çıxış kifayət deyil. Tətbiqin göndərdiklərini də qeydə alın, on
 C, PHP, C# və PowerShell-dən başqa hər dil batch sinifləri də alır (`--batch`): elementlər körpünü bir dəfə keçir və
 Rust-da qalır, hər çağırış isə bütün nüvələrdə hamısının üzərində işləyir.
 
-Dil repozitoriyadan müəyyən edilir (`go.mod`, `pom.xml`, `.csproj` və ya `.sln`, `pyproject.toml`,
-`Gemfile`, `composer.json`, `package.json`, əks halda ən çox rast gəlinən mənbə faylları); `--lang`
-bunu əvəz edir. Tiplər mənbədən gəlir: TS tipləri, Python type hint-ləri, C, Go, Java və C#
+Dil repozitoriyadan müəyyən edilir (`go.mod`, `pom.xml`, `build.gradle`/`build.gradle.kts`, `.csproj` və ya `.sln`,
+`pyproject.toml`, `Gemfile`, `composer.json`, `package.json`, əks halda ən çox rast gəlinən mənbə faylları);
+`.kt` mənbələri olan və `.java` mənbələri olmayan bir Gradle modulu Kotlin-dir, qarışıq modullar Java olaraq
+qalır. `--lang` bunu əvəz edir. Tiplər mənbədən gəlir: TS tipləri, Python type hint-ləri, C, Go, Java, Kotlin və C#
 imzaları, Ruby YARD teqləri, PHP tipləri və phpdoc; rəqəm kimi istifadə olunan tipsiz parametrlər
 rəqəm kimi müəyyən edilir.
 
 PHP üçün `analyze` PHP tətbiqini planlaşdırır (Composer paketləri və PSR-4 autoloading,
 sərbəst müqayisə və tam ədədin float-a daşması kimi risklər, crate-lərə uyğunlaşdırılmış Composer
 paketləri), PHP CLI və ya serveri isə qeydə alına, təkrar oynadıla və Rust front door-unun arxasına
-qoyula bilər. Onun vahidlərini PHP-nin FFI-ı vasitəsilə Rust-a port etmək növbəti addımdır
-([issue #2](https://github.com/erkamyaman/rust-anything/issues/2)).
+qoyula bilər. Bir vahidin skalyar, sətir, siyahı və assosiativ massiv parametrlərinə malik yuxarı
+səviyyəli funksiyaları PHP-nin FFI genişlənməsi (`php` `ext-ffi` ilə, CLI üçün susmaya görə aktiv)
+vasitəsilə körpülənir: `diff` keçdikdən sonra orijinal faylın əvəzinə yaradılmış `php/<crate>.php`
+faylını tələb edin. Hər çağırış JSON olaraq keçir, təxminən 1 µs, ona görə də `bench` kiçik
+funksiyaları PHP-dən daha yavaş göstərir; PHP üçün hələlik `shadow` yoxdur
+([issue #200](https://github.com/erkamyaman/rust-anything/issues/200)).
 
 C# da eyni şəkildə işləyir: `analyze` `.csproj` layihələrini və onların NuGet paketlərini
 oxuyur (crate-lərə uyğunlaşdırılmış), `using` direktivlərini qovluqlara həll edir və C#-ın fərqli
 etdiyi şeyləri işarələyir (`decimal`, `dynamic`, LINQ-in təxirə salınmış sorğuları, `Task`, `lock`,
 reflection). C# CLI və ya ASP.NET serveri qeydə alına, təkrar oynadıla və Rust front door-unun
-arxasına qoyula bilər; vahidləri P/Invoke vasitəsilə port etmək növbədədir.
+arxasına qoyula bilər. Bir vahidin skalyar, sətir, massiv, siyahı, lüğət və record və ya sadə sinif
+parametrlərinə malik public static metodları P/Invoke vasitəsilə körpülənir (qeydə almaq və müqayisə
+etmək üçün `PATH`-də `dotnet`): `diff` keçdikdən sonra yaradılmış `<namespace>.Rust` siniflərini
+çağırın və ya `using` ilə onlara ləqəb verin. Hər çağırış JSON olaraq keçir, təxminən 1-3 µs, ona görə
+də `bench` kiçik metodları .NET-dən daha yavaş göstərir; C# üçün hələlik `shadow` yoxdur
+([issue #200](https://github.com/erkamyaman/rust-anything/issues/200)).
 
 ## Ətraflı
 

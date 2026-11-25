@@ -427,3 +427,28 @@ fn cli_package_runs_the_front_door_and_falls_back_to_the_pinned_original() {
     assert!(wrong.is_err());
     let _ = std::fs::remove_dir_all(&root);
 }
+
+#[test]
+fn package_refuses_invalid_version_in_dry_run() {
+    let root = project(
+        "invalid-ver",
+        &[
+            ("package.json", r#"{"name":"calc","version":"1.0.0"}"#),
+            ("src/calc.js", "export function calc() { return 1; }\n"),
+        ],
+    );
+    let port = bridged(&root, "src/calc.js", Kind::Napi);
+    let err = package::package(&Options {
+        crate_dir: &port,
+        dry_run: true,
+        version: Some("bogus".into()),
+        ..options(&port)
+    })
+    .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("`bogus` is not a valid package version"),
+        "{err}"
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}

@@ -1083,6 +1083,45 @@ mod tests {
     use super::*;
 
     #[test]
+    fn base64_matches_the_rfc_4648_vectors() {
+        for (plain, encoded) in [
+            ("", ""),
+            ("f", "Zg=="),
+            ("fo", "Zm8="),
+            ("foo", "Zm9v"),
+            ("foob", "Zm9vYg=="),
+            ("fooba", "Zm9vYmE="),
+            ("foobar", "Zm9vYmFy"),
+        ] {
+            assert_eq!(encode_base64(plain.as_bytes()), encoded, "{plain:?}");
+            assert_eq!(
+                decode_base64(encoded.as_bytes()),
+                plain.as_bytes(),
+                "{encoded:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn base64_round_trips_every_byte_value() {
+        let bytes: Vec<u8> = (0..=255).collect();
+        for len in [256, 255, 254] {
+            let encoded = encode_base64(&bytes[..len]);
+            assert_eq!(
+                decode_base64(encoded.as_bytes()),
+                &bytes[..len],
+                "{len} bytes"
+            );
+        }
+    }
+
+    #[test]
+    fn base64_decoding_skips_line_breaks() {
+        assert_eq!(decode_base64(b"Zm9v\r\nYmFy"), b"foobar");
+        assert_eq!(decode_base64(b"Zm9v\nYmFy\n"), b"foobar");
+    }
+
+    #[test]
     fn only_scripts_of_the_repository_are_pointed_at_it() {
         let repo = std::env::temp_dir().join(format!("ra-effects-scripts-{}", std::process::id()));
         std::fs::create_dir_all(repo.join("scripts")).unwrap();

@@ -179,6 +179,9 @@ pub fn host_key() -> Option<&'static str> {
 
 pub fn package(opts: &Options) -> Result<Outcome> {
     let crate_dir = std::path::absolute(opts.crate_dir)?;
+    if let Some(v) = &opts.version {
+        validate_version(v)?;
+    }
     if cli::is_front_door(&crate_dir) {
         return cli::package(&crate_dir, opts);
     }
@@ -337,6 +340,34 @@ fn validate_npm_name(name: &str) -> Result<()> {
         });
     if !ok {
         bail!("`{name}` is not a valid npm package name (lowercase, URL-safe); pass --name");
+    }
+    Ok(())
+}
+
+/// `MAJOR.MINOR.PATCH` with an optional `-prerelease`, as npm's semver takes it (and PyPI
+/// accepts): no whitespace, no leading zeros in a number.
+fn validate_version(version: &str) -> Result<()> {
+    let number = |s: &str| {
+        !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) && (s == "0" || !s.starts_with('0'))
+    };
+    let (core, pre) = match version.split_once('-') {
+        Some((core, pre)) => (core, Some(pre)),
+        None => (version, None),
+    };
+    let parts: Vec<&str> = core.split('.').collect();
+    let ok = parts.len() == 3
+        && parts.iter().all(|p| number(p))
+        && pre.is_none_or(|pre| {
+            pre.split('.').all(|id| {
+                !id.is_empty()
+                    && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+                    && (!id.bytes().all(|b| b.is_ascii_digit()) || number(id))
+            })
+        });
+    if !ok {
+        bail!(
+            "`{version}` is not a valid package version (MAJOR.MINOR.PATCH, e.g. 1.2.0); pass --version"
+        );
     }
     Ok(())
 }
@@ -1085,6 +1116,28 @@ mod tests {
         assert!(validate_npm_name("fuzzy/extra").is_err());
         assert!(validate_npm_name("fuzzy@1").is_err());
         assert!(validate_npm_name("@x18n/fuzzy@1").is_err());
+    }
+
+    #[test]
+    fn package_versions() {
+        for ok in ["1.2.3", "0.1.0", "1.2.3-beta.1", "10.0.0-rc-1", "1.0.0-0"] {
+            assert!(validate_version(ok).is_ok(), "{ok}");
+        }
+        for bad in [
+            "",
+            "bogus",
+            "1.0",
+            " 1.0.0",
+            "1.0.0 ",
+            "1.2.3.4",
+            "01.2.3",
+            "1.2.3-",
+            "1.2.3-beta..1",
+            "1.2.3-01",
+            "v1.2.3",
+        ] {
+            assert!(validate_version(bad).is_err(), "{bad:?}");
+        }
     }
 
     #[test]

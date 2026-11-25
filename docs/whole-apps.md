@@ -110,6 +110,13 @@ rust-anything app replay . --build "target/release/mytool"
   fallback to the original), as the front door below does, also gets its fallback rate reported.
 - `app replay --case <name>` reruns one case by the name the report gives it: the fast,
   repeatable loop for fixing a mismatch before running everything again.
+- Each failing field names where it first differs: the line and column of the text (where its
+  literal part stops matching), the JSON path inside a JSON body, or the status change
+  (`200→500`). The report starts with a "Distinct differences" table: failing cases that differ
+  the same way (same field, path and kind) are one row with a short stable id and a count.
+- `app replay --redact` writes the report and prints the failures as shapes only: where and how
+  they differ, lengths and hashes, with no outputs, arguments or request paths, for a report you
+  can share.
 - The report has no timings or temporary paths: two replays of the same build write the same
   file. Commit it and run `app replay` then `git diff --exit-code rust/app-cases/replay-report.md`
   in CI, and a half-ported app fails CI on any change in what passes, better or worse, until the
@@ -181,7 +188,9 @@ rust-anything app lift .
   directory each time the original, the front door or a build starts; `--arg db.json` is an
   argument every start gets after its command, so the Rust binary is started as the original is.
   `--pace 50` waits 50 ms after each response, for work a server does after answering (a file
-  watcher reloading what it just wrote).
+  watcher reloading what it just wrote). A server gets 60 seconds to accept connections;
+  `--ready-timeout 180` gives a slow start (a JVM, .NET) longer, and `--ready-timeout 5` makes a
+  build that never listens fail fast.
 - Cases are `rust/app-cases/http/<case>.toml` (the request, the status and the headers that matter)
   and `<case>.body` (the response body, with `[..]` where two runs differed). Date, server and
   other per-response headers are left out; delete any header line you do not care about.
@@ -189,6 +198,40 @@ rust-anything app lift .
   every route no unit answers. `wire --route` takes axum routes: `METHOD /path/{param}`, `/path`
   for any method, `*` for everything else; the glue gets the route, its parameters and the
   request. `lift` removes the proxy; HTTP cases then run in CI with `app replay`.
+
+#### Shadow live traffic
+
+Recorded cases cover what the docs, `--inputs` and traps thought of. `app shadow` checks a build
+against real requests too: a proxy sends each request to the original, relays its answer to the
+client byte for byte, then sends the same request to the build and compares the two answers
+(status, headers other than the per-response ones a recording leaves out, body) with the saved
+normalizers:
+
+```sh
+rust-anything app shadow . --build rust/app/target/release/app --listen 8080
+rust-anything app shadow . --build ./server-rs --upstream 127.0.0.1:3000 --keep
+```
+
+- Clients only ever get the original's answer, and the build is asked after the client has it,
+  so a slow or broken build changes nothing for them. Requests are handled one at a time.
+- The original runs for real: the saved command starts it (with its saved `--arg`s), or
+  `--upstream HOST:PORT` points at one already running. Each side effect happens once, there.
+- The build runs on a port of its own with the HTTP and mail sinks of `--effects` always on
+  (`HTTP_PROXY`, `SMTP_HOST`, `SMTP_PORT` and any saved `--effect-env`), and the `--fresh` paths
+  copied from the repository into a working directory of its own when it starts. Its effects are
+  dropped, not compared. `--db-reset` and `--db-dump` are not run, and a database the build
+  reaches over the network is not isolated: point the build at a copy.
+- A header whose value differed between the original's own runs when it was recorded is checked
+  for presence only.
+- Each mismatch is a line in `rust/app-cases/shadow/mismatches.jsonl` with the method, a hash of
+  the path and, for each field that differed (`body`, `status`, `header content-type`), its
+  shape as `app replay --redact` writes it: where it first differs, kind, line and column,
+  lengths, never the values. The terminal shows the same, and at the end the distinct
+  differences with how many requests each covers. `--keep` appends the request itself to
+  `rust/app-cases/shadow/inputs.jsonl`, which `app record --inputs` turns into a case, so a
+  mismatch seen live is replayed with the full diff from then on.
+- It runs until Ctrl-C; `--requests 100` stops after 100 requests and exits 1 if any mismatched.
+  CLIs are not covered yet, and there is no MCP tool, since it runs until stopped.
 
 ### Libraries
 
@@ -233,10 +276,11 @@ rebuild, since `app front-door` never overwrites an existing `rust/app`.
 | `timeout_secs` | `--timeout` | Replaces if passed; keeps saved (default `30`) otherwise |
 | `normalize` | `--normalize NAME` | Merges (appends new built-in normalizer names) |
 | `normalizers` | `--normalize NAME=REGEX` | Merges (inserts or updates by `NAME`) |
-| `http` | `--http`, `--port`, `--arg`, `--pace` | Sticky once set; cannot be cleared via CLI flags |
+| `http` | `--http`, `--port`, `--arg`, `--pace`, `--ready-timeout` | Sticky once set; cannot be cleared via CLI flags |
 | `http.port` | `--port` | Replaces if passed; keeps saved otherwise |
 | `http.args` | `--arg` | Replaces if passed; keeps saved (cannot be cleared via CLI) |
 | `http.pace_ms` | `--pace` | Replaces if passed; `--pace 0` clears it |
+| `http.ready_secs` | `--ready-timeout` | Replaces if passed; `--ready-timeout 0` restores the default `60` |
 | `http.fresh` / `fresh` | `--fresh` | Replaces if passed; keeps saved (cannot be cleared via CLI) |
 | `effects` | `--effects`, `--effect-env`, `--effect-response`, `--db-reset`, `--db-dump` | Merges with saved sink and database settings; `--effect-response` replaces the saved rules |
 | `float_tolerance` | `--float-tolerance` | Replaces if passed; `--float-tolerance 0` clears it |
@@ -244,5 +288,60 @@ rebuild, since `app front-door` never overwrites an existing `rust/app`.
 | `unordered` | *(written by `app record`)* | Recomputed from `order` noise; tells `replay` to compare those lines in any order |
 | `recorded` | *(written by `app record`)* | Tracks generated case names so stale cases are cleaned up on the next `app record` |
 
-All five are MCP tools too: `app_record`, `app_replay`, `app_front_door`, `app_wire` and
-`app_lift`.
+All six are MCP tools too: `app_record`, `app_replay`, `app_front_door`, `app_wire`,
+`app_lift` and `app_drift`.
+
+### Keep up with the original
+
+The original keeps changing after the port starts, and after the lift. `app drift` checks both
+sides at once:
+
+```sh
+rust-anything app drift .                                # the build is rust/app, built with cargo
+rust-anything app drift . --build ./target/release/tcli  # or any build
+```
+
+- It replays the original against `rust/app-cases`: a case the original no longer matches
+  changed upstream.
+- It lists the examples in the original's docs (shell lines for a CLI, curl lines for a server)
+  that no case records yet.
+- It replays the build: a case it no longer matches while the original still does is a port
+  regression; one the original changed while the build still passes is marked "original changed,
+  port still old".
+
+It writes `rust/app-cases/drift-report.md` (with a diff per case, and the same stable paths as
+`replay-report.md`, so CI can commit it), leaves `replay-report.md` as it was, and exits 1 on any
+change. After a change upstream: `app record` again (it adds the new examples), then port what
+changed until `app replay` passes. Libraries are not covered: for units, `map --check` exits 1
+while any recording is stale (see [How it works](how-it-works.md#keep-up-with-the-original)).
+
+To check every week and on demand, in GitHub Actions:
+
+```yaml
+name: drift
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install rust-anything --locked
+      - run: rust-anything app drift .
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-report
+          path: rust/app-cases/drift-report.md
+```
+
+Set up the original's own runtime in place of `setup-node` (`actions/setup-python`,
+`actions/setup-go` and so on).

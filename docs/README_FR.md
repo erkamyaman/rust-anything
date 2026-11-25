@@ -4,7 +4,7 @@
 
 <h1 align="center">rust-anything</h1>
 
-<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · Français · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a></sub></p>
+<p align="center"><sub><a href="../README.md">English</a> · <a href="README_TR.md">Türkçe</a> · <a href="README_UK.md">Українська</a> · <a href="README_ZH.md">简体中文</a> · <a href="README_ZH-TW.md">繁體中文</a> · <a href="README_DE.md">Deutsch</a> · Français · <a href="README_RU.md">Русский</a> · <a href="README_JA.md">日本語</a> · <a href="README_KO.md">한국어</a> · <a href="README_AZ.md">Azərbaycanca</a> · <a href="README_UZ.md">Oʻzbekcha</a> · <a href="README_KK.md">Қазақша</a> · <a href="README_KY.md">Кыргызча</a> · <a href="README_TK.md">Türkmençe</a> · <a href="README_TT.md">Татарча</a> · <a href="README_UG.md">ئۇيغۇرچە</a> · <a href="README_PT.md">Português</a> · <a href="README_VI.md">Tiếng Việt</a> · <a href="README_ES.md">Español</a> · <a href="README_IT.md">Italiano</a> · <a href="README_ID.md">Bahasa Indonesia</a> · <a href="README_AR.md">العربية</a> · <a href="README_FA.md">فارسی</a> · <a href="README_HI.md">हिन्दी</a> · <a href="README_TH.md">ไทย</a> · <a href="https://github.com/erkamyaman/rust-anything/issues/425">+ add yours</a></sub></p>
 <p align="center"><sub>Cette traduction est maintenue par la communauté et peut être en retard sur le <a href="../README.md">README anglais</a>.</sub></p>
 
 <p align="center"><b>Réécrivez votre application en Rust, et prouvez qu'elle se comporte toujours de la même façon.</b><br>
@@ -41,7 +41,7 @@ Fait en Turquie 🇹🇷 par <a href="https://github.com/erkamyaman">erKam Yaman
   <sub>Prettier face à son portage Rust sur 59 fichiers réels issus de ms, Fuse.js et json-server (Apple M4). Même sortie, octet par octet. <a href="real-world.md#prettier">Comment c'est mesuré</a>.</sub>
 </p>
 
-<p align="center"><sub>PHP et C# : enregistrement, rejeu et porte d'entrée, plus les ports d'unités par FFI et P/Invoke.</sub></p>
+<p align="center"><sub>PHP, C# et PowerShell : ports d'unités par FFI et P/Invoke.</sub></p>
 
 <table>
   <tr>
@@ -245,6 +245,8 @@ courants) ; un module Gradle avec des sources `.kt` et sans source `.java` est d
 restent en Java. `--lang` permet de le forcer. Les types proviennent des sources : types TS, annotations
 Python, signatures C, Go, Java, Kotlin et C#, balises Ruby YARD, types PHP et phpdoc ; les paramètres non
 typés utilisés comme des nombres sont inférés comme nombres.
+[Types](types.md) indique ce que chacun devient dans le portage, et lesquels gardent une fonction dans son
+langage.
 
 Pour PHP, `analyze` planifie une application PHP (paquets Composer et chargement automatique
 PSR-4, risques tels que la comparaison souple et le débordement d'entiers en flottants, paquets Composer
@@ -270,7 +272,9 @@ petites méthodes plus lentes que .NET ; il n'y a pas encore de `shadow` pour C#
 ## En savoir plus
 
 - [Fonctionnement](how-it-works.md) : la boucle, ce que décident `bridge` et `analyze`, les chemins chauds, ce qui lui échappe, ce qu'exige un vrai portage, et le suivi de l'original (`map`)
+- [Publier un portage sous forme de paquet](packaging.md) : les wheels maturin et les paquets npm par plateforme de napi-rs, avec la CI qui les construit
 - [Porter toute une application](whole-apps.md) : serveurs, CLI et bibliothèques, de la porte d'entrée à `app lift`
+- [Types](types.md) : ce que deviennent les types de chaque langage dans `port.rs`, et pourquoi un type est refusé
 - [Exemples et études de cas](examples.md) : x18n, et du code réel dans six langages
 - [Portages réels](real-world.md) : json-server, Fuse.js, vercel/ms, avec benchmarks
 - [Installer, mettre à jour et développer](install.md) : toutes les méthodes d'installation, Windows, et la compilation depuis les sources

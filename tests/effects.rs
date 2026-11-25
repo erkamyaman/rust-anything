@@ -37,14 +37,15 @@ fn record(repo: &Path, python: &str, effects: Option<EffectsConfig>) -> app::Rec
         name: Some("notify"),
         traps: false,
         timeout_secs: None,
-        http: false,
-        server_args: &[],
-        fresh: &[],
+        http: None,
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: None,
         float_tolerance: None,
         float_files: &[],
         effects,
+        ready_secs: None,
     })
     .unwrap()
 }
@@ -184,14 +185,15 @@ fn a_server_that_mails_twice_fails_only_on_that_request() {
         name: Some("server"),
         traps: false,
         timeout_secs: None,
-        http: true,
-        server_args: &[],
-        fresh: &[],
+        http: Some(true),
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: None,
         float_tolerance: None,
         float_files: &[],
         effects: EffectsConfig::from_args(&["smtp".into()], &[], None, None).unwrap(),
+        ready_secs: None,
     })
     .unwrap();
     assert_eq!(outcome.cases, 2, "{outcome:?}");
@@ -270,14 +272,15 @@ fn rows_written_differently_fail_replay_through_the_db_dump() {
         name: Some("add"),
         traps: false,
         timeout_secs: None,
-        http: false,
-        server_args: &[],
-        fresh: &[],
+        http: None,
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: None,
         float_tolerance: None,
         float_files: &[],
         effects,
+        ready_secs: None,
     })
     .unwrap();
     assert!(outcome.unstable.is_empty(), "{outcome:?}");
@@ -377,14 +380,15 @@ fn same_mail_with_different_mime_framing_matches_unless_smtp_raw() {
         name: Some("mailer"),
         traps: false,
         timeout_secs: None,
-        http: false,
-        server_args: &[],
-        fresh: &[],
+        http: None,
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: None,
         float_tolerance: None,
         float_files: &[],
         effects,
+        ready_secs: None,
     })
     .unwrap();
     assert!(outcome.unstable.is_empty(), "{outcome:?}");
@@ -401,14 +405,15 @@ fn same_mail_with_different_mime_framing_matches_unless_smtp_raw() {
         name: Some("mailer"),
         traps: false,
         timeout_secs: None,
-        http: false,
-        server_args: &[],
-        fresh: &[],
+        http: None,
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: None,
         float_tolerance: None,
         float_files: &[],
         effects: raw_effects,
+        ready_secs: None,
     })
     .unwrap();
     assert!(raw_outcome.unstable.is_empty(), "{raw_outcome:?}");
@@ -470,14 +475,15 @@ fn db_reset_and_dump_run_where_the_case_runs() {
         name: Some("notes"),
         traps: false,
         timeout_secs: None,
-        http: false,
-        server_args: &[],
-        fresh: &[],
+        http: None,
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: None,
         float_tolerance: None,
         float_files: &[],
         effects,
+        ready_secs: None,
     })
     .unwrap();
     assert!(outcome.unstable.is_empty(), "{outcome:?}");
@@ -557,14 +563,15 @@ else:
         name: Some("pay"),
         traps: false,
         timeout_secs: None,
-        http: false,
-        server_args: &[],
-        fresh: &[],
+        http: None,
+        server_args: None,
+        fresh: None,
         pace_ms: None,
         port: None,
         float_tolerance: None,
         float_files: &[],
         effects,
+        ready_secs: None,
     })
     .unwrap();
     assert!(outcome.unstable.is_empty(), "{outcome:?}");
@@ -585,6 +592,162 @@ else:
     std::fs::remove_file(repo.join("fixtures/charge.json")).unwrap();
     let replayed = replay(&repo, &format!("{python} pay.py"));
     assert_eq!(replayed.passed, replayed.total, "{:?}", replayed.failures);
+
+    std::fs::remove_dir_all(&repo).unwrap();
+}
+
+/// A mail server that only counts the messages it accepts.
+fn counting_smtp() -> (u16, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+    use std::io::{BufRead, BufReader, Write};
+    use std::sync::atomic::Ordering;
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let mails = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counted = mails.clone();
+    std::thread::spawn(move || {
+        for stream in listener.incoming().flatten() {
+            let mut out = stream.try_clone().unwrap();
+            let mut lines = BufReader::new(stream);
+            let _ = out.write_all(b"220 test\r\n");
+            let mut data = false;
+            let mut line = String::new();
+            while lines.read_line(&mut line).is_ok_and(|n| n > 0) {
+                let reply: &[u8] = if data {
+                    if line.trim_end() == "." {
+                        data = false;
+                        counted.fetch_add(1, Ordering::SeqCst);
+                        b"250 ok\r\n"
+                    } else {
+                        b""
+                    }
+                } else if line.to_ascii_uppercase().starts_with("DATA") {
+                    data = true;
+                    b"354 go on\r\n"
+                } else if line.to_ascii_uppercase().starts_with("QUIT") {
+                    let _ = out.write_all(b"221 bye\r\n");
+                    break;
+                } else {
+                    b"250 ok\r\n"
+                };
+                let _ = out.write_all(reply);
+                line.clear();
+            }
+        }
+    });
+    (port, mails)
+}
+
+#[test]
+fn shadow_lets_the_original_mail_once_and_sends_the_build_mail_to_a_sink() {
+    use std::io::{Read, Write};
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = std::env::temp_dir().join(format!(
+        "rust-anything-effects-shadow-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("server.py"), SERVER).unwrap();
+    std::fs::write(
+        repo.join("twice.py"),
+        SERVER.replace("\"MAILS\", \"1\"", "\"MAILS\", \"2\""),
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("inputs.jsonl"),
+        "{\"name\": \"health\", \"method\": \"GET\", \"path\": \"/health\"}\n",
+    )
+    .unwrap();
+    app::record(&RecordOptions {
+        repo: &repo,
+        run: &[python.to_string(), "server.py".to_string()],
+        inputs: Some(&repo.join("inputs.jsonl")),
+        normalize: &[],
+        name: Some("server"),
+        traps: false,
+        timeout_secs: None,
+        http: Some(true),
+        server_args: None,
+        fresh: None,
+        pace_ms: None,
+        port: None,
+        float_tolerance: None,
+        float_files: &[],
+        effects: None,
+        ready_secs: None,
+    })
+    .unwrap();
+
+    let (smtp_port, mails) = counting_smtp();
+    let original_port = rust_anything::http::free_port().unwrap();
+    let mut original = std::process::Command::new(python)
+        .arg("server.py")
+        .current_dir(&repo)
+        .env("PORT", original_port.to_string())
+        .env("SMTP_HOST", "127.0.0.1")
+        .env("SMTP_PORT", smtp_port.to_string())
+        .spawn()
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    while std::net::TcpStream::connect(("127.0.0.1", original_port)).is_err() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the original never listened"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    let port = rust_anything::http::free_port().unwrap();
+    let shadow = {
+        let repo = repo.clone();
+        let build = format!("{python} twice.py");
+        std::thread::spawn(move || {
+            rust_anything::app_shadow::shadow(&rust_anything::app_shadow::ShadowOptions {
+                repo: &repo,
+                build: &build,
+                listen: Some(port),
+                upstream: Some(&format!("127.0.0.1:{original_port}")),
+                requests: Some(1),
+                timeout_secs: None,
+                keep: false,
+                progress: None,
+            })
+        })
+    };
+    let body = "{\"user\": \"erin\"}";
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    let answer = loop {
+        if let Ok(mut stream) = std::net::TcpStream::connect(("127.0.0.1", port)) {
+            write!(
+                stream,
+                "POST /signup HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+            let mut out = String::new();
+            stream.read_to_string(&mut out).unwrap();
+            break out;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the proxy never listened"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    };
+    let outcome = shadow.join().unwrap();
+    let _ = original.kill();
+    let _ = original.wait();
+    let outcome = outcome.unwrap();
+    assert!(answer.contains("201"), "{answer}");
+    assert!(answer.contains("\"erin\""), "{answer}");
+    assert_eq!((outcome.requests, outcome.matched), (1, 1), "{outcome:?}");
+    assert_eq!(
+        mails.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the build mailed outside the sink"
+    );
 
     std::fs::remove_dir_all(&repo).unwrap();
 }
