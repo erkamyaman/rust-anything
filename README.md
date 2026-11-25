@@ -282,7 +282,8 @@ a `.csproj` or `.sln`, `pyproject.toml`, `Gemfile`, `composer.json`, `package.js
 common source files); a Gradle module with `.kt` sources and no `.java` sources is Kotlin, mixed
 modules stay Java. `--lang` overrides it. Types come from the source: TS types, Python hints, C, Go,
 Java, Kotlin and C# signatures, Ruby YARD tags, PHP types and phpdoc; untyped parameters used as
-numbers are inferred as numbers.
+numbers are inferred as numbers. [Types](docs/types.md) lists what each one becomes in the port,
+and which keep a function in its language.
 
 For Android, `rust-anything build <crate> --profile android` builds the same JNI library with the
 NDK for `arm64-v8a`, `armeabi-v7a` and `x86_64` (or the `--abi` values you pass) and installs it
@@ -351,6 +352,7 @@ commands (see the [FAQ](docs/faq.md)).
 - [How it works](docs/how-it-works.md): the loop, what `bridge` and `analyze` decide, hot paths, what it can't catch, what a real port takes, and keeping up with the original (`map`)
 - [Ship a port as a package](docs/packaging.md): maturin wheels and napi-rs per-platform npm packages, with the CI that builds them
 - [Port a whole app](docs/whole-apps.md): servers, CLIs and libraries, from the front door to `app lift`
+- [Types](docs/types.md): what each language's types become in `port.rs`, and why a type is refused
 - [Examples and case studies](docs/examples.md): x18n, and real code in eight languages
 - [Real-world ports](docs/real-world.md): json-server, Fuse.js, vercel/ms, with benchmarks
 - [Install, update and develop](docs/install.md): every install method, Windows, and building from source

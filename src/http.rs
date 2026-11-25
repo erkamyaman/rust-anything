@@ -159,6 +159,32 @@ pub struct Req {
     pub headers: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body: Option<String>,
+    /// Base64-encoded body for non-UTF-8 payloads (images, PDFs, protobufs, binary uploads).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_base64: Option<String>,
+    /// Path to a file with raw request body bytes (under `http/` in `.toml` cases, or relative to
+    /// the inputs file / repo in `--inputs`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_file: Option<String>,
+}
+
+impl Req {
+    fn from_body_bytes(bytes: Vec<u8>) -> (Option<String>, Option<String>) {
+        match String::from_utf8(bytes) {
+            Ok(text) => (Some(text), None),
+            Err(err) => (None, Some(encode_base64(&err.into_bytes()))),
+        }
+    }
+
+    fn body_bytes(&self) -> Result<Option<Vec<u8>>> {
+        if let Some(b64) = &self.body_base64 {
+            Ok(Some(decode_base64_strict(b64)?))
+        } else if let Some(text) = &self.body {
+            Ok(Some(text.as_bytes().to_vec()))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -325,7 +351,8 @@ fn send(addr: SocketAddr, req: &Req, timeout: Duration) -> Result<Resp> {
     let mut stream = TcpStream::connect_timeout(&addr, timeout)?;
     stream.set_read_timeout(Some(timeout))?;
     stream.set_write_timeout(Some(timeout))?;
-    let body = req.body.as_deref().unwrap_or("").as_bytes();
+    let body_opt = req.body_bytes()?;
+    let body = body_opt.as_deref().unwrap_or(&[]);
     let mut head = format!(
         "{} {} HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n",
         req.method, req.path
@@ -338,7 +365,7 @@ fn send(addr: SocketAddr, req: &Req, timeout: Duration) -> Result<Resp> {
             head += &format!("{k}: {v}\r\n");
         }
     }
-    if req.body.is_some() || matches!(req.method.as_str(), "POST" | "PUT" | "PATCH") {
+    if body_opt.is_some() || matches!(req.method.as_str(), "POST" | "PUT" | "PATCH") {
         head += &format!("Content-Length: {}\r\n", body.len());
     }
     head += "\r\n";
@@ -728,6 +755,243 @@ fn percent_encode(text: &str) -> String {
     out
 }
 
+struct FormPart {
+    name: String,
+    filename: Option<String>,
+    content_type: Option<String>,
+    data: Vec<u8>,
+}
+
+fn infer_mime(path: &str) -> &'static str {
+    match Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        Some("pdf") => "application/pdf",
+        Some("json") => "application/json",
+        Some("xml") => "application/xml",
+        Some("html" | "htm") => "text/html",
+        Some("txt" | "csv") => "text/plain",
+        _ => "application/octet-stream",
+    }
+}
+
+fn escape_param(s: &str) -> String {
+    s.replace(['\r', '\n'], "")
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+}
+
+fn split_form_segments(s: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let bytes = s.as_bytes();
+    let mut start = 0usize;
+    let mut in_quotes = false;
+    let mut i = 0usize;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' if in_quotes && i + 1 < bytes.len() => i += 2,
+            b'"' => {
+                in_quotes = !in_quotes;
+                i += 1;
+            }
+            b';' if !in_quotes => {
+                out.push(&s[start..i]);
+                i += 1;
+                start = i;
+            }
+            _ => i += 1,
+        }
+    }
+    out.push(&s[start..]);
+    out
+}
+
+fn unquote_form_value(s: &str) -> String {
+    let Some(rest) = s.strip_prefix('"') else {
+        return s.to_string();
+    };
+    let mut out = String::with_capacity(rest.len());
+    let mut chars = rest.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => match chars.next() {
+                Some(next @ ('"' | '\\')) => out.push(next),
+                Some(other) => {
+                    out.push('\\');
+                    out.push(other);
+                }
+                None => return s.to_string(),
+            },
+            '"' => {
+                return if chars.next().is_none() {
+                    out
+                } else {
+                    s.to_string()
+                };
+            }
+            _ => out.push(c),
+        }
+    }
+    s.to_string()
+}
+
+fn with_multipart_boundary(existing: &str, boundary: &str) -> String {
+    let mut parts = split_form_segments(existing).into_iter();
+    let media = parts
+        .next()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("multipart/form-data");
+    let mut out = String::from(media);
+    for param in parts {
+        let trimmed = param.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let is_boundary = trimmed
+            .split_once('=')
+            .is_some_and(|(k, _)| k.trim().eq_ignore_ascii_case("boundary"));
+        if !is_boundary {
+            out.push_str("; ");
+            out.push_str(trimmed);
+        }
+    }
+    out.push_str("; boundary=");
+    out.push_str(boundary);
+    out
+}
+
+fn parse_form_part(
+    spec: &str,
+    literal: bool,
+    read_bytes: &impl Fn(&str) -> Option<Vec<u8>>,
+) -> Option<FormPart> {
+    let (name, rest) = spec.split_once('=')?;
+    if name.is_empty() {
+        return None;
+    }
+    if literal {
+        return Some(FormPart {
+            name: name.to_string(),
+            filename: None,
+            content_type: None,
+            data: rest.as_bytes().to_vec(),
+        });
+    }
+    // Split `;type=...` and `;filename=...` parameters outside quoted strings.
+    let mut segments = split_form_segments(rest).into_iter();
+    let first = segments.next()?;
+    let mut filename_override: Option<String> = None;
+    let mut type_override: Option<String> = None;
+    let mut trailing_literal = String::new();
+    for seg in segments {
+        let trimmed = seg.trim();
+        if let Some(v) = trimmed.strip_prefix("type=") {
+            type_override = Some(unquote_form_value(v.trim()));
+        } else if let Some(v) = trimmed.strip_prefix("filename=") {
+            filename_override = Some(unquote_form_value(v.trim()));
+        } else if trimmed.starts_with("headers=") || trimmed.starts_with("encoder=") {
+            return None;
+        } else if let Some(ct) = type_override.as_mut() {
+            // Curl treats parameters after `;type=` (e.g. `;charset=UTF-8`) as part of the media type.
+            ct.push(';');
+            ct.push_str(trimmed);
+        } else {
+            trailing_literal.push(';');
+            trailing_literal.push_str(seg);
+        }
+    }
+    if let Some(path) = first.strip_prefix('@') {
+        let raw_path = if trailing_literal.is_empty() {
+            unquote_form_value(path)
+        } else {
+            format!("{}{trailing_literal}", unquote_form_value(path))
+        };
+        let data = read_bytes(&raw_path)?;
+        let default_name = Path::new(&raw_path)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| raw_path.clone());
+        let ct = type_override.unwrap_or_else(|| infer_mime(&raw_path).to_string());
+        Some(FormPart {
+            name: name.to_string(),
+            filename: Some(filename_override.unwrap_or(default_name)),
+            content_type: Some(ct),
+            data,
+        })
+    } else if let Some(path) = first.strip_prefix('<') {
+        let raw_path = if trailing_literal.is_empty() {
+            unquote_form_value(path)
+        } else {
+            format!("{}{trailing_literal}", unquote_form_value(path))
+        };
+        let data = read_bytes(&raw_path)?;
+        Some(FormPart {
+            name: name.to_string(),
+            filename: None,
+            content_type: type_override,
+            data,
+        })
+    } else {
+        let val = if trailing_literal.is_empty() {
+            unquote_form_value(first)
+        } else {
+            format!("{}{trailing_literal}", unquote_form_value(first))
+        };
+        Some(FormPart {
+            name: name.to_string(),
+            filename: filename_override,
+            content_type: type_override,
+            data: val.into_bytes(),
+        })
+    }
+}
+
+fn build_multipart(parts: &[FormPart]) -> (String, Vec<u8>) {
+    let mut boundary = String::from("----RustAnythingFormBoundary7MA4YWxkTrZu0gW");
+    let mut suffix = 0u32;
+    while parts
+        .iter()
+        .any(|p| find(&p.data, boundary.as_bytes()).is_some())
+    {
+        suffix += 1;
+        boundary = format!("----RustAnythingFormBoundary{suffix}");
+    }
+    let mut out = Vec::new();
+    for part in parts {
+        out.extend_from_slice(b"--");
+        out.extend_from_slice(boundary.as_bytes());
+        out.extend_from_slice(b"\r\nContent-Disposition: form-data; name=\"");
+        out.extend_from_slice(escape_param(&part.name).as_bytes());
+        out.push(b'"');
+        if let Some(file) = &part.filename {
+            out.extend_from_slice(b"; filename=\"");
+            out.extend_from_slice(escape_param(file).as_bytes());
+            out.push(b'"');
+        }
+        out.extend_from_slice(b"\r\n");
+        if let Some(ct) = &part.content_type {
+            out.extend_from_slice(b"Content-Type: ");
+            out.extend_from_slice(ct.as_bytes());
+            out.extend_from_slice(b"\r\n");
+        }
+        out.extend_from_slice(b"\r\n");
+        out.extend_from_slice(&part.data);
+        out.extend_from_slice(b"\r\n");
+    }
+    out.extend_from_slice(b"--");
+    out.extend_from_slice(boundary.as_bytes());
+    out.extend_from_slice(b"--\r\n");
+    (boundary, out)
+}
+
 fn parse_curl(line: &str, repo: &Path, doc_dir: &Path) -> Option<Req> {
     let toks = app::shell_tokens(line)?;
     if toks.iter().any(|t| t.op) {
@@ -740,15 +1004,15 @@ fn parse_curl(line: &str, repo: &Path, doc_dir: &Path) -> Option<Req> {
     }
     let mut method: Option<String> = None;
     let mut headers = BTreeMap::new();
-    let mut data: Vec<String> = Vec::new();
+    let mut data: Vec<Vec<u8>> = Vec::new();
+    let mut form_parts: Vec<FormPart> = Vec::new();
     let mut url: Option<String> = None;
     let mut i = 0;
-    let read_file = |name: &str| -> Option<String> {
-        let name = name.strip_prefix('@')?;
+    let read_file_bytes = |name: &str| -> Option<Vec<u8>> {
         [repo.join(name), doc_dir.join(name)]
             .iter()
             .find(|p| p.is_file())
-            .and_then(|p| std::fs::read_to_string(p).ok())
+            .and_then(|p| std::fs::read(p).ok())
     };
     while i < args.len() {
         let arg = &args[i];
@@ -765,29 +1029,41 @@ fn parse_curl(line: &str, repo: &Path, doc_dir: &Path) -> Option<Req> {
             }
             "-d" | "--data" | "--data-raw" | "--data-binary" | "--data-ascii" => {
                 let d = next()?;
-                data.push(if d.starts_with('@') && arg != "--data-raw" {
-                    let mut contents = read_file(&d)?;
+                let bytes = if let Some(path) = d.strip_prefix('@')
+                    && arg != "--data-raw"
+                {
+                    let mut raw = read_file_bytes(path)?;
                     if arg != "--data-binary" {
-                        contents.retain(|c| !matches!(c, '\r' | '\n' | '\0'));
+                        raw.retain(|b| !matches!(b, b'\r' | b'\n' | b'\0'));
                     }
-                    contents
+                    raw
                 } else {
-                    d
-                });
+                    d.into_bytes()
+                };
+                data.push(bytes);
             }
             "--json" => {
                 let d = next()?;
-                data.push(if d.starts_with('@') {
-                    read_file(&d)?
+                let bytes = if let Some(path) = d.strip_prefix('@') {
+                    read_file_bytes(path)?
                 } else {
-                    d
-                });
+                    d.into_bytes()
+                };
+                data.push(bytes);
                 headers
                     .entry("Content-Type".to_string())
                     .or_insert_with(|| "application/json".to_string());
                 headers
                     .entry("Accept".to_string())
                     .or_insert_with(|| "application/json".to_string());
+            }
+            "-F" | "--form" => {
+                let spec = next()?;
+                form_parts.push(parse_form_part(&spec, false, &read_file_bytes)?);
+            }
+            "--form-string" => {
+                let spec = next()?;
+                form_parts.push(parse_form_part(&spec, true, &read_file_bytes)?);
             }
             "-A" | "--user-agent" => {
                 headers.insert("User-Agent".to_string(), next()?);
@@ -817,6 +1093,9 @@ fn parse_curl(line: &str, repo: &Path, doc_dir: &Path) -> Option<Req> {
                 let (k, v) = other[2..].split_once(':')?;
                 headers.insert(k.trim().to_string(), v.trim().to_string());
             }
+            other if other.starts_with("-F") && other.len() > 2 => {
+                form_parts.push(parse_form_part(&other[2..], false, &read_file_bytes)?);
+            }
             other
                 if other.starts_with('-')
                     && other.len() > 1
@@ -826,6 +1105,9 @@ fn parse_curl(line: &str, repo: &Path, doc_dir: &Path) -> Option<Req> {
             other => url = Some(other.to_string()),
         }
         i += 1;
+    }
+    if !data.is_empty() && !form_parts.is_empty() {
+        return None;
     }
     let url = url?;
     let (scheme, rest) = url.split_once("://").unwrap_or(("http", &url));
@@ -847,37 +1129,67 @@ fn parse_curl(line: &str, repo: &Path, doc_dir: &Path) -> Option<Req> {
     if !LOCAL_HOSTS.contains(&host) {
         return None;
     }
-    let body = (!data.is_empty()).then(|| data.join("&"));
-    if body.is_some()
-        && !headers
+    let (body, body_base64) = if !form_parts.is_empty() {
+        let (boundary, raw) = build_multipart(&form_parts);
+        if let Some(existing_key) = headers
+            .keys()
+            .find(|k| k.eq_ignore_ascii_case("content-type"))
+            .cloned()
+        {
+            let updated = with_multipart_boundary(&headers[&existing_key], &boundary);
+            headers.insert(existing_key, updated);
+        } else {
+            headers.insert(
+                "Content-Type".to_string(),
+                format!("multipart/form-data; boundary={boundary}"),
+            );
+        }
+        Req::from_body_bytes(raw)
+    } else if !data.is_empty() {
+        let mut joined = Vec::new();
+        for (idx, chunk) in data.into_iter().enumerate() {
+            if idx > 0 {
+                joined.push(b'&');
+            }
+            joined.extend_from_slice(&chunk);
+        }
+        if !headers
             .keys()
             .any(|k| k.eq_ignore_ascii_case("content-type"))
-    {
-        headers.insert(
-            "Content-Type".to_string(),
-            "application/x-www-form-urlencoded".to_string(),
-        );
-    }
-    let method = method.unwrap_or_else(|| if body.is_some() { "POST" } else { "GET" }.to_string());
+        {
+            headers.insert(
+                "Content-Type".to_string(),
+                "application/x-www-form-urlencoded".to_string(),
+            );
+        }
+        Req::from_body_bytes(joined)
+    } else {
+        (None, None)
+    };
+    let has_body = body.is_some() || body_base64.is_some();
+    let method = method.unwrap_or_else(|| if has_body { "POST" } else { "GET" }.to_string());
     Some(Req {
         method,
         path,
         headers,
         body,
+        body_base64,
+        body_file: None,
     })
 }
 
-fn read_inputs(path: &Path) -> Result<Vec<(Option<String>, Req)>> {
+fn read_inputs(path: &Path, repo: &Path) -> Result<Vec<(Option<String>, Req)>> {
     let text =
         std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+    let inputs_dir = path.parent().unwrap_or_else(|| Path::new("."));
     let mut out = Vec::new();
     for (n, line) in text.lines().enumerate() {
         if line.trim().is_empty() {
             continue;
         }
-        let input: HttpInput = serde_json::from_str(line).with_context(|| {
+        let mut input: HttpInput = serde_json::from_str(line).with_context(|| {
             format!(
-                "{}:{}: expected {{\"method\", \"path\", \"headers\": {{...}}, \"body\"}}",
+                "{}:{}: expected {{\"method\", \"path\", \"headers\": {{...}}, \"body\"|\"body_base64\"|\"body_file\"}}",
                 path.display(),
                 n + 1
             )
@@ -888,6 +1200,40 @@ fn read_inputs(path: &Path) -> Result<Vec<(Option<String>, Req)>> {
             path.display(),
             n + 1
         );
+        let body_forms = usize::from(input.req.body.is_some())
+            + usize::from(input.req.body_base64.is_some())
+            + usize::from(input.req.body_file.is_some());
+        ensure!(
+            body_forms <= 1,
+            "{}:{}: specify at most one of `body`, `body_base64`, or `body_file`",
+            path.display(),
+            n + 1
+        );
+        if let Some(b64) = &input.req.body_base64 {
+            decode_base64_strict(b64)
+                .with_context(|| format!("{}:{}: invalid `body_base64`", path.display(), n + 1))?;
+        }
+        if let Some(rel) = input.req.body_file.take() {
+            let file = if Path::new(&rel).is_absolute() {
+                PathBuf::from(&rel)
+            } else {
+                [inputs_dir.join(&rel), repo.join(&rel)]
+                    .into_iter()
+                    .find(|p| p.is_file())
+                    .unwrap_or_else(|| repo.join(&rel))
+            };
+            let bytes = std::fs::read(&file).with_context(|| {
+                format!(
+                    "{}:{}: reading `body_file` `{}`",
+                    path.display(),
+                    n + 1,
+                    file.display()
+                )
+            })?;
+            let (body, body_base64) = Req::from_body_bytes(bytes);
+            input.req.body = body;
+            input.req.body_base64 = body_base64;
+        }
         out.push((input.name, input.req));
     }
     Ok(out)
@@ -903,9 +1249,14 @@ fn trap_values(raw: &str) -> Vec<&'static str> {
     }
 }
 
-fn traps(bases: &[Req]) -> Vec<Req> {
-    let mut out = Vec::new();
+fn req_key(req: &Req) -> String {
+    serde_json::to_string(req).unwrap_or_default()
+}
+
+fn traps(bases: &[Req]) -> (Vec<Req>, usize) {
+    let mut per_base = Vec::with_capacity(bases.len());
     for base in bases {
+        let mut slots: Vec<Vec<Req>> = Vec::new();
         let (path, query) = match base.path.split_once('?') {
             Some((p, q)) => (p, Some(q)),
             None => (base.path.as_str(), None),
@@ -913,12 +1264,20 @@ fn traps(bases: &[Req]) -> Vec<Req> {
         let segments: Vec<&str> = path.split('/').collect();
         for i in 2..segments.len() {
             let raw = percent_decode(segments[i]);
-            for v in trap_values(&raw).into_iter().filter(|v| *v != raw) {
-                let mut parts: Vec<String> = segments.iter().map(|s| s.to_string()).collect();
-                parts[i] = percent_encode(v);
-                let mut req = base.clone();
-                req.path = parts.join("/") + &query.map(|q| format!("?{q}")).unwrap_or_default();
-                out.push(req);
+            let slot: Vec<Req> = trap_values(&raw)
+                .into_iter()
+                .filter(|v| *v != raw)
+                .map(|v| {
+                    let mut parts: Vec<String> = segments.iter().map(|s| s.to_string()).collect();
+                    parts[i] = percent_encode(v);
+                    let mut req = base.clone();
+                    req.path =
+                        parts.join("/") + &query.map(|q| format!("?{q}")).unwrap_or_default();
+                    req
+                })
+                .collect();
+            if !slot.is_empty() {
+                slots.push(slot);
             }
         }
         if let Some(query) = query {
@@ -928,38 +1287,62 @@ fn traps(bases: &[Req]) -> Vec<Req> {
                     continue;
                 };
                 let raw = percent_decode(raw);
-                for v in trap_values(&raw).into_iter().filter(|v| *v != raw) {
-                    let mut new: Vec<String> = pairs.iter().map(|p| p.to_string()).collect();
-                    new[i] = format!("{key}={}", percent_encode(v));
-                    let mut req = base.clone();
-                    req.path = format!("{path}?{}", new.join("&"));
-                    out.push(req);
+                let slot: Vec<Req> = trap_values(&raw)
+                    .into_iter()
+                    .filter(|v| *v != raw)
+                    .map(|v| {
+                        let mut new: Vec<String> = pairs.iter().map(|p| p.to_string()).collect();
+                        new[i] = format!("{key}={}", percent_encode(v));
+                        let mut req = base.clone();
+                        req.path = format!("{path}?{}", new.join("&"));
+                        req
+                    })
+                    .collect();
+                if !slot.is_empty() {
+                    slots.push(slot);
                 }
             }
         }
-        if let Some(body) = &base.body {
-            let json =
-                serde_json::from_str::<Value>(body).is_ok_and(|v| v.is_object() || v.is_array());
+        if base.body.is_some() || base.body_base64.is_some() {
+            let json = base.body.as_deref().is_some_and(|body| {
+                serde_json::from_str::<Value>(body).is_ok_and(|v| v.is_object() || v.is_array())
+            });
             let values: &[&str] = if json {
                 &app::JSON_TRAPS
             } else {
                 &app::STDIN_TRAPS
             };
-            for v in values {
-                let mut req = base.clone();
-                req.body = Some(v.to_string());
-                out.push(req);
-            }
+            slots.push(
+                values
+                    .iter()
+                    .map(|v| {
+                        let mut req = base.clone();
+                        req.body = Some(v.to_string());
+                        req.body_base64 = None;
+                        req.body_file = None;
+                        req
+                    })
+                    .collect(),
+            );
         }
+        per_base.push(app::interleave(slots));
     }
-    out.push(Req {
+    let unknown_route = Req {
         method: "GET".to_string(),
         path: "/rust-anything-missing".to_string(),
         headers: BTreeMap::new(),
         body: None,
-    });
-    out.truncate(app::MAX_TRAPS);
-    out
+        body_base64: None,
+        body_file: None,
+    };
+    let existing: BTreeSet<_> = bases.iter().map(req_key).collect();
+    app::spread_traps(
+        per_base,
+        vec![unknown_route],
+        &existing,
+        req_key,
+        app::MAX_TRAPS,
+    )
 }
 
 fn case_slug(req: &Req) -> String {
@@ -1023,6 +1406,8 @@ fn write_case(
     request["path"] = value(req.path.as_str());
     if let Some(body) = &req.body {
         request["body"] = value(body.as_str());
+    } else if let Some(b64) = &req.body_base64 {
+        request["body_base64"] = value(b64.as_str());
     }
     if !req.headers.is_empty() {
         request.insert("headers", Item::Table(table(&req.headers)));
@@ -1050,7 +1435,7 @@ pub(crate) fn record(
 ) -> Result<RecordOutcome> {
     let examples = app::scan_examples(repo, |line, doc_dir| parse_curl(line, repo, doc_dir));
     let inputs = match opts.inputs {
-        Some(path) => read_inputs(path)?,
+        Some(path) => read_inputs(path, repo)?,
         None => Vec::new(),
     };
     let mut planned: Vec<(String, Req)> = Vec::new();
@@ -1059,8 +1444,7 @@ pub(crate) fn record(
     let mut counts = [0usize; 3];
     let mut bases = Vec::new();
     let mut push = |kind: usize, given: Option<String>, req: Req| -> bool {
-        let key = serde_json::to_string(&req).unwrap_or_default();
-        if !seen.insert(key) {
+        if !seen.insert(req_key(&req)) {
             return false;
         }
         counts[kind] += 1;
@@ -1089,12 +1473,17 @@ pub(crate) fn record(
             path: "/".to_string(),
             headers: BTreeMap::new(),
             body: None,
+            body_base64: None,
+            body_file: None,
         };
         push(0, None, root.clone());
         bases.push(root);
     }
+    let mut traps_dropped = 0usize;
     if opts.traps {
-        for req in traps(&bases) {
+        let (generated, dropped) = traps(&bases);
+        traps_dropped = dropped;
+        for req in generated {
             push(2, None, req);
         }
     }
@@ -1137,6 +1526,7 @@ pub(crate) fn record(
         examples: counts[0],
         inputs: counts[1],
         traps: counts[2],
+        traps_dropped,
         noisy: Vec::new(),
         noise: Vec::new(),
         unstable: Vec::new(),
@@ -1219,6 +1609,80 @@ fn load_spec(dir: &Path, path: &Path) -> Result<Spec> {
     let response = doc.get("response").context("no [response]")?;
     let body_file = dir.join(format!("{name}.body"));
     let effects_file = dir.join(format!("{name}.{}", crate::effects::EXT));
+    let raw_body = request.get("body");
+    let raw_body_base64 = request.get("body_base64");
+    let raw_body_file = request.get("body_file");
+    let body_forms = usize::from(raw_body.is_some())
+        + usize::from(raw_body_base64.is_some())
+        + usize::from(raw_body_file.is_some());
+    ensure!(
+        body_forms <= 1,
+        "{}: [request] may specify at most one of body, body_base64, or body_file",
+        path.display()
+    );
+    let req_body = match raw_body {
+        Some(item) => Some(
+            item.as_str()
+                .with_context(|| format!("{}: request.body must be a string", path.display()))?
+                .to_string(),
+        ),
+        None => None,
+    };
+    let req_body_base64 = match raw_body_base64 {
+        Some(item) => Some(
+            item.as_str()
+                .with_context(|| {
+                    format!("{}: request.body_base64 must be a string", path.display())
+                })?
+                .to_string(),
+        ),
+        None => None,
+    };
+    let req_body_file = match raw_body_file {
+        Some(item) => Some(
+            item.as_str()
+                .with_context(|| format!("{}: request.body_file must be a string", path.display()))?
+                .to_string(),
+        ),
+        None => None,
+    };
+    let (req_body, req_body_base64) = if let Some(b64) = req_body_base64 {
+        decode_base64_strict(&b64)
+            .with_context(|| format!("{}: invalid request.body_base64", path.display()))?;
+        (None, Some(b64))
+    } else if let Some(rel) = req_body_file {
+        let rel_path = Path::new(&rel);
+        ensure!(
+            !rel_path.is_absolute()
+                && rel_path.components().all(|c| matches!(
+                    c,
+                    std::path::Component::Normal(_) | std::path::Component::CurDir
+                )),
+            "{}: request.body_file `{rel}` must be a relative path under http/",
+            path.display()
+        );
+        let root = std::fs::canonicalize(dir)
+            .with_context(|| format!("{}: resolving http case directory", path.display()))?;
+        let candidate = std::fs::canonicalize(dir.join(rel_path))
+            .with_context(|| format!("{}: reading request.body_file `{rel}`", path.display()))?;
+        ensure!(
+            candidate.starts_with(&root),
+            "{}: request.body_file `{rel}` escapes http/",
+            path.display()
+        );
+        let meta = std::fs::metadata(&candidate)
+            .with_context(|| format!("{}: reading request.body_file `{rel}`", path.display()))?;
+        ensure!(
+            meta.is_file(),
+            "{}: request.body_file `{rel}` is not a regular file",
+            path.display()
+        );
+        let bytes = std::fs::read(&candidate)
+            .with_context(|| format!("{}: reading request.body_file `{rel}`", path.display()))?;
+        Req::from_body_bytes(bytes)
+    } else {
+        (req_body, None)
+    };
     Ok(Spec {
         effects: if effects_file.exists() {
             Some(std::fs::read(&effects_file)?)
@@ -1237,10 +1701,9 @@ fn load_spec(dir: &Path, path: &Path) -> Result<Spec> {
                 .with_context(|| format!("{}: no request.path", path.display()))?
                 .to_string(),
             headers: strings(request.get("headers")),
-            body: request
-                .get("body")
-                .and_then(Item::as_str)
-                .map(str::to_string),
+            body: req_body,
+            body_base64: req_body_base64,
+            body_file: None,
         },
         status: response
             .get("status")
@@ -1420,6 +1883,78 @@ pub(crate) fn replay(
     std::fs::write(&outcome.report, app::report_markdown(&outcome))
         .with_context(|| format!("writing {}", outcome.report.display()))?;
     Ok(outcome)
+}
+
+fn encode_base64(input: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
+    for chunk in input.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = chunk.get(1).copied().unwrap_or(0) as u32;
+        let b2 = chunk.get(2).copied().unwrap_or(0) as u32;
+        let n = (b0 << 16) | (b1 << 8) | b2;
+        out.push(TABLE[((n >> 18) & 0x3f) as usize] as char);
+        out.push(TABLE[((n >> 12) & 0x3f) as usize] as char);
+        out.push(if chunk.len() > 1 {
+            TABLE[((n >> 6) & 0x3f) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            TABLE[(n & 0x3f) as usize] as char
+        } else {
+            '='
+        });
+    }
+    out
+}
+
+fn decode_base64_strict(input: &str) -> Result<Vec<u8>> {
+    let cleaned: Vec<u8> = input.bytes().filter(|b| !b.is_ascii_whitespace()).collect();
+    if cleaned.is_empty() {
+        return Ok(Vec::new());
+    }
+    ensure!(
+        cleaned.len().is_multiple_of(4),
+        "base64 length must be a multiple of 4"
+    );
+    let mut out = Vec::with_capacity(cleaned.len() / 4 * 3);
+    let (chunks, _) = cleaned.as_chunks::<4>();
+    for (chunk_idx, chunk) in chunks.iter().enumerate() {
+        let is_last = (chunk_idx + 1) * 4 == cleaned.len();
+        let decode = |b: u8| -> Option<u8> {
+            match b {
+                b'A'..=b'Z' => Some(b - b'A'),
+                b'a'..=b'z' => Some(b - b'a' + 26),
+                b'0'..=b'9' => Some(b - b'0' + 52),
+                b'+' => Some(62),
+                b'/' => Some(63),
+                _ => None,
+            }
+        };
+        let a = decode(chunk[0]).context("invalid base64 character")?;
+        let b = decode(chunk[1]).context("invalid base64 character")?;
+        match (chunk[2], chunk[3]) {
+            (b'=', b'=') => {
+                ensure!(is_last, "unexpected base64 padding before end");
+                out.push((a << 2) | (b >> 4));
+            }
+            (c, b'=') => {
+                ensure!(is_last, "unexpected base64 padding before end");
+                let c = decode(c).context("invalid base64 character")?;
+                out.push((a << 2) | (b >> 4));
+                out.push((b << 4) | (c >> 2));
+            }
+            (c, d) => {
+                let c = decode(c).context("invalid base64 character")?;
+                let d = decode(d).context("invalid base64 character")?;
+                out.push((a << 2) | (b >> 4));
+                out.push((b << 4) | (c >> 2));
+                out.push((c << 6) | d);
+            }
+        }
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -1745,8 +2280,11 @@ mod tests {
             path: "/div/7/2?name=bob".into(),
             headers: BTreeMap::new(),
             body: Some("{\"a\":1}".into()),
+            body_base64: None,
+            body_file: None,
         };
-        let t = traps(&[base]);
+        let (t, dropped) = traps(&[base]);
+        assert_eq!(dropped, 0);
         assert!(t.iter().any(|r| r.path == "/div/-7/2?name=bob"));
         assert!(t.iter().any(|r| r.path == "/div/7/0?name=bob"));
         assert!(
@@ -1768,5 +2306,302 @@ mod tests {
         assert_eq!(percent_decode("%2b"), "+");
         assert_eq!(percent_decode("%2B"), "+");
         assert_eq!(percent_decode("%4"), "%4");
+    }
+
+    #[test]
+    fn http_traps_spread_across_all_endpoints_keep_unknown_route_and_deduplicate() {
+        // 40 endpoints each with a numeric path segment and a query param -> > 300 unique traps.
+        let bases: Vec<Req> = (0..40)
+            .map(|i| Req {
+                method: "GET".into(),
+                path: format!("/ep{i:02}/7?name=bob"),
+                headers: BTreeMap::new(),
+                body: None,
+                body_base64: None,
+                body_file: None,
+            })
+            .collect();
+        let (t, dropped) = traps(&bases);
+        assert_eq!(t.len(), app::MAX_TRAPS);
+        assert!(dropped > 0);
+        // Unknown-route probe is always kept even when traps exceed MAX_TRAPS.
+        assert!(
+            t.iter()
+                .any(|r| r.method == "GET" && r.path == "/rust-anything-missing"),
+            "unknown-route trap was dropped"
+        );
+        // Every single endpoint gets traps round-robin (not just the first few).
+        for i in 0..40 {
+            let prefix = format!("/ep{i:02}/");
+            let count = t.iter().filter(|r| r.path.starts_with(&prefix)).count();
+            assert!(
+                count >= 7,
+                "{prefix} only got {count} traps out of {}",
+                app::MAX_TRAPS
+            );
+        }
+        // All emitted traps are unique and distinct from bases.
+        let keys: BTreeSet<String> = t.iter().map(req_key).collect();
+        assert_eq!(keys.len(), t.len());
+        for b in &bases {
+            assert!(!keys.contains(&req_key(b)));
+        }
+
+        // Colliding traps across many bases (> 300 raw, < 300 unique) deduplicate before
+        // truncating so nothing is dropped and later endpoints still get traps.
+        let mut colliding: Vec<Req> = (1..=40)
+            .map(|i| Req {
+                method: "GET".into(),
+                path: format!("/items/{i}"),
+                headers: BTreeMap::new(),
+                body: None,
+                body_base64: None,
+                body_file: None,
+            })
+            .collect();
+        colliding.push(Req {
+            method: "GET".into(),
+            path: "/tail/hello".into(),
+            headers: BTreeMap::new(),
+            body: None,
+            body_base64: None,
+            body_file: None,
+        });
+        let (ct, cdropped) = traps(&colliding);
+        assert_eq!(cdropped, 0);
+        assert!(ct.iter().any(|r| r.path.starts_with("/tail/")));
+        assert!(ct.iter().any(|r| r.path == "/rust-anything-missing"));
+        let ckeys: BTreeSet<String> = ct.iter().map(req_key).collect();
+        assert_eq!(ckeys.len(), ct.len());
+    }
+
+    #[test]
+    fn parse_curl_supports_binary_files_and_multipart_forms() {
+        let root = app::temp_dir("curl-binary-multipart").unwrap();
+        let png = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff];
+        std::fs::write(root.join("photo.png"), &png).unwrap();
+        std::fs::write(root.join("note.txt"), "hello form").unwrap();
+
+        let bin = parse_curl(
+            "curl --data-binary @photo.png -H 'Content-Type: image/png' http://localhost:8080/upload",
+            &root,
+            &root,
+        )
+        .unwrap();
+        assert_eq!(bin.method, "POST");
+        assert!(bin.body.is_none());
+        assert!(bin.body_base64.is_some());
+        assert_eq!(bin.body_bytes().unwrap().as_deref(), Some(png.as_slice()));
+
+        let multi = parse_curl(
+            "curl -F title=avatar -F 'file=@photo.png;type=image/png;filename=pic.png' -F 'note=<note.txt' http://localhost:8080/multipart",
+            &root,
+            &root,
+        )
+        .unwrap();
+        assert_eq!(multi.method, "POST");
+        let ct = multi.headers.get("Content-Type").unwrap();
+        assert!(ct.starts_with("multipart/form-data; boundary="), "{ct}");
+        let raw = multi.body_bytes().unwrap().unwrap();
+        assert!(find(&raw, b"name=\"title\"\r\n\r\navatar\r\n").is_some());
+        assert!(
+            find(
+                &raw,
+                b"name=\"file\"; filename=\"pic.png\"\r\nContent-Type: image/png\r\n\r\n"
+            )
+            .is_some()
+        );
+        assert!(find(&raw, &png).is_some());
+        assert!(find(&raw, b"name=\"note\"\r\n\r\nhello form\r\n").is_some());
+
+        // Quoted -F values and filenames containing `;`, plus --form-string literal preservation.
+        std::fs::write(root.join("photo;final.png"), &png).unwrap();
+        let quoted = parse_curl(
+            "curl -H 'Content-Type: multipart/mixed; charset=utf-8' \
+             -F 'colors=\"red; green; blue\";type=text/plain' \
+             -F 'file=@\"photo;final.png\"' \
+             --form-string 'raw=\"a; b\"' \
+             http://localhost:8080/quoted",
+            &root,
+            &root,
+        )
+        .unwrap();
+        let qct = quoted.headers.get("Content-Type").unwrap();
+        assert!(
+            qct.starts_with("multipart/mixed; charset=utf-8; boundary="),
+            "{qct}"
+        );
+        let qraw = quoted.body_bytes().unwrap().unwrap();
+        assert!(
+            find(
+                &qraw,
+                b"name=\"colors\"\r\nContent-Type: text/plain\r\n\r\nred; green; blue\r\n"
+            )
+            .is_some()
+        );
+        assert!(
+            find(
+                &qraw,
+                b"name=\"file\"; filename=\"photo;final.png\"\r\nContent-Type: image/png\r\n\r\n"
+            )
+            .is_some()
+        );
+        assert!(find(&qraw, b"name=\"raw\"\r\n\r\n\"a; b\"\r\n").is_some());
+
+        // Caller-supplied `Content-Type: multipart/form-data` still gets the generated boundary.
+        let hdr_ct = parse_curl(
+            "curl -H 'Content-Type: multipart/form-data' -F a=1 http://localhost:8080/m",
+            &root,
+            &root,
+        )
+        .unwrap();
+        let hct = hdr_ct.headers.get("Content-Type").unwrap();
+        assert!(hct.starts_with("multipart/form-data; boundary="), "{hct}");
+
+        // Mixing -d and -F is refused, as curl does.
+        assert!(parse_curl("curl -d a=1 -F b=2 http://localhost:8080/mix", &root, &root).is_none());
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn binary_request_bodies_round_trip_through_inputs_and_toml() {
+        let root = app::temp_dir("http-binary-spec").unwrap();
+        let bytes = vec![0x00, 0xff, 0x80, 0xfe, b'A', b'B'];
+        let b64 = encode_base64(&bytes);
+        std::fs::write(root.join("blob.bin"), &bytes).unwrap();
+        std::fs::write(
+            root.join("inputs.jsonl"),
+            format!(
+                "{{\"name\":\"b64\",\"method\":\"POST\",\"path\":\"/raw\",\"body_base64\":\"{b64}\"}}\n\
+                 {{\"name\":\"file\",\"method\":\"POST\",\"path\":\"/raw\",\"body_file\":\"blob.bin\"}}\n"
+            ),
+        )
+        .unwrap();
+
+        let inputs = read_inputs(&root.join("inputs.jsonl"), &root).unwrap();
+        assert_eq!(inputs.len(), 2);
+        assert_eq!(
+            inputs[0].1.body_bytes().unwrap().as_deref(),
+            Some(bytes.as_slice())
+        );
+        assert_eq!(
+            inputs[1].1.body_bytes().unwrap().as_deref(),
+            Some(bytes.as_slice())
+        );
+
+        // Round-trip through write_case + load_spec (body_base64) and hand-written body_file.
+        let http_dir = root.join("http");
+        std::fs::create_dir_all(&http_dir).unwrap();
+        write_case(
+            &http_dir,
+            "b64",
+            &inputs[0].1,
+            200,
+            &BTreeMap::new(),
+            b"ok",
+            false,
+        )
+        .unwrap();
+        let loaded = load_spec(&http_dir, &http_dir.join("b64.toml")).unwrap();
+        assert_eq!(
+            loaded.req.body_bytes().unwrap().as_deref(),
+            Some(bytes.as_slice())
+        );
+
+        std::fs::write(http_dir.join("payload.bin"), &bytes).unwrap();
+        std::fs::write(
+            http_dir.join("from-file.toml"),
+            "[request]\nmethod = \"POST\"\npath = \"/raw\"\nbody_file = \"payload.bin\"\n\n[response]\nstatus = 200\n",
+        )
+        .unwrap();
+        let from_file = load_spec(&http_dir, &http_dir.join("from-file.toml")).unwrap();
+        assert_eq!(
+            from_file.req.body_bytes().unwrap().as_deref(),
+            Some(bytes.as_slice())
+        );
+
+        // Reject traversal in body_file and invalid base64.
+        std::fs::write(
+            http_dir.join("escape.toml"),
+            "[request]\nmethod = \"POST\"\npath = \"/raw\"\nbody_file = \"../blob.bin\"\n\n[response]\nstatus = 200\n",
+        )
+        .unwrap();
+        assert!(load_spec(&http_dir, &http_dir.join("escape.toml")).is_err());
+
+        // Reject symlink escaping http/.
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(root.join("blob.bin"), http_dir.join("link.bin")).unwrap();
+            std::fs::write(
+                http_dir.join("symlink-escape.toml"),
+                "[request]\nmethod = \"POST\"\npath = \"/raw\"\nbody_file = \"link.bin\"\n\n[response]\nstatus = 200\n",
+            )
+            .unwrap();
+            assert!(load_spec(&http_dir, &http_dir.join("symlink-escape.toml")).is_err());
+        }
+
+        assert!(decode_base64_strict("not!valid!b64!").is_err());
+
+        // Quoted Content-Type parameters containing `;` are preserved when replacing boundary.
+        assert_eq!(
+            with_multipart_boundary("multipart/form-data; profile=\"a;b\"; boundary=old", "new"),
+            "multipart/form-data; profile=\"a;b\"; boundary=new"
+        );
+        // Unsupported curl `-F '...;headers=...'` and `encoder=` are declined cleanly.
+        assert!(
+            parse_curl(
+                "curl -F 'submit=OK;headers=\"X-Submit-Type: OK\"' http://localhost:8080/h",
+                &root,
+                &root,
+            )
+            .is_none()
+        );
+        assert!(
+            parse_curl(
+                "curl -F 'note=hello;type=text/plain;encoder=base64' http://localhost:8080/h",
+                &root,
+                &root,
+            )
+            .is_none()
+        );
+        // Parameters following `;type=` belong to the part Content-Type, not the field value.
+        let typed = parse_curl(
+            "curl -F 'note=hello;type=text/plain;charset=UTF-8' http://localhost:8080/typed",
+            &root,
+            &root,
+        )
+        .unwrap();
+        let typed_raw = typed.body_bytes().unwrap().unwrap();
+        assert!(
+            find(
+                &typed_raw,
+                b"name=\"note\"\r\nContent-Type: text/plain;charset=UTF-8\r\n\r\nhello\r\n"
+            )
+            .is_some()
+        );
+        // Non-string TOML body declarations are rejected before exclusivity checks.
+        std::fs::write(
+            http_dir.join("bad-type.toml"),
+            "[request]\nmethod = \"POST\"\npath = \"/raw\"\nbody = \"fallback\"\nbody_base64 = 42\n\n[response]\nstatus = 200\n",
+        )
+        .unwrap();
+        assert!(load_spec(&http_dir, &http_dir.join("bad-type.toml")).is_err());
+        std::fs::write(
+            http_dir.join("bad-file-type.toml"),
+            "[request]\nmethod = \"POST\"\npath = \"/raw\"\nbody_file = 42\n\n[response]\nstatus = 200\n",
+        )
+        .unwrap();
+        assert!(load_spec(&http_dir, &http_dir.join("bad-file-type.toml")).is_err());
+        // Non-regular body_file (e.g. directory) is rejected.
+        std::fs::create_dir_all(http_dir.join("subdir")).unwrap();
+        std::fs::write(
+            http_dir.join("dir-body.toml"),
+            "[request]\nmethod = \"POST\"\npath = \"/raw\"\nbody_file = \"subdir\"\n\n[response]\nstatus = 200\n",
+        )
+        .unwrap();
+        assert!(load_spec(&http_dir, &http_dir.join("dir-body.toml")).is_err());
+
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

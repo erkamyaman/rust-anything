@@ -199,6 +199,16 @@ const DRIVER_PHP: &str = r#"namespace {
     if ($autoload !== false && $autoload !== '') {
         require_once $autoload;
     }
+    $classmapPath = \getenv('RUST_ANYTHING_PHP_CLASSMAP');
+    if ($classmapPath !== false && $classmapPath !== '') {
+        $classmap = \json_decode(\file_get_contents($classmapPath), true, Codec::DEPTH, \JSON_THROW_ON_ERROR);
+        \spl_autoload_register(static function (string $name) use ($classmap): void {
+            $file = $classmap[\strtolower($name)] ?? null;
+            if ($file !== null) {
+                require_once $file;
+            }
+        });
+    }
     foreach (\array_slice($argv, 6) as $file) {
         require_once $file;
     }

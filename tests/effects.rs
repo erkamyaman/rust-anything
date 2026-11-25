@@ -494,3 +494,97 @@ fn db_reset_and_dump_run_where_the_case_runs() {
 
     std::fs::remove_dir_all(&repo).unwrap();
 }
+
+#[test]
+fn http_effect_responses_are_saved_and_replayed() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = std::env::temp_dir().join(format!(
+        "rust-anything-http-effect-responses-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(repo.join("fixtures")).unwrap();
+    std::fs::write(
+        repo.join("fixtures/charge.json"),
+        r#"{"id":"ch_42","status":"paid"}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("pay.py"),
+        r#"import json, os, sys, urllib.error, urllib.request
+base = os.environ["PAY_API"]
+mode = sys.argv[1]
+if mode == "charge":
+    req = urllib.request.Request(f"{base}/v1/charges", data=b'{"amount":10}', method="POST")
+    with urllib.request.urlopen(req) as r:
+        data = json.loads(r.read().decode())
+        print(f"charged:{r.status}:{data['id']}")
+else:
+    req = urllib.request.Request(f"{base}/hooks/dead", data=b"{}", method="POST")
+    try:
+        urllib.request.urlopen(req)
+        print("hook:ok")
+    except urllib.error.HTTPError as e:
+        print(f"hook:err:{e.code}")
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        repo.join("inputs.jsonl"),
+        "{\"name\": \"charge\", \"args\": [\"charge\"]}\n{\"name\": \"gone\", \"args\": [\"gone\"]}\n",
+    )
+    .unwrap();
+
+    let effects = EffectsConfig::from_args_with_responses(
+        &[],
+        &["PAY_API=http-url".into()],
+        &[
+            "POST /v1/charges=201 @fixtures/charge.json".into(),
+            "POST /hooks/*=410".into(),
+        ],
+        &repo,
+        None,
+        None,
+    )
+    .unwrap();
+    let outcome = app::record(&RecordOptions {
+        repo: &repo,
+        run: &[python.to_string(), "pay.py".to_string()],
+        inputs: Some(&repo.join("inputs.jsonl")),
+        normalize: &[],
+        name: Some("pay"),
+        traps: false,
+        timeout_secs: None,
+        http: false,
+        server_args: &[],
+        fresh: &[],
+        pace_ms: None,
+        port: None,
+        float_tolerance: None,
+        float_files: &[],
+        effects,
+    })
+    .unwrap();
+    assert!(outcome.unstable.is_empty(), "{outcome:?}");
+    assert_eq!(
+        std::fs::read_to_string(app::cases_dir(&repo).join("charge.stdout"))
+            .unwrap()
+            .trim(),
+        "charged:201:ch_42"
+    );
+    assert_eq!(
+        std::fs::read_to_string(app::cases_dir(&repo).join("gone.stdout"))
+            .unwrap()
+            .trim(),
+        "hook:err:410"
+    );
+
+    // Even if the fixture file is deleted after recording, replay uses the saved response config.
+    std::fs::remove_file(repo.join("fixtures/charge.json")).unwrap();
+    let replayed = replay(&repo, &format!("{python} pay.py"));
+    assert_eq!(replayed.passed, replayed.total, "{:?}", replayed.failures);
+
+    std::fs::remove_dir_all(&repo).unwrap();
+}

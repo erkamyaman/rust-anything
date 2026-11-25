@@ -23,7 +23,7 @@ where the language allows it:
 | Language | `TypeName` is | Looked up | Otherwise |
 | --- | --- | --- | --- |
 | Python | a dotted class path | the module is imported (`mypkg.errors.ParseError`) | `ValueError` |
-| Ruby | a top-level class name | that constant only, so `Errors::ParseError` needs the full path | `RuntimeError` |
+| Ruby | a constant or `::`-separated class path | `Object` down the `::` path (`Errors::ParseError`) | `RuntimeError` |
 | JavaScript | a built-in error name | `globalThis` (`TypeError`, `RangeError`, …) | `Error` |
 | Go | not a type: the string is the `error` value | — | — |
 | Java, Kotlin | a bare or package-qualified class | the JDK packages, then its own | `RuntimeException` |

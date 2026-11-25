@@ -199,7 +199,7 @@ rust-anything 并不负责自动翻译代码：具体 Rust 代码由你的编程
 
 除 C、PHP、C# 和 PowerShell 外，每种语言都支持生成批处理类（`--batch`）：数据只需跨边界传入一次并常驻 Rust 侧，每次调用即可在全部 CPU 核心上并行处理所有条目。
 
-语言会根据代码库自动检测（依次检查 `go.mod`、`pom.xml`、`.csproj` 或 `.sln`、`pyproject.toml`、`Gemfile`、`composer.json`、`package.json`，否则统计最常见的源码文件）；也可以通过 `--lang` 手动指定。类型信息直接从源码提取：TS 类型、Python 类型注解、C/Go/Java/C# 函数签名、Ruby YARD 标签、PHP 类型与 phpdoc；对于未标注类型但按数值使用的参数，会自动推断为数值类型。
+语言会根据代码库自动检测（依次检查 `go.mod`、`pom.xml`、`build.gradle`/`build.gradle.kts`、`.csproj` 或 `.sln`、`pyproject.toml`、`Gemfile`、`composer.json`、`package.json`，否则统计最常见的源码文件）；只有 `.kt` 源码而没有 `.java` 源码的 Gradle 模块视为 Kotlin，混合模块仍视为 Java；也可以通过 `--lang` 手动指定。类型信息直接从源码提取：TS 类型、Python 类型注解、C/Go/Java/Kotlin/C# 函数签名、Ruby YARD 标签、PHP 类型与 phpdoc；对于未标注类型但按数值使用的参数，会自动推断为数值类型。
 
 对于 PHP，`analyze` 可为 PHP 应用生成迁移规划（支持 Composer 包与 PSR-4 自动加载、识别松散比较和整数溢出转浮点等风险、将 Composer 包映射为 Rust crate），并且支持对 PHP CLI 或服务端进行录制、回放与 Rust 前门接管。通过 PHP FFI 将单元逐个迁入 Rust 是下一步计划（[issue #2](https://github.com/erkamyaman/rust-anything/issues/2)）。
 

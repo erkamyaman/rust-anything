@@ -28,4 +28,18 @@ module Textkit
       value.clamp(low, high)
     end
   end
+
+  class ParseError < StandardError; end
+
+  module Nums
+    module_function
+
+    # @param text [String]
+    # @return [Integer]
+    def digit(text)
+      raise ParseError, "not a digit" unless text.is_a?(String) && text.match?(/\A[0-9]\z/)
+
+      text.to_i
+    end
+  end
 end

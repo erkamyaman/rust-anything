@@ -133,6 +133,12 @@ fn driver_command(
     rust: bool,
 ) -> Result<Command> {
     let classes = compile(crate_dir, m, rust)?;
+    let classpath = if rust {
+        let original_classes = compile(crate_dir, m, false)?;
+        std::env::join_paths([&classes, &original_classes])?
+    } else {
+        classes.into_os_string()
+    };
     let work = crate_dir.join(WORK_DIR);
     let targets = work.join("targets.json");
     std::fs::write(&targets, crate::codegen_java::targets(m).to_string())?;
@@ -147,7 +153,7 @@ fn driver_command(
         ));
     }
     cmd.arg("-cp")
-        .arg(&classes)
+        .arg(&classpath)
         .arg("rustanything.RustAnythingDriver")
         .arg(mode)
         .arg(&targets)

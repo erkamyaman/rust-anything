@@ -2,6 +2,9 @@
 
 namespace Acme\Numbers;
 
+require_once __DIR__ . '/ZParseFailure.php';
+require_once __DIR__ . '/ParseException.php';
+
 function clamp(int $value, int $lo = 0, int $hi = 10): int
 {
     if ($lo > $hi) {
@@ -24,4 +27,12 @@ function mean(array $xs): float
 function ratio(float $a, float $b): float
 {
     return $a / $b;
+}
+
+function digit(string $text): int
+{
+    if (strlen($text) === 1 && $text >= '0' && $text <= '9') {
+        return (int) $text;
+    }
+    throw new ParseException('not a digit');
 }

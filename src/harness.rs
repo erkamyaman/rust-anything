@@ -658,10 +658,21 @@ pub struct Verdict {
     pub faster: Vec<String>,
     pub slower: Vec<String>,
     pub advice: String,
+    /// Functions whose recorded cases do not all match: timed, but not counted (#341).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub left_out: Vec<String>,
 }
 
-/// Faster means at least 1.1x, slower below 0.9x; between is a tie (timing noise).
+/// Faster means at least 1.1x, slower below 0.9x; between is a tie (timing noise). Functions
+/// whose cases do not all match are left out: their time is the cost of failing (a panic caught
+/// at the bridge), not of the work.
 pub fn verdict(rows: &[BenchRow], lang: crate::lang::Lang) -> Verdict {
+    let left_out: Vec<String> = rows
+        .iter()
+        .filter(|r| r.failing)
+        .map(|r| r.name.clone())
+        .collect();
+    let rows: Vec<&BenchRow> = rows.iter().filter(|r| !r.failing).collect();
     let faster: Vec<String> = rows
         .iter()
         .filter(|r| r.speedup >= 1.1)
@@ -677,7 +688,10 @@ pub fn verdict(rows: &[BenchRow], lang: crate::lang::Lang) -> Verdict {
     } else {
         (rows.iter().map(|r| r.speedup.max(1e-9).ln()).sum::<f64>() / rows.len() as f64).exp()
     };
-    let advice = if rows.is_empty() {
+    let advice = if rows.is_empty() && !left_out.is_empty() {
+        "Nothing to compare: no function matches all its recorded cases yet. Run `diff`."
+            .to_string()
+    } else if rows.is_empty() {
         "Nothing to compare: record cases that do not throw first.".to_string()
     } else if slower.is_empty() && faster.len() == rows.len() {
         "Ship it: every function is faster in Rust, call included.".to_string()
@@ -704,6 +718,7 @@ pub fn verdict(rows: &[BenchRow], lang: crate::lang::Lang) -> Verdict {
         faster,
         slower,
         advice,
+        left_out,
     }
 }
 
@@ -724,6 +739,7 @@ pub fn bench_rows(
                 original_ns: o,
                 rust_ns: n,
                 speedup: o / n,
+                failing: false,
             })
         })
         .collect()
@@ -739,6 +755,10 @@ pub struct BenchRow {
     pub rust_ns: f64,
     /// `original_ns / rust_ns`: above 1 means Rust is faster, bridge included.
     pub speedup: f64,
+    /// Some recorded cases of this function do not match (or the port lacks it), so its time is
+    /// not the port's and `verdict` leaves it out (#341).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub failing: bool,
 }
 
 pub struct BenchOptions<'a> {
@@ -749,8 +769,40 @@ pub struct BenchOptions<'a> {
     pub node_args: &'a [String],
 }
 
-/// Times the recorded cases against the original and the built Rust module, bridge included.
+/// Times the recorded cases against the original and the built Rust module, bridge included,
+/// and marks the functions whose recorded cases do not all match.
 pub fn bench(opts: &BenchOptions) -> Result<Vec<BenchRow>> {
+    let mut rows = time_functions(opts)?;
+    let crate_dir = std::path::absolute(opts.crate_dir)?;
+    let diff = DiffOptions {
+        crate_dir: &crate_dir,
+        module: None,
+        ignore_key_order: false,
+        node_args: opts.node_args,
+        float_tolerance: None,
+    };
+    let cases_path = crate_dir.join(CASES);
+    let cases = std::fs::read_to_string(&cases_path)
+        .with_context(|| format!("reading {}", cases_path.display()))?;
+    // `diff_exact` and `settle`, not `diff_full`: a bench is not a change to the port, so it adds
+    // nothing to the match trend.
+    let outcome = settle(&diff, diff_exact(&diff)?)?;
+    let counts = counts_from_cases_text(&cases, &outcome)?;
+    for row in &mut rows {
+        row.failing = failing(&row.name, &outcome, &counts);
+    }
+    Ok(rows)
+}
+
+fn failing(row: &str, outcome: &DiffOutcome, counts: &BTreeMap<String, (usize, usize)>) -> bool {
+    let name = row.strip_prefix("class ").unwrap_or(row);
+    outcome.missing.iter().any(|m| m == name)
+        || counts
+            .get(name)
+            .is_some_and(|&(passed, total)| passed < total)
+}
+
+fn time_functions(opts: &BenchOptions) -> Result<Vec<BenchRow>> {
     let crate_dir = std::path::absolute(opts.crate_dir)?;
     let opts = &BenchOptions {
         crate_dir: &crate_dir,
@@ -2344,6 +2396,18 @@ writeFileSync(outPath, JSON.stringify(summary, null, 2))
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_class_bench_row_is_failing_when_its_cases_do_not_match() {
+        let outcome = DiffOutcome {
+            missing: vec!["Gone".into()],
+            ..Default::default()
+        };
+        let counts = BTreeMap::from([("Counter".to_string(), (1, 2)), ("add".to_string(), (2, 2))]);
+        assert!(super::failing("class Counter", &outcome, &counts));
+        assert!(super::failing("class Gone", &outcome, &counts));
+        assert!(!super::failing("add", &outcome, &counts));
+    }
+
     use super::*;
     use crate::ts::exports::{ExportedFn, Param};
 
@@ -2529,7 +2593,35 @@ mod verdict_tests {
             original_ns: speedup,
             rust_ns: 1.0,
             speedup,
+            failing: false,
         }
+    }
+
+    #[test]
+    fn functions_that_do_not_match_are_left_out_of_the_verdict() {
+        // The numbers in #341: `count` is ported, `rangeOf` and `words` still panic.
+        let failing = |name, speedup| BenchRow {
+            failing: true,
+            ..row(name, speedup)
+        };
+        let v = verdict(
+            &[
+                failing("rangeOf", 0.0012),
+                failing("words", 0.0058),
+                row("count", 0.11),
+            ],
+            crate::lang::Lang::Ts,
+        );
+        assert_eq!(v.left_out, ["rangeOf", "words"]);
+        assert!((v.speedup - 0.11).abs() < 1e-9, "{v:?}");
+        assert_eq!(v.slower, ["count"]);
+
+        let none = verdict(&[failing("words", 0.0058)], crate::lang::Lang::Ts);
+        assert!(
+            none.advice
+                .starts_with("Nothing to compare: no function matches")
+        );
+        assert!((none.speedup - 1.0).abs() < 1e-9);
     }
 
     #[test]

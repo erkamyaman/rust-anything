@@ -4,9 +4,11 @@
 //! original from the repository.
 
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
 use std::process::Command;
 
 use rust_anything::app::{self, RecordOptions, ReplayOptions};
+#[cfg(unix)]
 use rust_anything::front_door::{self, FrontDoorOptions};
 
 const TOOL: &str = r#"#!/bin/sh

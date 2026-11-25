@@ -1,4 +1,4 @@
-use crate::walk::Canonical;
+use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -7,6 +7,9 @@ use serde_json::Value;
 
 use crate::bridge::Manifest;
 use crate::harness::{BenchRow, CASES, DiffOutcome};
+use crate::lang::php;
+use crate::ts::discover::FileKind;
+use crate::walk::Canonical;
 
 const WORK_DIR: &str = ".rust-anything";
 
@@ -31,23 +34,22 @@ fn run(cmd: &mut Command, what: &str) -> Result<()> {
     Ok(())
 }
 
-fn files(crate_dir: &Path, m: &Manifest, rust: bool) -> Result<Vec<PathBuf>> {
-    if rust {
-        return Ok(vec![
-            crate_dir
-                .join(crate::codegen_php::wrapper_path(m))
-                .canonical()?,
-        ]);
+fn project_types(m: &Manifest, ported: &HashSet<&str>) -> Result<BTreeMap<String, PathBuf>> {
+    let mut types = BTreeMap::new();
+    for file in php::discover(&m.root)?.files {
+        if file.kind != FileKind::Source || ported.contains(file.path.as_str()) {
+            continue;
+        }
+        let path = m.root.join(file.path);
+        let source = std::fs::read(&path)
+            .with_context(|| format!("reading PHP source {}", path.display()))?;
+        for name in php::declared_types(&String::from_utf8_lossy(&source)) {
+            types
+                .entry(name.to_ascii_lowercase())
+                .or_insert_with(|| path.clone());
+        }
     }
-    let mut files: Vec<PathBuf> = m
-        .exports
-        .iter()
-        .map(|f| m.root.join(&f.file))
-        .chain(m.js_only.iter().map(|j| m.root.join(&j.file)))
-        .collect();
-    files.sort();
-    files.dedup();
-    Ok(files)
+    Ok(types)
 }
 
 fn driver_command(
@@ -65,23 +67,44 @@ fn driver_command(
     std::fs::write(&script, crate::codegen_php::driver())?;
     let targets = work.join("targets.json");
     std::fs::write(&targets, crate::codegen_php::targets(m).to_string())?;
+    let originals = m
+        .exports
+        .iter()
+        .map(|f| f.file.as_str())
+        .chain(m.js_only.iter().map(|j| j.file.as_str()));
     let mut cmd = Command::new("php");
     cmd.args(["-d", "memory_limit=-1", "-d", "display_errors=stderr"]);
-    if rust {
-        cmd.args(["-d", "ffi.enable=1"]);
+    let files = if rust {
+        let ported = originals.collect();
+        let types = project_types(m, &ported)?;
+        let classmap = work.join("php-classes.json");
+        std::fs::write(&classmap, serde_json::to_vec(&types)?)?;
+        cmd.args(["-d", "ffi.enable=1"])
+            .env_remove("RUST_ANYTHING_PHP_AUTOLOAD")
+            .env("RUST_ANYTHING_PHP_CLASSMAP", classmap);
+        vec![
+            crate_dir
+                .join(crate::codegen_php::wrapper_path(m))
+                .canonical()?,
+        ]
     } else {
+        cmd.env_remove("RUST_ANYTHING_PHP_CLASSMAP");
         let autoload = m.root.join("vendor/autoload.php");
         if autoload.is_file() {
             cmd.env("RUST_ANYTHING_PHP_AUTOLOAD", autoload);
         }
-    }
+        let mut files: Vec<_> = originals.map(|file| m.root.join(file)).collect();
+        files.sort();
+        files.dedup();
+        files
+    };
     cmd.arg(&script)
         .arg(mode)
         .arg(&targets)
         .arg(cases)
         .arg(out)
         .arg(min_ms.to_string())
-        .args(files(crate_dir, m, rust)?);
+        .args(files);
     Ok(cmd)
 }
 

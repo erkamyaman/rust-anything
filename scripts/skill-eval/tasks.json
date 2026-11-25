@@ -1,0 +1,7 @@
+[
+  {
+    "id": "py-slug",
+    "fixture": "tasks/py-slug",
+    "prompt": "Port the `slugify` function in slug.py to Rust with rust-anything. Keep `count_words` in Python. Follow the rust-anything skill and stop when `rust-anything gate` passes on the crate."
+  }
+]

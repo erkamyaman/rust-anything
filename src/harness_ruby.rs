@@ -34,11 +34,8 @@ pub fn wrapper_path(m: &Manifest) -> String {
     format!("ruby/{}.rb", m.lib_name())
 }
 
-/// The files to load: the unit's sources, or the wrapper.
+/// The files to load: the unit's sources, followed by the wrapper when `rust` is set.
 fn files(crate_dir: &Path, m: &Manifest, rust: bool) -> Result<Vec<PathBuf>> {
-    if rust {
-        return Ok(vec![crate_dir.join(wrapper_path(m)).canonical()?]);
-    }
     let mut files: Vec<PathBuf> = m
         .exports
         .iter()
@@ -47,6 +44,9 @@ fn files(crate_dir: &Path, m: &Manifest, rust: bool) -> Result<Vec<PathBuf>> {
         .collect();
     files.sort();
     files.dedup();
+    if rust {
+        files.push(crate_dir.join(wrapper_path(m)).canonical()?);
+    }
     Ok(files)
 }
 
@@ -81,11 +81,17 @@ fn driver_command(
     let mut cmd = Command::new("ruby");
     // Source and data are UTF-8 whatever the machine's locale says.
     cmd.args(["-E", "UTF-8:UTF-8"]);
-    // The original's `require "name"` finds its own files through each package's lib folder.
-    if !rust && let Ok(ws) = crate::lang::ruby::discover(&m.root) {
+    // `require "name"` finds project files (such as error modules) through each package's lib folder.
+    if let Ok(ws) = crate::lang::ruby::discover(&m.root) {
         for p in &ws.packages {
             cmd.arg(format!("-I{}", m.root.join(&p.src_root).display()));
         }
+    }
+    if rust {
+        cmd.env(
+            "RUST_ANYTHING_WRAPPER",
+            crate_dir.join(wrapper_path(m)).canonical()?,
+        );
     }
     cmd.arg(&script)
         .arg(mode)
