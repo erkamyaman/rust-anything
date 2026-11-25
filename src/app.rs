@@ -2177,22 +2177,32 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
     }
     config.unordered = unordered_of(&outcome.noise);
     drop_stale(&mut outcome, if previous_http { &[] } else { &previous })?;
-    config.recorded = outcome.recorded.clone();
-    std::fs::write(
-        dir.join(CONFIG_FILE),
-        serde_json::to_string_pretty(&config)? + "\n",
-    )?;
-    if previous_http {
-        // A server recorded as a CLI (`--no-http`): remove the requests its last recording wrote,
-        // or a later `--http` would replay them; requests written by hand stay. The CLI config is
-        // saved first, so a removal cut short never leaves a server config with half its cases.
-        let http_dir = cases_dir(&repo).join(crate::http::HTTP_DIR);
-        if http_dir.is_dir() {
-            let removed = remove_stale(&http_dir, &[], &previous)?;
-            outcome
-                .stale
-                .extend(removed.into_iter().map(|name| format!("http/{name}")));
-        }
+    // A server recorded as a CLI (`--no-http`): the requests its last recording wrote go too, or a
+    // later `--http` would replay them; requests written by hand stay. They are saved in `recorded`
+    // as `http/<name>` before any is removed, so a run cut short leaves a CLI config whose next
+    // recording removes the rest, and a folder a CLI case reads through `fs.base` is kept.
+    let pending: Vec<String> = if previous_http {
+        let http = crate::http::HTTP_DIR;
+        previous
+            .iter()
+            .map(|name| format!("{http}/{name}"))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    config.recorded = outcome.recorded.iter().chain(&pending).cloned().collect();
+    let save = |config: &Config| {
+        std::fs::write(
+            dir.join(CONFIG_FILE),
+            serde_json::to_string_pretty(config)? + "\n",
+        )
+    };
+    save(&config)?;
+    if !pending.is_empty() {
+        let removed = remove_stale(&dir, &outcome.recorded, &pending)?;
+        outcome.stale.extend(removed);
+        config.recorded = outcome.recorded.clone();
+        save(&config)?;
     }
     Ok(outcome)
 }

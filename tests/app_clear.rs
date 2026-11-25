@@ -325,3 +325,160 @@ fn a_setting_cannot_be_given_and_removed_at_once() {
     assert!(Config::load(&repo).unwrap().is_none());
     let _ = std::fs::remove_dir_all(&repo);
 }
+
+/// Records `server.py` as a server and returns the names of the requests it wrote.
+fn record_server(repo: &Path, python: &str) -> Vec<String> {
+    record(
+        repo,
+        Record {
+            run: &strings(&[python, "server.py"]),
+            http: true,
+            server_args: &[],
+            fresh: &[],
+            clear: Clear::default(),
+        },
+    )
+    .unwrap();
+    let names = config(repo).recorded;
+    assert!(!names.is_empty());
+    names
+}
+
+fn record_cli(repo: &Path, python: &str, clear: Clear) -> app::RecordOutcome {
+    record(
+        repo,
+        Record {
+            run: &strings(&[python, "cli.py"]),
+            http: false,
+            server_args: &[],
+            fresh: &[],
+            clear,
+        },
+    )
+    .unwrap()
+}
+
+/// Keeps a recorded request from being removed while it lives: on Windows its `.toml` is held
+/// open without delete sharing, elsewhere its folder is made read-only.
+struct Pinned {
+    #[cfg(windows)]
+    _file: std::fs::File,
+    #[cfg(not(windows))]
+    dir: PathBuf,
+}
+
+impl Pinned {
+    fn new(dir: &Path, name: &str) -> Pinned {
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::OpenOptionsExt;
+            const FILE_SHARE_READ: u32 = 1;
+            let file = std::fs::OpenOptions::new()
+                .read(true)
+                .share_mode(FILE_SHARE_READ)
+                .open(dir.join(format!("{name}.toml")))
+                .unwrap();
+            Pinned { _file: file }
+        }
+        #[cfg(not(windows))]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = name;
+            std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+            Pinned {
+                dir: dir.to_path_buf(),
+            }
+        }
+    }
+}
+
+#[cfg(not(windows))]
+impl Drop for Pinned {
+    fn drop(&mut self) {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&self.dir, std::fs::Permissions::from_mode(0o755));
+    }
+}
+
+#[test]
+fn a_switch_cut_short_is_finished_by_the_next_recording() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = repo("cut-short");
+    let server_cases = record_server(&repo, python);
+    let http_dir = app::cases_dir(&repo).join("http");
+    let no_http = Clear {
+        http: true,
+        ..Clear::default()
+    };
+
+    // The removal of the server's requests fails partway: the CLI config is saved, and still lists
+    // the requests left to remove.
+    let pinned = Pinned::new(&http_dir, &server_cases[0]);
+    let err = record(
+        &repo,
+        Record {
+            run: &strings(&[python, "cli.py"]),
+            http: false,
+            server_args: &[],
+            fresh: &[],
+            clear: no_http,
+        },
+    )
+    .unwrap_err();
+    drop(pinned);
+    let saved = config(&repo);
+    assert!(saved.http.is_none(), "{err:#}");
+    assert!(
+        saved
+            .recorded
+            .contains(&format!("http/{}", server_cases[0])),
+        "{:?}",
+        saved.recorded
+    );
+
+    // The next recording, without --no-http, removes the rest.
+    let outcome = record_cli(&repo, python, Clear::default());
+    for name in &server_cases {
+        assert!(!http_dir.join(format!("{name}.toml")).exists(), "{name}");
+    }
+    assert!(
+        outcome.stale.contains(&format!("http/{}", server_cases[0])),
+        "{:?}",
+        outcome.stale
+    );
+    assert_eq!(config(&repo).recorded, outcome.recorded);
+    let _ = std::fs::remove_dir_all(&repo);
+}
+
+#[test]
+fn a_folder_a_cli_case_reads_stays_when_the_server_cases_go() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = repo("kept-base");
+    let server_cases = record_server(&repo, python);
+    let first = &server_cases[0];
+    // A CLI case written by hand that reads a folder named after a recorded request.
+    let cases = app::cases_dir(&repo);
+    std::fs::create_dir_all(cases.join(format!("http/{first}.in"))).unwrap();
+    std::fs::write(cases.join(format!("http/{first}.in/data.txt")), "x\n").unwrap();
+    std::fs::write(
+        cases.join("by-hand.toml"),
+        format!("bin.name = \"cli\"\nargs = []\n\n[fs]\nbase = \"http/{first}.in\"\n"),
+    )
+    .unwrap();
+
+    record_cli(
+        &repo,
+        python,
+        Clear {
+            http: true,
+            ..Clear::default()
+        },
+    );
+    assert!(!cases.join(format!("http/{first}.toml")).exists());
+    assert!(cases.join(format!("http/{first}.in/data.txt")).is_file());
+    let _ = std::fs::remove_dir_all(&repo);
+}
