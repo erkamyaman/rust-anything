@@ -1650,10 +1650,16 @@ pub(crate) fn drop_stale(outcome: &mut RecordOutcome, previous: &[String]) -> Re
 /// of those it removed (see `drop_stale`).
 fn remove_stale(dir: &Path, written: &[String], previous: &[String]) -> Result<Vec<String>> {
     let written: BTreeSet<&str> = written.iter().map(String::as_str).collect();
+    // Names come from the saved config: only a path inside `dir` is removed.
     let ours: BTreeSet<&str> = previous
         .iter()
         .map(String::as_str)
         .filter(|name| !written.contains(name))
+        .filter(|name| {
+            Path::new(name)
+                .components()
+                .all(|c| matches!(c, std::path::Component::Normal(_)))
+        })
         .collect();
     let read = bases_read(dir, &ours);
     let mut stale = Vec::new();
@@ -2057,7 +2063,19 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
             }
         })?;
         config.unordered = unordered_of(&outcome.noise);
-        drop_stale(&mut outcome, if previous_http { &previous } else { &[] })?;
+        // After a CLI recording, only the requests a `--no-http` run cut short (saved in
+        // `recorded` as `http/<name>`) are this folder's.
+        let http_prefix = format!("{}/", crate::http::HTTP_DIR);
+        let owned: Vec<String> = if previous_http {
+            previous.clone()
+        } else {
+            previous
+                .iter()
+                .filter_map(|name| name.strip_prefix(http_prefix.as_str()))
+                .map(str::to_string)
+                .collect()
+        };
+        drop_stale(&mut outcome, &owned)?;
         config.recorded = outcome.recorded.clone();
         std::fs::write(
             cases_dir(&repo).join(CONFIG_FILE),

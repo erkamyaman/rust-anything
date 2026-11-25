@@ -482,3 +482,68 @@ fn a_folder_a_cli_case_reads_stays_when_the_server_cases_go() {
     assert!(cases.join(format!("http/{first}.in/data.txt")).is_file());
     let _ = std::fs::remove_dir_all(&repo);
 }
+
+#[test]
+fn a_server_recording_after_a_cut_short_switch_removes_the_old_requests() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = repo("cut-short-back");
+    let server_cases = record_server(&repo, python);
+    let http_dir = app::cases_dir(&repo).join("http");
+    let pinned = Pinned::new(&http_dir, &server_cases[0]);
+    record(
+        &repo,
+        Record {
+            run: &strings(&[python, "cli.py"]),
+            http: false,
+            server_args: &[],
+            fresh: &[],
+            clear: Clear {
+                http: true,
+                ..Clear::default()
+            },
+        },
+    )
+    .unwrap_err();
+    drop(pinned);
+
+    // Back to a server whose docs now show one request: the old requests it does not write again
+    // go, as they would after any server recording.
+    let one = SERVER_DOCS
+        .lines()
+        .filter(|l| !l.starts_with("$ curl") || l.ends_with("/hello"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    std::fs::write(repo.join("README.md"), one).unwrap();
+    record_server(&repo, python);
+    let now = config(&repo).recorded;
+    assert_eq!(now.len(), 1, "{now:?}");
+    for name in server_cases.iter().filter(|n| !now.contains(n)) {
+        assert!(!http_dir.join(format!("{name}.toml")).exists(), "{name}");
+    }
+    let _ = std::fs::remove_dir_all(&repo);
+}
+
+#[test]
+fn a_saved_case_name_never_removes_a_file_outside_the_cases() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = repo("outside");
+    record_cli(&repo, python, Clear::default());
+    let cases = app::cases_dir(&repo);
+    let outside = cases.join("../keep.toml");
+    std::fs::write(&outside, "x = 1\n").unwrap();
+    let mut saved = config(&repo);
+    saved.recorded.push("../keep".to_string());
+    std::fs::write(
+        cases.join(app::CONFIG_FILE),
+        serde_json::to_string_pretty(&saved).unwrap(),
+    )
+    .unwrap();
+
+    record_cli(&repo, python, Clear::default());
+    assert!(outside.is_file());
+    let _ = std::fs::remove_dir_all(&repo);
+}
