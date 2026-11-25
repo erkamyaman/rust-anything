@@ -243,14 +243,22 @@ Generic and variadic methods are refused.
 | `Task<int>` | refused | is async |
 | `DateTime`, `Guid` | refused | uses the type |
 
-A public record or plain class declared in the project crosses as `serde_json::Value`. Its
-properties are the public auto-properties with `get` and `set` or `init` (`{ get; set; }`,
-`{ get; init; }`), plus a positional record's parameters, as in
-`public record Point(double X, double Y)`. Other properties, such as a getter-only `{ get; }`, are
-left out and their types are not checked. Each property's type must cross as well (a `decimal`
-property refuses the class), and a class with no such property is refused. One that is not
-`public`, is generic, inherits, declares a constructor that takes arguments or has public fields
-is refused. `ref`, `out`, `in` and `params` parameters and generic methods are refused.
+A record, class or struct declared in the project crosses as `serde_json::Value` when:
+
+- it is `public`, and not `static`, `abstract`, generic or derived from another type;
+- its name is declared once in the project (two classes named `Point` in different namespaces
+  refuse both);
+- it has no constructor that takes arguments and no public instance fields (static fields are
+  fine);
+- it has at least one property, and each property's type crosses (a `decimal` property refuses
+  it, and so does a type that contains itself).
+
+Its properties are the public instance auto-properties with `get` and `set` or `init`
+(`{ get; set; }`, `{ get; init; }`), plus a positional record's parameters, as in
+`public record Point(double X, double Y)`. Other members, such as a getter-only `{ get; }` or a
+static property, are left out and their types are not checked.
+
+`ref`, `out`, `in` and `params` parameters and generic methods are refused.
 
 ## Ruby
 
