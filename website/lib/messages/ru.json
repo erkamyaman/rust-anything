@@ -17,8 +17,8 @@
     "closeMenu": "Закрыть меню",
     "menu": "Меню",
     "language": "Язык",
-    "home": "Главная rust-anything",
-    "github": "rust-anything на GitHub",
+    "home": "Главная Rust Anything",
+    "github": "Rust Anything на GitHub",
     "onThisPage": "На этой странице",
     "editPage": "Редактировать страницу на GitHub",
     "previous": "Назад",
@@ -54,7 +54,7 @@
       "project": "Проект"
     },
     "items": {
-      "/docs/introduction/what-is-rust-anything": "Что такое rust-anything",
+      "/docs/introduction/what-is-rust-anything": "Что такое Rust Anything",
       "/docs/introduction/quick-start": "Быстрый старт",
       "/docs/introduction/install": "Установка",
       "/docs/introduction/agents": "Настройка агента",
@@ -104,7 +104,7 @@
   "hero": {
     "title1": "Перепишите приложение на Rust.",
     "title2": "Докажите, что оно ведёт себя так же.",
-    "sub": "rust-anything записывает, что делает ваш код, а затем воспроизводит каждый записанный кейс на Rust-порте. Rust пишет ваш агент. Ничего не выходит в релиз, пока выходные данные не совпадут.",
+    "sub": "Rust Anything записывает, что делает ваш код, а затем воспроизводит каждый записанный кейс на Rust-порте. Rust пишет ваш агент. Ничего не выходит в релиз, пока выходные данные не совпадут.",
     "cta": "Читать быстрый старт",
     "source": "Исходный код на GitHub",
     "sourceLanguage": "Исходный язык",
@@ -138,10 +138,10 @@
     "installTitle": "Установка",
     "installDesc": "Установите CLI, затем зарегистрируйте MCP-сервер и навык рабочего процесса в Claude Code, Codex, Cursor и Gemini CLI.",
     "installNote": "Готовые бинарники для macOS, Linux и Windows есть в каждом [релизе на GitHub]({releases}).",
-    "agentPrompt": "Установи rust-anything: выполни `cargo install rust-anything`, затем `rust-anything setup`.",
+    "agentPrompt": "Установи Rust Anything: выполни `cargo install rust-anything`, затем `rust-anything setup`.",
     "agentRestart": "Скажи, когда тебя перезапустить.",
     "loopTitle": "Как делается порт",
-    "loopDesc": "Оригинал остаётся источником истины. rust-anything не переводит код: он даёт то, что агент не может угадать, и гейт, который говорит, когда порт готов.",
+    "loopDesc": "Оригинал остаётся источником истины. Rust Anything не переводит код: он даёт то, что агент не может угадать, и гейт, который говорит, когда порт готов.",
     "steps": [
       {
         "title": "Запись",
@@ -270,8 +270,11 @@
       "java": "JNI и бинарный протокол. Фасад JDK: 4,492/4,492"
     },
     "sponsorsTitle": "Спонсоры",
-    "sponsorsDesc": "rust-anything бесплатен и с открытым исходным кодом. Если он помогает в вашей работе, пожалуйста, подумайте о спонсорстве. Ваша поддержка помогает продолжать разработку.",
+    "sponsorsDesc": "Rust Anything бесплатен и с открытым исходным кодом. Если он помогает в вашей работе, пожалуйста, подумайте о спонсорстве. Ваша поддержка помогает продолжать разработку.",
     "companySponsor": "Спонсор-компания",
+    "domainSponsor": "Спонсор домена",
+    "peopleSponsors": "Частные спонсоры",
+    "buyCoffee": "Угостить меня кофе",
     "becomeSponsor": "Стать спонсором"
   }
 }

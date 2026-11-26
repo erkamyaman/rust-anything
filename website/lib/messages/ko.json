@@ -17,8 +17,8 @@
     "closeMenu": "메뉴 닫기",
     "menu": "메뉴",
     "language": "언어",
-    "home": "rust-anything 홈",
-    "github": "GitHub의 rust-anything",
+    "home": "Rust Anything 홈",
+    "github": "GitHub의 Rust Anything",
     "onThisPage": "이 페이지의 내용",
     "editPage": "GitHub에서 이 페이지 편집",
     "previous": "이전",
@@ -272,6 +272,9 @@
     "sponsorsTitle": "후원사",
     "sponsorsDesc": "rust-anything은 무료 오픈 소스입니다. 작업에 도움이 된다면 후원을 고려해 주세요. 여러분의 후원이 개발을 이어 가게 합니다.",
     "companySponsor": "기업 후원사",
+    "domainSponsor": "도메인 후원사",
+    "peopleSponsors": "개인 후원자",
+    "buyCoffee": "커피 한 잔 사주기",
     "becomeSponsor": "후원하기"
   }
 }

@@ -17,8 +17,8 @@
     "closeMenu": "Менюны ябу",
     "menu": "Меню",
     "language": "Тел",
-    "home": "rust-anything баш бите",
-    "github": "GitHub'та rust-anything",
+    "home": "Rust Anything баш бите",
+    "github": "GitHub'та Rust Anything",
     "onThisPage": "Бу биттә",
     "editPage": "Бу битне GitHub'та төзәтү",
     "previous": "Алдагы",
@@ -104,7 +104,7 @@
   "hero": {
     "title1": "Кушымтагызны Rust телендә яңадан языгыз.",
     "title2": "Аның шулай ук эшләвен исбатлагыз.",
-    "sub": "rust-anything кодыгыз нәрсә эшләгәнен язып ала, аннары язып алынган һәр очракны Rust портында кабат уйната. Rust кодын агентыгыз яза. Чыгышлар туры килмичә, бернәрсә дә чыгарылмый.",
+    "sub": "Rust Anything кодыгыз нәрсә эшләгәнен язып ала, аннары язып алынган һәр очракны Rust портында кабат уйната. Rust кодын агентыгыз яза. Чыгышлар туры килмичә, бернәрсә дә чыгарылмый.",
     "cta": "Тиз башлауны уку",
     "source": "GitHub'тагы чыганак код",
     "sourceLanguage": "Чыганак тел",
@@ -138,10 +138,10 @@
     "installTitle": "Урнаштыру",
     "installDesc": "CLI'ны урнаштырыгыз, аннары MCP серверны һәм workflow skill'ны Claude Code, Codex, Cursor һәм Gemini CLI'да теркәгез.",
     "installNote": "macOS, Linux һәм Windows өчен әзер бинар файллар һәр [GitHub релизында]({releases}).",
-    "agentPrompt": "rust-anything урнаштыр: `cargo install rust-anything` җибәр, аннары `rust-anything setup`.",
+    "agentPrompt": "Rust Anything урнаштыр: `cargo install rust-anything` җибәр, аннары `rust-anything setup`.",
     "agentRestart": "Сине кайчан яңадан җибәрергә кирәклеген әйт.",
     "loopTitle": "Порт ничек эшләнә",
-    "loopDesc": "Оригинал дөреслек чыганагы булып кала. rust-anything кодны тәрҗемә итми: ул агент чамалый алмаган нәрсәләрне һәм порт кайчан әзер икәнен әйтүче gate бирә.",
+    "loopDesc": "Оригинал дөреслек чыганагы булып кала. Rust Anything кодны тәрҗемә итми: ул агент чамалый алмаган нәрсәләрне һәм порт кайчан әзер икәнен әйтүче gate бирә.",
     "steps": [
       {
         "title": "Язып алу",
@@ -270,8 +270,11 @@
       "java": "JNI һәм бинар wire. JDK фасады: 4,492/4,492"
     },
     "sponsorsTitle": "Спонсорлар",
-    "sponsorsDesc": "rust-anything бушлай һәм ачык чыганаклы. Әгәр ул эшегездә ярдәм итсә, зинһар, аңа спонсорлык итүне уйлап карагыз. Сезнең ярдәм эшләнмәне дәвам итәргә мөмкинлек бирә.",
+    "sponsorsDesc": "Rust Anything бушлай һәм ачык чыганаклы. Әгәр ул эшегездә ярдәм итсә, зинһар, аңа спонсорлык итүне уйлап карагыз. Сезнең ярдәм эшләнмәне дәвам итәргә мөмкинлек бирә.",
     "companySponsor": "Компания спонсоры",
+    "domainSponsor": "Домен спонсоры",
+    "peopleSponsors": "Шәхси спонсорлар",
+    "buyCoffee": "Миңа кофе алып бир",
     "becomeSponsor": "Спонсор булу"
   }
 }

@@ -17,8 +17,8 @@
     "closeMenu": "بستن منو",
     "menu": "منو",
     "language": "زبان",
-    "home": "صفحه‌ی اصلی rust-anything",
-    "github": "rust-anything در GitHub",
+    "home": "صفحه‌ی اصلی Rust Anything",
+    "github": "Rust Anything در GitHub",
     "onThisPage": "در این صفحه",
     "editPage": "ویرایش این صفحه در GitHub",
     "previous": "قبلی",
@@ -104,7 +104,7 @@
   "hero": {
     "title1": "برنامه‌تان را به Rust بازنویسی کنید.",
     "title2": "ثابت کنید که همان رفتار را دارد.",
-    "sub": "rust-anything آنچه کدتان انجام می‌دهد را ضبط می‌کند و سپس هر مورد ضبط‌شده را روی پورت Rust بازپخش می‌کند. عامل شما Rust را می‌نویسد. تا زمانی که خروجی‌ها یکی نشوند، چیزی ارسال نمی‌شود.",
+    "sub": "Rust Anything آنچه کدتان انجام می‌دهد را ضبط می‌کند و سپس هر مورد ضبط‌شده را روی پورت Rust بازپخش می‌کند. عامل شما Rust را می‌نویسد. تا زمانی که خروجی‌ها یکی نشوند، چیزی ارسال نمی‌شود.",
     "cta": "خواندن شروع سریع",
     "source": "کد منبع در GitHub",
     "sourceLanguage": "زبان مبدأ",
@@ -138,10 +138,10 @@
     "installTitle": "نصب",
     "installDesc": "CLI را نصب کنید و سپس سرور MCP و مهارت گردش‌کار را در Claude Code، Codex، Cursor و Gemini CLI ثبت کنید.",
     "installNote": "باینری‌های از پیش ساخته برای macOS، Linux و Windows در هر [انتشار GitHub]({releases}) هست.",
-    "agentPrompt": "rust-anything را نصب کن: `cargo install rust-anything` را اجرا کن، سپس `rust-anything setup`.",
+    "agentPrompt": "Rust Anything را نصب کن: `cargo install rust-anything` را اجرا کن، سپس `rust-anything setup`.",
     "agentRestart": "بگو چه وقت باید دوباره راه‌اندازی‌ات کنم.",
     "loopTitle": "یک پورت چگونه ساخته می‌شود",
-    "loopDesc": "نسخه‌ی اصلی مرجع می‌ماند. rust-anything کد را ترجمه نمی‌کند: چیزی را فراهم می‌کند که عامل نمی‌تواند حدس بزند و دروازه‌ای که می‌گوید پورت چه زمانی تمام است.",
+    "loopDesc": "نسخه‌ی اصلی مرجع می‌ماند. Rust Anything کد را ترجمه نمی‌کند: چیزی را فراهم می‌کند که عامل نمی‌تواند حدس بزند و دروازه‌ای که می‌گوید پورت چه زمانی تمام است.",
     "steps": [
       {
         "title": "ضبط",
@@ -270,8 +270,11 @@
       "java": "JNI و یک wire دودویی. نمای JDK: 4,492/4,492"
     },
     "sponsorsTitle": "حامیان مالی",
-    "sponsorsDesc": "rust-anything رایگان و متن‌باز است. اگر در کارتان به شما کمک می‌کند، لطفاً از آن حمایت کنید. حمایت شما توسعه را ادامه‌دار نگه می‌دارد.",
+    "sponsorsDesc": "Rust Anything رایگان و متن‌باز است. اگر در کارتان به شما کمک می‌کند، لطفاً از آن حمایت کنید. حمایت شما توسعه را ادامه‌دار نگه می‌دارد.",
     "companySponsor": "حامی شرکتی",
+    "domainSponsor": "حامی دامنه",
+    "peopleSponsors": "حامیان فردی",
+    "buyCoffee": "یک قهوه مهمانم کنید",
     "becomeSponsor": "حامی شوید"
   }
 }

@@ -2,7 +2,6 @@ import { useShared } from '@void/react'
 import { useFrontmatter } from '@void/md'
 import Navbar from '../../../components/site/Navbar' with { island: 'load' }
 import Toc from '../../../components/docs/Toc' with { island: 'load' }
-import ThemeToggle from '../../../components/site/ThemeToggle' with { island: 'load' }
 import Sidebar from '../../../components/docs/Sidebar'
 import Breadcrumb from '../../../components/docs/Breadcrumb'
 import Pager from '../../../components/docs/Pager'
@@ -27,7 +26,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
       </header>
       <div className="mx-auto flex w-full max-w-[1440px]">
         <aside className="hidden w-64 shrink-0 lg:block">
-          <Sidebar currentPath={currentPath} locale={LOCALE} footer={<ThemeToggle withLabel ui={m.ui} />} />
+          <Sidebar currentPath={currentPath} locale={LOCALE} />
         </aside>
         <div className="min-w-0 flex-1 px-5 pt-8 pb-16 sm:px-8 lg:px-12">
           <div className="mx-auto max-w-3xl">

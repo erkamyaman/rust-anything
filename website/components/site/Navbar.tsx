@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import Logo from '../Logo'
 import ThemeToggle from './ThemeToggle'
 import SearchDialog, { SearchButton } from './SearchDialog'
-import { CloseIcon, DiscordIcon, GitHubIcon, HeartIcon, MenuIcon } from './icons'
+import { CloseIcon, GitHubIcon, HeartIcon, MenuIcon } from './icons'
 import type { NavGroup } from '../../lib/nav'
 import type { Messages } from '../../lib/messages/en'
 import { LOCALES, stripLocale, withLocale } from '../../lib/locales'
@@ -37,15 +37,15 @@ function LanguageMenu({ currentPath, locale, label }: { currentPath: string; loc
         aria-label={label}
         title={label}
       >
-        <Flag l={current} />
-        <span className="hidden xl:inline">{current.name}</span>
-        <svg className="hidden opacity-60 sm:block" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-          <path d="M6 9l6 6 6-6" />
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z" />
         </svg>
+        <span className="font-mono text-xs uppercase tracking-wide">{current.code.split('-')[0]}</span>
       </summary>
       <div className="absolute end-0 top-11 z-[70] w-[24rem] max-sm:fixed max-sm:inset-x-3 max-sm:top-[4.25rem] max-sm:w-auto rounded-xl border border-line bg-bg p-2 shadow-2xl">
         <div className="px-2 pb-1.5 pt-1 text-sm font-medium text-muted">{label}</div>
-        <ul className="thin-scrollbar grid max-h-[min(30rem,75vh)] grid-cols-2 gap-0.5 overflow-y-auto">
+        <ul className="thin-scrollbar grid max-h-[75vh] grid-cols-2 gap-0.5 overflow-y-auto sm:max-h-none sm:overflow-visible">
           {LOCALES.map((l) => {
             const on = l.code === locale
             return (
@@ -62,7 +62,6 @@ function LanguageMenu({ currentPath, locale, label }: { currentPath: string; loc
                     } catch {}
                   }}
                 >
-                  <Flag l={l} />
                   <span className="min-w-0 flex-1 truncate">{l.name}</span>
                   {on && (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
@@ -82,7 +81,7 @@ function LanguageMenu({ currentPath, locale, label }: { currentPath: string; loc
 export default function Navbar({
   currentPath,
   locale = 'en',
-  themeToggle = true,
+  themeToggle = false,
   ui,
   nav,
 }: {
@@ -129,25 +128,20 @@ export default function Navbar({
       <a href={L('/')} className="shrink-0 font-display text-[17px] font-bold" aria-label={ui.home}>
         <Logo size={32} />
       </a>
-      <div className="ml-auto flex items-center gap-1 sm:gap-2">
-        <nav className="mr-2 hidden items-center gap-1 md:flex" aria-label="Main">
+      <div className="ms-auto flex items-center gap-0.5 sm:gap-1">
+        <nav className="me-3 hidden items-center gap-1 border-line pe-3 lg:flex lg:border-e" aria-label={ui.docs}>
           {LINKS.map((l) => (
             <a
               key={l.href}
               href={l.href}
-              className={`rounded-md px-3 py-1.5 text-sm ${active(l.match) ? 'font-semibold text-fg' : 'text-muted hover:text-fg'}`}
+              className={`whitespace-nowrap rounded-md px-3 py-1.5 text-sm ${active(l.match) ? 'font-semibold text-fg' : 'text-muted hover:text-fg'}`}
               aria-current={active(l.match) ? 'page' : undefined}
             >
               {l.title}
             </a>
           ))}
         </nav>
-        <div className="hidden sm:block">
-          <SearchButton ui={ui} onOpen={() => setSearchOpen(true)} />
-        </div>
-        <div className="sm:hidden">
-          <SearchButton ui={ui} compact onOpen={() => setSearchOpen(true)} />
-        </div>
+        <SearchButton ui={ui} compact onOpen={() => setSearchOpen(true)} />
         <LanguageMenu currentPath={currentPath} locale={locale} label={ui.language} />
         <a
           href={REPO_URL}
@@ -157,20 +151,12 @@ export default function Navbar({
           <GitHubIcon className="h-[22px] w-[22px]" />
         </a>
         <a
-          href="https://discord.gg/FXhUEA8eBR"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-fg/80 hover:text-fg"
-          aria-label="Discord"
-        >
-          <DiscordIcon className="h-[22px] w-[22px]" />
-        </a>
-        <a
           href="https://github.com/sponsors/erkamyaman"
-          className="group inline-flex h-9 items-center justify-center gap-1.5 rounded-md px-2 text-sm text-fg/80 hover:text-fg xl:border xl:border-line xl:px-3 xl:hover:border-[#db61a2]/60"
+          className="group inline-flex h-9 items-center justify-center gap-1.5 rounded-md px-2 text-sm text-fg/80 hover:text-fg"
           aria-label={ui.sponsor}
           title={ui.sponsor}
         >
-          <HeartIcon className="h-[18px] w-[18px] fill-transparent stroke-[#db61a2] stroke-2 transition-colors group-hover:fill-[#db61a2] motion-reduce:transition-none" />
-          <span className="hidden xl:inline">{ui.sponsor}</span>
+          <HeartIcon className="h-[18px] w-[18px] fill-transparent stroke-current stroke-2 transition-colors group-hover:fill-current motion-reduce:transition-none" />
         </a>
         <button
           type="button"
@@ -185,14 +171,15 @@ export default function Navbar({
 
       {menuOpen &&
         createPortal(
-        <div data-theme={themeToggle ? undefined : "dark"} className="fixed inset-0 z-[65] lg:hidden" role="dialog" aria-modal="true" aria-label={ui.menu}>
+        <div className="fixed inset-0 z-[65] lg:hidden" role="dialog" aria-modal="true" aria-label={ui.menu} onKeyDown={(e) => e.key === 'Escape' && setMenuOpen(false)}>
           <button type="button" tabIndex={-1} aria-label={ui.closeMenu} className="absolute inset-0 cursor-default bg-black/50" onClick={() => setMenuOpen(false)} />
-          <div className="absolute inset-y-0 right-0 flex w-[min(20rem,88vw)] flex-col border-l border-line bg-bg text-fg">
+          <div className="absolute inset-y-0 end-0 flex w-[min(20rem,88vw)] flex-col border-s border-line bg-bg text-fg">
             <div className="flex h-16 items-center justify-between border-b border-line px-4">
               <span className="font-display font-bold"><Logo size={26} /></span>
               <button
                 type="button"
                 className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:text-fg"
+                autoFocus
                 onClick={() => setMenuOpen(false)}
                 aria-label={ui.closeMenu}
               >
@@ -237,28 +224,5 @@ export default function Navbar({
 
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} ui={ui} locale={locale} />
     </div>
-  )
-}
-
-function Flag({ l }: { l: (typeof LOCALES)[number] }) {
-  const country = 'country' in l ? l.country : undefined
-  if (!country) {
-    return (
-      <svg className="h-[15px] w-5 shrink-0 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z" />
-      </svg>
-    )
-  }
-  return (
-    <img
-      src={`/flags/${country}.svg`}
-      width={20}
-      height={15}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      className="h-[15px] w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-black/10"
-    />
   )
 }

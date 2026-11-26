@@ -1,0 +1,14 @@
+{
+  "cargo install rust-anything": "<span style=\"color:#b392f0\">cargo </span><span style=\"color:#e1e4e8\">install rust-anything</span>",
+  "npm install -g rust-anything": "<span style=\"color:#b392f0\">npm </span><span style=\"color:#e1e4e8\">install -g rust-anything</span>",
+  "rust-anything setup": "<span style=\"color:#b392f0\">rust-anything </span><span style=\"color:#e1e4e8\">setup</span>",
+  "rust-anything profile . -- node bench.mjs": "<span style=\"color:#b392f0\">rust-anything </span><span style=\"color:#e1e4e8\">profile </span>. <span style=\"color:#e1e4e8\">-- node bench.mjs</span>",
+  "rust-anything bridge . src/fuzzy.ts --batch fuzzyScore:text": "<span style=\"color:#b392f0\">rust-anything </span><span style=\"color:#e1e4e8\">bridge </span>. <span style=\"color:#e1e4e8\">src/fuzzy.ts --batch fuzzyScore</span>:<span style=\"color:#e1e4e8\">text</span>",
+  "rust-anything record rust/fuzzy-rs": "<span style=\"color:#b392f0\">rust-anything </span><span style=\"color:#e1e4e8\">record rust/fuzzy-rs</span>",
+  "rust-anything build rust/fuzzy-rs": "<span style=\"color:#b392f0\">rust-anything </span><span style=\"color:#e1e4e8\">build rust/fuzzy-rs</span>",
+  "rust-anything diff rust/fuzzy-rs": "<span style=\"color:#b392f0\">rust-anything </span><span style=\"color:#e1e4e8\">diff rust/fuzzy-rs</span>",
+  "rust-anything bench rust/fuzzy-rs": "<span style=\"color:#b392f0\">rust-anything </span><span style=\"color:#e1e4e8\">bench rust/fuzzy-rs</span>",
+  "rust-anything gate rust/fuzzy-rs": "<span style=\"color:#b392f0\">rust-anything </span><span style=\"color:#e1e4e8\">gate rust/fuzzy-rs</span>",
+  "rust-anything bridge . src/words.ts": "<span style=\"color:#b392f0\">rust-anything </span><span style=\"color:#e1e4e8\">bridge </span>. <span style=\"color:#e1e4e8\">src/words.ts</span>",
+  "{\"fn\":\"wordCount\",\"args\":[\"a\\u00a0b\"],\"ok\":1}": "<span style=\"color:#79b8ff\">{\"fn\"</span><span style=\"color:#f97583\">:</span><span style=\"color:#9ecbff\">\"wordCount\"</span><span style=\"color:#f97583\">,</span><span style=\"color:#79b8ff\">\"args\"</span><span style=\"color:#f97583\">:</span><span style=\"color:#79b8ff\">[</span><span style=\"color:#9ecbff\">\"a\\u00a0b\"</span><span style=\"color:#79b8ff\">]</span><span style=\"color:#f97583\">,</span><span style=\"color:#79b8ff\">\"ok\"</span><span style=\"color:#f97583\">:</span><span style=\"color:#79b8ff\">1}</span>"
+}

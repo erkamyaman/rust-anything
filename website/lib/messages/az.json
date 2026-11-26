@@ -17,8 +17,8 @@
     "closeMenu": "Menyunu bağla",
     "menu": "Menyu",
     "language": "Dil",
-    "home": "rust-anything ana səhifəsi",
-    "github": "GitHub-da rust-anything",
+    "home": "Rust Anything ana səhifəsi",
+    "github": "GitHub-da Rust Anything",
     "onThisPage": "Bu səhifədə",
     "editPage": "Bu səhifəni GitHub-da redaktə edin",
     "previous": "Əvvəlki",
@@ -104,7 +104,7 @@
   "hero": {
     "title1": "Tətbiqinizi Rust-da yenidən yazın.",
     "title2": "Eyni davrandığını sübut edin.",
-    "sub": "rust-anything kodunuzun nə etdiyini qeydə alır, sonra hər qeydə alınmış halı Rust portuna qarşı təkrar oynadır. Rust-u agentiniz yazır. Çıxışlar uyğun gəlməyənə qədər heç nə buraxılmır.",
+    "sub": "Rust Anything kodunuzun nə etdiyini qeydə alır, sonra hər qeydə alınmış halı Rust portuna qarşı təkrar oynadır. Rust-u agentiniz yazır. Çıxışlar uyğun gəlməyənə qədər heç nə buraxılmır.",
     "cta": "Sürətli başlanğıcı oxuyun",
     "source": "GitHub-da mənbə kodu",
     "sourceLanguage": "Mənbə dili",
@@ -141,7 +141,7 @@
     "agentPrompt": "rust-anything-i quraşdır: `cargo install rust-anything`, sonra `rust-anything setup` işə sal.",
     "agentRestart": "Səni nə vaxt yenidən başlatmalı olduğumu de.",
     "loopTitle": "Port necə hazır olur",
-    "loopDesc": "Orijinal həqiqət mənbəyi olaraq qalır. rust-anything kodu tərcümə etmir: agentin təxmin edə bilmədiyini və portun nə vaxt hazır olduğunu deyən gate-i təmin edir.",
+    "loopDesc": "Orijinal həqiqət mənbəyi olaraq qalır. Rust Anything kodu tərcümə etmir: agentin təxmin edə bilmədiyini və portun nə vaxt hazır olduğunu deyən gate-i təmin edir.",
     "steps": [
       {
         "title": "Qeyd",
@@ -270,8 +270,11 @@
       "java": "JNI və binary wire. JDK fasadı: 4,492/4,492"
     },
     "sponsorsTitle": "Sponsorlar",
-    "sponsorsDesc": "rust-anything pulsuz və açıq mənbəlidir. Əgər işinizə yarayırsa, lütfən ona sponsorluq etməyi düşünün. Dəstəyiniz inkişafın davam etməsinə kömək edir.",
+    "sponsorsDesc": "Rust Anything pulsuz və açıq mənbəlidir. Əgər işinizə yarayırsa, lütfən ona sponsorluq etməyi düşünün. Dəstəyiniz inkişafın davam etməsinə kömək edir.",
     "companySponsor": "Şirkət sponsoru",
+    "domainSponsor": "Domen sponsoru",
+    "peopleSponsors": "Fərdi sponsorlar",
+    "buyCoffee": "Mənə qəhvə al",
     "becomeSponsor": "Sponsor olun"
   }
 }

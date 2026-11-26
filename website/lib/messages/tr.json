@@ -17,8 +17,8 @@
     "closeMenu": "Menüyü kapat",
     "menu": "Menü",
     "language": "Dil",
-    "home": "rust-anything ana sayfa",
-    "github": "GitHub'da rust-anything",
+    "home": "Rust Anything ana sayfa",
+    "github": "GitHub'da Rust Anything",
     "onThisPage": "Bu sayfada",
     "editPage": "Bu sayfayı GitHub'da düzenleyin",
     "previous": "Önceki",
@@ -104,7 +104,7 @@
   "hero": {
     "title1": "Uygulamanızı Rust ile yeniden yazın.",
     "title2": "Aynı davrandığını kanıtlayın.",
-    "sub": "rust-anything kodunuzun ne yaptığını kaydeder, ardından kaydedilen her vakayı Rust portuna karşı yeniden oynatır. Rust'ı ajanınız yazar. Çıktılar eşleşene kadar hiçbir şey yayınlanmaz.",
+    "sub": "Rust Anything kodunuzun ne yaptığını kaydeder, ardından kaydedilen her vakayı Rust portuna karşı yeniden oynatır. Rust'ı ajanınız yazar. Çıktılar eşleşene kadar hiçbir şey yayınlanmaz.",
     "cta": "Hızlı başlangıcı okuyun",
     "source": "GitHub'daki kaynak kod",
     "sourceLanguage": "Kaynak dil",
@@ -138,10 +138,10 @@
     "installTitle": "Kurulum",
     "installDesc": "CLI'ı kurun, ardından MCP sunucusunu ve iş akışı skill'ini Claude Code, Codex, Cursor ve Gemini CLI'a kaydedin.",
     "installNote": "macOS, Linux ve Windows için hazır derlenmiş binary'ler her [GitHub release]({releases}) sayfasında bulunur.",
-    "agentPrompt": "rust-anything'i kur: `cargo install rust-anything`, ardından `rust-anything setup` çalıştır.",
+    "agentPrompt": "Rust Anything'i kur: `cargo install rust-anything`, ardından `rust-anything setup` çalıştır.",
     "agentRestart": "Seni ne zaman yeniden başlatmam gerektiğini söyle.",
     "loopTitle": "Bir port nasıl tamamlanır",
-    "loopDesc": "Doğruluğun kaynağı orijinal kod olarak kalır. rust-anything kodu çevirmez: bir ajanın tahmin edemeyeceklerini ve bir portun ne zaman bittiğini söyleyen bir gate'i sağlar.",
+    "loopDesc": "Doğruluğun kaynağı orijinal kod olarak kalır. Rust Anything kodu çevirmez: bir ajanın tahmin edemeyeceklerini ve bir portun ne zaman bittiğini söyleyen bir gate'i sağlar.",
     "steps": [
       {
         "title": "Kaydet",
@@ -270,8 +270,11 @@
       "java": "JNI ve ikili bir wire. JDK cephesi: 4,492/4,492"
     },
     "sponsorsTitle": "Sponsorlar",
-    "sponsorsDesc": "rust-anything ücretsiz ve açık kaynaktır. İşinize yarıyorsa lütfen sponsor olmayı düşünün. Desteğiniz geliştirmenin sürmesini sağlar.",
+    "sponsorsDesc": "Rust Anything ücretsiz ve açık kaynaktır. İşinize yarıyorsa lütfen sponsor olmayı düşünün. Desteğiniz geliştirmenin sürmesini sağlar.",
     "companySponsor": "Şirket sponsoru",
+    "domainSponsor": "Alan adı sponsoru",
+    "peopleSponsors": "Bireysel sponsorlar",
+    "buyCoffee": "Bana bir kahve ısmarla",
     "becomeSponsor": "Sponsor olun"
   }
 }

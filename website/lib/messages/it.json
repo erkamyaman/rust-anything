@@ -17,8 +17,8 @@
     "closeMenu": "Chiudi il menu",
     "menu": "Menu",
     "language": "Lingua",
-    "home": "Home di rust-anything",
-    "github": "rust-anything su GitHub",
+    "home": "Home di Rust Anything",
+    "github": "Rust Anything su GitHub",
     "onThisPage": "In questa pagina",
     "editPage": "Modifica questa pagina su GitHub",
     "previous": "Precedente",
@@ -104,7 +104,7 @@
   "hero": {
     "title1": "Riscrivi la tua app in Rust.",
     "title2": "Dimostra che si comporta allo stesso modo.",
-    "sub": "rust-anything registra ciò che fa il tuo codice, poi ripete ogni caso registrato sul port in Rust. Il Rust lo scrive il tuo agente. Nulla viene rilasciato finché gli output non coincidono.",
+    "sub": "Rust Anything registra ciò che fa il tuo codice, poi ripete ogni caso registrato sul port in Rust. Il Rust lo scrive il tuo agente. Nulla viene rilasciato finché gli output non coincidono.",
     "cta": "Leggi l'avvio rapido",
     "source": "Sorgente su GitHub",
     "sourceLanguage": "Linguaggio di origine",
@@ -138,10 +138,10 @@
     "installTitle": "Installazione",
     "installDesc": "Installa la CLI, poi registra il server MCP e la skill di flusso di lavoro in Claude Code, Codex, Cursor e Gemini CLI.",
     "installNote": "I binari precompilati per macOS, Linux e Windows sono allegati a ogni [release su GitHub]({releases}).",
-    "agentPrompt": "Installa rust-anything: esegui `cargo install rust-anything`, poi `rust-anything setup`.",
+    "agentPrompt": "Installa Rust Anything: esegui `cargo install rust-anything`, poi `rust-anything setup`.",
     "agentRestart": "Dimmi quando devo riavviarti.",
     "loopTitle": "Come nasce un port",
-    "loopDesc": "L'originale resta la fonte di verità. rust-anything non traduce il codice: fornisce ciò che un agente non può indovinare e un gate che dice quando un port è finito.",
+    "loopDesc": "L'originale resta la fonte di verità. Rust Anything non traduce il codice: fornisce ciò che un agente non può indovinare e un gate che dice quando un port è finito.",
     "steps": [
       {
         "title": "Registra",
@@ -270,8 +270,11 @@
       "java": "JNI e un wire binario. facciata del JDK: 4,492/4,492"
     },
     "sponsorsTitle": "Sponsor",
-    "sponsorsDesc": "rust-anything è gratuito e open source. Se ti aiuta nel lavoro, considera di sostenerlo. Il tuo contributo mantiene vivo lo sviluppo.",
+    "sponsorsDesc": "Rust Anything è gratuito e open source. Se ti aiuta nel lavoro, considera di sostenerlo. Il tuo contributo mantiene vivo lo sviluppo.",
     "companySponsor": "Sponsor aziendale",
+    "domainSponsor": "Sponsor del dominio",
+    "peopleSponsors": "Sponsor individuali",
+    "buyCoffee": "Offrimi un caffè",
     "becomeSponsor": "Diventa sponsor"
   }
 }

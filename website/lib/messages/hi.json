@@ -17,8 +17,8 @@
     "closeMenu": "मेन्यू बंद करें",
     "menu": "मेन्यू",
     "language": "भाषा",
-    "home": "rust-anything मुखपृष्ठ",
-    "github": "GitHub पर rust-anything",
+    "home": "Rust Anything मुखपृष्ठ",
+    "github": "GitHub पर Rust Anything",
     "onThisPage": "इस पन्ने पर",
     "editPage": "GitHub पर इस पन्ने को संपादित करें",
     "previous": "पिछला",
@@ -104,7 +104,7 @@
   "hero": {
     "title1": "अपना ऐप Rust में दोबारा लिखें।",
     "title2": "साबित करें कि वह वैसे ही चलता है।",
-    "sub": "rust-anything रिकॉर्ड करता है कि आपका कोड क्या करता है, फिर हर रिकॉर्ड किए गए मामले को Rust पोर्ट पर दोबारा चलाता है। Rust आपका एजेंट लिखता है। जब तक आउटपुट मेल न खाएँ, कुछ भी शिप नहीं होता।",
+    "sub": "Rust Anything रिकॉर्ड करता है कि आपका कोड क्या करता है, फिर हर रिकॉर्ड किए गए मामले को Rust पोर्ट पर दोबारा चलाता है। Rust आपका एजेंट लिखता है। जब तक आउटपुट मेल न खाएँ, कुछ भी शिप नहीं होता।",
     "cta": "त्वरित शुरुआत पढ़ें",
     "source": "GitHub पर सोर्स",
     "sourceLanguage": "सोर्स भाषा",
@@ -138,10 +138,10 @@
     "installTitle": "इंस्टॉल",
     "installDesc": "CLI इंस्टॉल करें, फिर MCP सर्वर और वर्कफ़्लो स्किल को Claude Code, Codex, Cursor और Gemini CLI में दर्ज करें।",
     "installNote": "macOS, Linux और Windows के पहले से बने बाइनरी हर [GitHub रिलीज़]({releases}) के साथ मिलते हैं।",
-    "agentPrompt": "rust-anything इंस्टॉल करो: `cargo install rust-anything` चलाओ, फिर `rust-anything setup`।",
+    "agentPrompt": "Rust Anything इंस्टॉल करो: `cargo install rust-anything` चलाओ, फिर `rust-anything setup`।",
     "agentRestart": "बताओ कि मुझे तुम्हें कब रीस्टार्ट करना है।",
     "loopTitle": "एक पोर्ट कैसे बनता है",
-    "loopDesc": "मूल कोड ही प्रामाणिक रहता है। rust-anything कोड का अनुवाद नहीं करता: यह वह देता है जो एजेंट अंदाज़े से नहीं जान सकता, और एक gate जो बताता है कि पोर्ट कब पूरा हुआ।",
+    "loopDesc": "मूल कोड ही प्रामाणिक रहता है। Rust Anything कोड का अनुवाद नहीं करता: यह वह देता है जो एजेंट अंदाज़े से नहीं जान सकता, और एक gate जो बताता है कि पोर्ट कब पूरा हुआ।",
     "steps": [
       {
         "title": "रिकॉर्ड",
@@ -270,8 +270,11 @@
       "java": "JNI और बाइनरी वायर। JDK फ़साड: 4,492/4,492"
     },
     "sponsorsTitle": "प्रायोजक",
-    "sponsorsDesc": "rust-anything मुफ़्त और ओपन सोर्स है। अगर यह आपके काम में मदद करता है, तो कृपया स्पॉन्सर करने पर विचार करें। आपका सहयोग विकास को चालू रखता है।",
+    "sponsorsDesc": "Rust Anything मुफ़्त और ओपन सोर्स है। अगर यह आपके काम में मदद करता है, तो कृपया स्पॉन्सर करने पर विचार करें। आपका सहयोग विकास को चालू रखता है।",
     "companySponsor": "कंपनी प्रायोजक",
+    "domainSponsor": "डोमेन प्रायोजक",
+    "peopleSponsors": "व्यक्तिगत प्रायोजक",
+    "buyCoffee": "मुझे एक कॉफ़ी पिलाएँ",
     "becomeSponsor": "स्पॉन्सर बनें"
   }
 }

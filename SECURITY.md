@@ -14,7 +14,7 @@ Security fixes go into the latest release. Upgrade with `cargo install rust-anyt
 
 Please report it privately, not in a public issue: use
 [Report a vulnerability](https://github.com/erkamyaman/rust-anything/security/advisories/new) on
-the repository's Security tab.
+the repository's Security tab, or email [hello@rustanything.ai](mailto:hello@rustanything.ai).
 
 Include what you found, how to reproduce it, which version and platform you used, and what an
 attacker could do with it. You'll get a reply within a few days, and you'll hear when a fix is out.

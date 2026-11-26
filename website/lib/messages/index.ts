@@ -13,7 +13,6 @@ import kk from './kk.json'
 import ky from './ky.json'
 import tk from './tk.json'
 import tt from './tt.json'
-import ug from './ug.json'
 import pt from './pt.json'
 import ar from './ar.json'
 import fa from './fa.json'
@@ -39,7 +38,6 @@ export const translations: Record<string, unknown> = {
   'ky': ky,
   'tk': tk,
   'tt': tt,
-  'ug': ug,
   'pt': pt,
   'ar': ar,
   'fa': fa,

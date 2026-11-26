@@ -28,41 +28,82 @@ const AUTHOR_LINKS = [
 export default function Footer({ locale = 'en' }: { locale?: string }) {
   const ui = messages(locale).ui
   const L = (p: string) => withLocale(p, locale)
+  const cols = [
+    {
+      title: ui.footerProduct,
+      links: [
+        [ui.quickStart, L('/docs/introduction/quick-start')],
+        [ui.cliReference, L('/docs/reference/cli')],
+        [ui.footerLanguages, L('/docs/languages/overview')],
+        [ui.footerPorts, `${REPO_URL}/blob/main/docs/real-world.md`],
+      ],
+    },
+    {
+      title: ui.footerProject,
+      links: [
+        [ui.status, L('/docs/project/status')],
+        [ui.footerChangelog, `${REPO_URL}/blob/main/CHANGELOG.md`],
+        [ui.footerDecisions, `${REPO_URL}/blob/main/DECISIONS.md`],
+        [ui.issues, `${REPO_URL}/issues`],
+      ],
+    },
+    {
+      title: ui.footerCommunity,
+      links: [
+        ['GitHub', REPO_URL],
+        ['Discord', 'https://discord.gg/FXhUEA8eBR'],
+        [ui.sponsor, 'https://github.com/sponsors/erkamyaman'],
+        ['hello@rustanything.ai', 'mailto:hello@rustanything.ai'],
+      ],
+    },
+  ]
   return (
     <footer className="border-t border-line bg-bg text-fg">
-      <div
-        className="mx-auto flex max-w-[1440px] flex-col gap-8 px-5 py-12 text-sm text-muted sm:px-8 md:flex-row md:items-start md:justify-between md:py-16"
-      >
-        <div className="max-w-md space-y-3">
-          <span className="text-base"><Logo size={28} /></span>
-          <p className="leading-relaxed">{ui.legal}</p>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2">
-            <a href="https://erkamyaman.dev" className="inline-flex items-center gap-2 text-fg hover:text-brand-ink">
-              <img src="https://github.com/erkamyaman.png?size=64" width={24} height={24} alt="" className="rounded-full" loading="lazy" />
-              <span>
-                {ui.madeBy} <span className="font-medium">erKam Yaman</span>
-              </span>
-            </a>
-            <span className="flex items-center gap-3">
-              {AUTHOR_LINKS.map((l) => (
-                <a key={l.label} href={l.href} aria-label={l.label} title={l.label} className="hover:text-fg">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                    <path d={l.icon} />
-                  </svg>
-                </a>
-              ))}
+      <div className="mx-auto max-w-[1200px] px-5 pt-14 pb-8 sm:px-8 md:pt-20">
+        <div className="grid gap-10 md:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
+          <div className="max-w-xs space-y-4">
+            <span className="text-base">
+              <Logo size={28} />
             </span>
+            <p className="text-[15px] leading-relaxed text-muted">{ui.footerTagline}</p>
           </div>
+          {cols.map((c) => (
+            <div key={c.title}>
+              <div className="mb-4 text-sm font-semibold">{c.title}</div>
+              <ul className="space-y-3 text-[15px] text-muted">
+                {c.links.map(([label, href]) => (
+                  <li key={href}>
+                    <a className="hover:text-fg" href={href}>
+                      {label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
-        <div className="grid grid-cols-2 gap-x-12 gap-y-2">
-          <a className="hover:text-fg" href={L('/docs/introduction/quick-start')}>{ui.quickStart}</a>
-          <a className="hover:text-fg" href={REPO_URL}>GitHub</a>
-          <a className="hover:text-fg" href={L('/docs/reference/cli')}>{ui.cliReference}</a>
-          <a className="hover:text-fg" href={`${REPO_URL}/issues`}>{ui.issues}</a>
-          <a className="hover:text-fg" href={L('/docs/project/status')}>{ui.status}</a>
-          <a className="hover:text-fg" href="https://github.com/sponsors/erkamyaman">{ui.sponsor}</a>
-          <span />
-          <a className="hover:text-fg" href="https://discord.gg/FXhUEA8eBR">Discord</a>
+        <div className="mt-14 flex flex-col gap-4 border-t border-line pt-6 text-sm text-muted md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <a href="https://erkamyaman.dev" className="hover:text-fg">
+              © 2026 Erkam Yaman
+            </a>
+            <a href={`${REPO_URL}#license`} className="hover:text-fg">
+              {ui.footerLicense}
+            </a>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <a href="https://erkamyaman.dev" className="inline-flex items-center gap-2 hover:text-fg">
+              <img src="https://github.com/erkamyaman.png?size=64" width={20} height={20} alt="" className="rounded-full" loading="lazy" />
+              {ui.madeBy} erKam Yaman
+            </a>
+            {AUTHOR_LINKS.map((l) => (
+              <a key={l.label} href={l.href} aria-label={l.label} title={l.label} className="hover:text-fg">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <path d={l.icon} />
+                </svg>
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     </footer>
