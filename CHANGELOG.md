@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The MCP `bridge` and `app_wire` tools refuse a `unit` that is not a string with
+  `` `unit` must be a string, not 5 `` instead of `` missing `unit` ``, and `bridge` refuses a `name`
+  that is not a string instead of writing the bridge under the default name. A missing or `null`
+  `unit` still says `` missing `unit` `` (#684).
 - `docs/whole-apps.md` says six of the seven `app` commands are MCP tools and that `app shadow` is
   CLI only, instead of "All six are MCP tools too" (#672, #674 by @XiaoBinGan).
 - The MCP `app_record` tool refuses a `ready`, `name`, `db_reset` or `db_dump` that is neither a

@@ -762,6 +762,12 @@ fn opt_string(args: &Value, key: &str) -> Result<Option<String>> {
     }
 }
 
+/// A string argument the tool cannot run without: absent or `null` is "missing", any other type is
+/// refused by name, so `"unit": 5` is not reported as if `unit` had not been sent.
+fn req_string(args: &Value, key: &str) -> Result<String> {
+    opt_string(args, key)?.with_context(|| format!("missing `{key}`"))
+}
+
 fn opt_u64(args: &Value, key: &str) -> Result<Option<u64>> {
     match args.get(key) {
         None | Some(Value::Null) => Ok(None),
@@ -865,10 +871,10 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             let force = opt_bool(args, "force")?.unwrap_or(false);
             serde_json::to_value(bridge::bridge(&bridge::Options {
                 root: &root,
-                unit: args["unit"].as_str().context("missing `unit`")?,
+                unit: &req_string(args, "unit")?,
                 kind,
                 out: opt_path("out"),
-                name: args["name"].as_str().map(str::to_string),
+                name: opt_string(args, "name")?,
                 force,
                 keep: strings("keep"),
                 lang: None,
@@ -1250,7 +1256,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             let repo = path("repo")?;
             serde_json::to_value(front_door::wire(&front_door::WireOptions {
                 repo: &repo,
-                unit: args["unit"].as_str().context("missing `unit`")?,
+                unit: &req_string(args, "unit")?,
                 commands: &strings("commands"),
                 routes: &strings("routes"),
                 skip_gate: opt_bool(args, "skip_gate")?.unwrap_or(false),
@@ -1301,6 +1307,43 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert_eq!(err, "`ready` must be a string, not 42");
+    }
+
+    #[test]
+    fn bridge_and_app_wire_refuse_a_unit_or_name_that_is_not_a_string() {
+        // Issue #684: `"unit": 5` used to read as a missing unit, and `"name": 7` was dropped, so the
+        // bridge was written under the default name. Both are refused before anything is written.
+        let dir =
+            std::env::temp_dir().join(format!("rust-anything-mcp-684-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let root = dir.to_str().unwrap();
+        let err = |tool: &str, args: Value| call(tool, &args).unwrap_err().to_string();
+        assert_eq!(
+            err("bridge", json!({ "root": root, "unit": 5, "kind": "napi" })),
+            "`unit` must be a string, not 5"
+        );
+        assert_eq!(
+            err("app_wire", json!({ "repo": root, "unit": 5 })),
+            "`unit` must be a string, not 5"
+        );
+        assert_eq!(
+            err(
+                "bridge",
+                json!({ "root": root, "unit": "src/math.ts", "kind": "napi", "name": 7 })
+            ),
+            "`name` must be a string, not 7"
+        );
+        assert_eq!(
+            err("bridge", json!({ "root": root, "kind": "napi" })),
+            "missing `unit`"
+        );
+        assert_eq!(
+            err("app_wire", json!({ "repo": root, "unit": null })),
+            "missing `unit`"
+        );
+        let written = std::fs::read_dir(&dir).unwrap().count();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(written, 0);
     }
 
     #[test]
