@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The MCP `package` tool refuses a `name`, `version`, `fallback` or `original` that is not a
+  string with `` `version` must be a string, not 2 ``, instead of dropping it and packaging with the
+  crate's own value. A missing or `null` value still means not given (#683).
 - `docs/whole-apps.md` says six of the seven `app` commands are MCP tools and that `app shadow` is
   CLI only, instead of "All six are MCP tools too" (#672, #674 by @XiaoBinGan).
 - The MCP `app_record` tool refuses a `ready`, `name`, `db_reset` or `db_dump` that is neither a

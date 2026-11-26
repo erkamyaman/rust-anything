@@ -1082,13 +1082,13 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             let crate_dir = path("crate")?;
             serde_json::to_value(crate::package::package(&crate::package::Options {
                 crate_dir: &crate_dir,
-                name: args["name"].as_str().map(str::to_string),
-                version: args["version"].as_str().map(str::to_string),
+                name: opt_string(args, "name")?,
+                version: opt_string(args, "version")?,
                 out: opt_path("out"),
                 dry_run: opt_bool(args, "dry_run")?.unwrap_or(false),
-                fallback: args["fallback"].as_str().map(str::to_string),
+                fallback: opt_string(args, "fallback")?,
                 bin: strings("bin"),
-                original: args["original"].as_str().map(str::to_string),
+                original: opt_string(args, "original")?,
             })?)?
         }
         "go" => {
@@ -1301,6 +1301,20 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert_eq!(err, "`ready` must be a string, not 42");
+    }
+
+    #[test]
+    fn package_refuses_a_string_argument_that_is_not_a_string() {
+        // Issue #683: `"version": 2` was dropped, so the package was built with the crate's own
+        // version and the caller never learned `version` had been ignored.
+        let err = |key: &str| {
+            let mut args = json!({ "crate": "rust/math-rs", "dry_run": true });
+            args[key] = json!(2);
+            call("package", &args).unwrap_err().to_string()
+        };
+        for key in ["name", "version", "fallback", "original"] {
+            assert_eq!(err(key), format!("`{key}` must be a string, not 2"));
+        }
     }
 
     #[test]
