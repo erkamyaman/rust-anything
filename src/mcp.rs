@@ -223,6 +223,14 @@ struct FailureKind {
 
 /// Checked in order; the first match wins, `failed` otherwise.
 const FAILURES: &[FailureKind] = &[
+    // An argument of the wrong type (`opt_string`, `req_string`, `opt_u64`): checked first, since the
+    // value it quotes may contain text another rule matches, such as "still running after".
+    FailureKind {
+        code: "invalid_arguments",
+        retryable: false,
+        matches: |t| t.starts_with('`') && t.contains("` must be ") && !t.contains('\n'),
+        next: None,
+    },
     FailureKind {
         code: "timed_out",
         retryable: true,
@@ -1310,6 +1318,23 @@ mod tests {
     }
 
     #[test]
+    fn a_wrong_type_argument_is_classified_as_invalid_arguments_through_handle() {
+        // The type error keeps the machine-readable code a missing argument has, and a quoted value that
+        // reads like a timeout is not reported as retryable.
+        for arguments in [
+            json!({ "root": ".", "unit": 5, "kind": "napi" }),
+            json!({ "root": ".", "unit": { "x": "still running after 5s" }, "kind": "napi" }),
+        ] {
+            let response = handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": { "name": "bridge", "arguments": arguments } }))
+            .unwrap();
+            let s = &response["result"]["structuredContent"];
+            assert_eq!(s["code"], "invalid_arguments", "{s}");
+            assert_eq!(s["retryable"], false, "{s}");
+        }
+    }
+
+    #[test]
     fn bridge_and_app_wire_refuse_a_unit_or_name_that_is_not_a_string() {
         // Issue #684: `"unit": 5` used to read as a missing unit, and `"name": 7` was dropped, so the
         // bridge was written under the default name. Both are refused before anything is written.
@@ -1662,6 +1687,24 @@ mod tests {
                 None,
             ),
             ("missing `crate`", "invalid_arguments", false, None),
+            (
+                "`unit` must be a string, not 5",
+                "invalid_arguments",
+                false,
+                None,
+            ),
+            (
+                "`ready` must be a string, not {\"x\":\"still running after 5s\"}",
+                "invalid_arguments",
+                false,
+                None,
+            ),
+            (
+                "`port` must be a non-negative integer, not \"8080\"",
+                "invalid_arguments",
+                false,
+                None,
+            ),
             ("something else broke", "failed", false, None),
         ];
         for (text, code, retryable, next) in cases {
