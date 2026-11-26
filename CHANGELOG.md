@@ -4,7 +4,16 @@
 
 - The MCP tools refuse an optional path (`out`, `inputs`, `module`, `resolve_from`, `ndk`,
   `jni_libs`) that is not a string with `` `out` must be a string, not 5 ``, instead of dropping
-  it and using the default. A missing or `null` path still means not given (#686).
+  it and using the default. A missing or `null` path still means not given
+  (#686, #689 by @susheelg1197).
+- Every MCP tool's required path (`root`, `repo` or `crate`) that is there but not a string is
+  refused with `` `root` must be a string, not 5 `` instead of `` missing `root` ``. An absent or
+  `null` path still says `` missing `root` `` (#685, #688 by @susheelg1197).
+- The MCP `bridge` and `app_wire` tools refuse a `unit` that is not a string with
+  `` `unit` must be a string, not 5 `` instead of `` missing `unit` ``, and `bridge` refuses a `name`
+  that is not a string instead of writing the bridge under the default name. A missing or `null`
+  `unit` still says `` missing `unit` ``. A wrong-type argument to any MCP tool now gets the
+  `invalid_arguments` code, not retryable, instead of `failed` (#684, #687 by @susheelg1197).
 - `docs/whole-apps.md` says six of the seven `app` commands are MCP tools and that `app shadow` is
   CLI only, instead of "All six are MCP tools too" (#672, #674 by @XiaoBinGan).
 - The MCP `app_record` tool refuses a `ready`, `name`, `db_reset` or `db_dump` that is neither a

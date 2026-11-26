@@ -223,6 +223,14 @@ struct FailureKind {
 
 /// Checked in order; the first match wins, `failed` otherwise.
 const FAILURES: &[FailureKind] = &[
+    // An argument of the wrong type (`opt_string`, `req_string`, `opt_u64`): checked first, since the
+    // value it quotes may contain text another rule matches, such as "still running after".
+    FailureKind {
+        code: "invalid_arguments",
+        retryable: false,
+        matches: |t| t.starts_with('`') && t.contains("` must be ") && !t.contains('\n'),
+        next: None,
+    },
     FailureKind {
         code: "timed_out",
         retryable: true,
@@ -762,6 +770,12 @@ fn opt_string(args: &Value, key: &str) -> Result<Option<String>> {
     }
 }
 
+/// A string argument the tool cannot run without: absent or `null` is "missing", any other type is
+/// refused by name, so `"unit": 5` is not reported as if `unit` had not been sent.
+fn req_string(args: &Value, key: &str) -> Result<String> {
+    opt_string(args, key)?.with_context(|| format!("missing `{key}`"))
+}
+
 fn opt_u64(args: &Value, key: &str) -> Result<Option<u64>> {
     match args.get(key) {
         None | Some(Value::Null) => Ok(None),
@@ -814,8 +828,7 @@ fn opt_bool(args: &Value, key: &str) -> Result<Option<bool>> {
 
 fn call(name: &str, args: &Value) -> Result<Value> {
     let path = |key: &str| -> Result<PathBuf> {
-        args[key]
-            .as_str()
+        opt_string(args, key)?
             .map(PathBuf::from)
             .with_context(|| format!("missing `{key}`"))
     };
@@ -866,10 +879,10 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             let force = opt_bool(args, "force")?.unwrap_or(false);
             serde_json::to_value(bridge::bridge(&bridge::Options {
                 root: &root,
-                unit: args["unit"].as_str().context("missing `unit`")?,
+                unit: &req_string(args, "unit")?,
                 kind,
                 out: opt_path("out")?,
-                name: args["name"].as_str().map(str::to_string),
+                name: opt_string(args, "name")?,
                 force,
                 keep: strings("keep"),
                 lang: None,
@@ -1252,7 +1265,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             let repo = path("repo")?;
             serde_json::to_value(front_door::wire(&front_door::WireOptions {
                 repo: &repo,
-                unit: args["unit"].as_str().context("missing `unit`")?,
+                unit: &req_string(args, "unit")?,
                 commands: &strings("commands"),
                 routes: &strings("routes"),
                 skip_gate: opt_bool(args, "skip_gate")?.unwrap_or(false),
@@ -1324,6 +1337,79 @@ mod tests {
         .unwrap_err()
         .to_string();
         assert_eq!(err, "`module` must be a string, not 5");
+    }
+
+    #[test]
+    fn a_required_path_that_is_not_a_string_is_named_not_reported_missing() {
+        // Issue #685: `"root": 5` was reported as `missing `root``, which sends the caller looking
+        // for a typo in the key instead of the value.
+        let err = |args: Value| call("analyze", &args).unwrap_err().to_string();
+        assert_eq!(err(json!({ "root": 5 })), "`root` must be a string, not 5");
+        assert_eq!(err(json!({})), "missing `root`");
+        assert_eq!(err(json!({ "root": null })), "missing `root`");
+        let err = |tool: &str, args: Value| call(tool, &args).unwrap_err().to_string();
+        assert_eq!(
+            err("app_lift", json!({ "repo": true })),
+            "`repo` must be a string, not true"
+        );
+        assert_eq!(
+            err("package", json!({ "crate": ["x"] })),
+            "`crate` must be a string, not [\"x\"]"
+        );
+    }
+
+    #[test]
+    fn a_wrong_type_argument_is_classified_as_invalid_arguments_through_handle() {
+        // The type error keeps the machine-readable code a missing argument has, and a quoted value that
+        // reads like a timeout is not reported as retryable.
+        for arguments in [
+            json!({ "root": ".", "unit": 5, "kind": "napi" }),
+            json!({ "root": ".", "unit": { "x": "still running after 5s" }, "kind": "napi" }),
+        ] {
+            let response = handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": { "name": "bridge", "arguments": arguments } }))
+            .unwrap();
+            let s = &response["result"]["structuredContent"];
+            assert_eq!(s["code"], "invalid_arguments", "{s}");
+            assert_eq!(s["retryable"], false, "{s}");
+        }
+    }
+
+    #[test]
+    fn bridge_and_app_wire_refuse_a_unit_or_name_that_is_not_a_string() {
+        // Issue #684: `"unit": 5` used to read as a missing unit, and `"name": 7` was dropped, so the
+        // bridge was written under the default name. Both are refused before anything is written.
+        let dir =
+            std::env::temp_dir().join(format!("rust-anything-mcp-684-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let root = dir.to_str().unwrap();
+        let err = |tool: &str, args: Value| call(tool, &args).unwrap_err().to_string();
+        assert_eq!(
+            err("bridge", json!({ "root": root, "unit": 5, "kind": "napi" })),
+            "`unit` must be a string, not 5"
+        );
+        assert_eq!(
+            err("app_wire", json!({ "repo": root, "unit": 5 })),
+            "`unit` must be a string, not 5"
+        );
+        assert_eq!(
+            err(
+                "bridge",
+                json!({ "root": root, "unit": "src/math.ts", "kind": "napi", "name": 7 })
+            ),
+            "`name` must be a string, not 7"
+        );
+        assert_eq!(
+            err("bridge", json!({ "root": root, "kind": "napi" })),
+            "missing `unit`"
+        );
+        assert_eq!(
+            err("app_wire", json!({ "repo": root, "unit": null })),
+            "missing `unit`"
+        );
+        let written = std::fs::read_dir(&dir).unwrap().count();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(written, 0);
     }
 
     #[test]
@@ -1642,6 +1728,24 @@ mod tests {
                 None,
             ),
             ("missing `crate`", "invalid_arguments", false, None),
+            (
+                "`unit` must be a string, not 5",
+                "invalid_arguments",
+                false,
+                None,
+            ),
+            (
+                "`ready` must be a string, not {\"x\":\"still running after 5s\"}",
+                "invalid_arguments",
+                false,
+                None,
+            ),
+            (
+                "`port` must be a non-negative integer, not \"8080\"",
+                "invalid_arguments",
+                false,
+                None,
+            ),
             ("something else broke", "failed", false, None),
         ];
         for (text, code, retryable, next) in cases {
