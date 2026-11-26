@@ -121,7 +121,8 @@ fn check_ready_request(request: &str) -> Result<()> {
     ensure!(
         !method.is_empty()
             && method.bytes().all(|b| b.is_ascii_uppercase())
-            && path.starts_with('/'),
+            && path.starts_with('/')
+            && !path.contains(char::is_whitespace),
         "--ready takes `METHOD /path`, e.g. `GET /health`, not `{request}`"
     );
     Ok(())
@@ -2281,6 +2282,8 @@ mod tests {
             "GET health",
             "GET  /health",
             " /health",
+            "GET /health ",
+            "GET /health extra",
             "GÉT /h",
         ] {
             let err = check_ready_request(bad).unwrap_err().to_string();
@@ -2289,6 +2292,28 @@ mod tests {
                 format!("--ready takes `METHOD /path`, e.g. `GET /health`, not `{bad}`")
             );
         }
+        let opts = |ready_request| RecordOptions {
+            repo: Path::new("."),
+            run: &[],
+            inputs: None,
+            normalize: &[],
+            name: None,
+            traps: false,
+            timeout_secs: None,
+            http: None,
+            server_args: None,
+            fresh: None,
+            pace_ms: None,
+            port: None,
+            float_tolerance: None,
+            float_files: &[],
+            effects: None,
+            ready_secs: None,
+            ready_request: Some(ready_request),
+        };
+        assert!(merge_config(None, &opts("get /health")).is_err());
+        let good = merge_config(None, &opts("GET /health")).unwrap().unwrap();
+        assert_eq!(good.ready_request.as_deref(), Some("GET /health"));
     }
 
     #[test]
