@@ -124,6 +124,26 @@ HTTPServer(("127.0.0.1", int(os.environ["PORT"])), H).serve_forever()
 "#;
 
 #[cfg(unix)]
+const NEVER_READY: &str = r#"import os
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "server.pid"), "w").write(str(os.getpid()))
+
+
+class H(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(503)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def log_message(self, *args):
+        pass
+
+
+HTTPServer(("127.0.0.1", int(os.environ["PORT"])), H).serve_forever()
+"#;
+
+#[cfg(unix)]
 fn alive(pid: &str) -> bool {
     // `kill -0` says the pid exists, which a zombie also does until its parent reaps it. Ask `ps`
     // for the state and count only a process that can still run.
@@ -206,6 +226,67 @@ fn a_server_started_for_replay_is_gone_after_it() {
     assert!(
         !running,
         "the server (pid {started}) is still running after replay"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_server_that_never_answers_ready_is_gone_after_record_fails() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = std::env::temp_dir().join(format!(
+        "rust-anything-http-ready-failure-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("server.py"), NEVER_READY).unwrap();
+    std::fs::write(
+        repo.join("inputs.jsonl"),
+        "{\"name\":\"ok\",\"path\":\"/\"}\n",
+    )
+    .unwrap();
+    let result = app::record(&RecordOptions {
+        repo: &repo,
+        run: &[python.to_string(), "server.py".to_string()],
+        inputs: Some(&repo.join("inputs.jsonl")),
+        normalize: &[],
+        name: None,
+        traps: false,
+        timeout_secs: None,
+        http: Some(true),
+        server_args: None,
+        fresh: None,
+        pace_ms: None,
+        port: None,
+        float_tolerance: None,
+        float_files: &[],
+        effects: None,
+        ready_secs: Some(1),
+        ready_request: Some("GET /health"),
+    });
+    let pid = std::fs::read_to_string(repo.join("server.pid"))
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    let running = !pid.is_empty() && alive(&pid);
+    if running {
+        let _ = std::process::Command::new("kill")
+            .args(["-9", &pid])
+            .status();
+    }
+    let _ = std::fs::remove_dir_all(&repo);
+    let error = result.expect_err("a server that never answers 2xx must fail readiness");
+    let error = format!("{error:#}");
+    assert!(
+        error.contains("did not answer 2xx") && error.contains("status 503"),
+        "unexpected readiness error: {error}"
+    );
+    assert!(!pid.is_empty(), "the fixture should have written its pid");
+    assert!(
+        !running,
+        "the server (pid {pid}) is still running after failed record"
     );
 }
 
