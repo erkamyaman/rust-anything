@@ -891,6 +891,9 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             let pin_clock = opt_bool(args, "pin_clock")?;
             let count = opt_usize(args, "count")?.unwrap_or(200);
             let mut inputs = opt_path("inputs")?;
+            // Read before the test capture below, which runs the test command and writes files.
+            let module = opt_path("module")?;
+            let resolve_from = opt_path("resolve_from")?;
             let test_command = strings("test_command");
             let captured = if test_command.is_empty() {
                 None
@@ -907,8 +910,6 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                     "tests_passed": c.tests_passed,
                 }))
             };
-            let module = opt_path("module")?;
-            let resolve_from = opt_path("resolve_from")?;
             if let Some(t) = float_tolerance {
                 let mut manifest = bridge::Manifest::load(&crate_dir)?;
                 manifest.float_tolerance = (t > 0.0).then_some(t);
@@ -1315,6 +1316,14 @@ mod tests {
         .unwrap_err()
         .to_string();
         assert_eq!(err, "`out` must be a string, not 5");
+        // `record` refuses a bad `module` before its test command runs: this one could never start.
+        let err = call(
+            "record",
+            &json!({ "crate": "rust/math-rs", "test_command": ["/nonexistent/test-runner"], "module": 5 }),
+        )
+        .unwrap_err()
+        .to_string();
+        assert_eq!(err, "`module` must be a string, not 5");
     }
 
     #[test]
