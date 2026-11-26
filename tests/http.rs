@@ -429,6 +429,87 @@ fn a_ready_request_waits_until_the_routes_answer() {
     );
 }
 
+/// Answers 503 to every request and writes its pid next to itself, so a test can check it is gone.
+const NEVER_READY: &str = r#"import os
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "server.pid"), "w").write(str(os.getpid()))
+
+
+class H(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(503)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def log_message(self, *args):
+        pass
+
+
+HTTPServer(("127.0.0.1", int(os.environ["PORT"])), H).serve_forever()
+"#;
+
+#[cfg(unix)]
+#[test]
+fn a_ready_request_that_never_answers_2xx_fails_and_stops_the_server() {
+    // The failure path of `--ready`: `Server::start` returns the error from `wait_ready` and must
+    // stop the server's process tree, or a failed record leaves a server holding the port.
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = std::env::temp_dir().join(format!(
+        "rust-anything-http-never-ready-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&repo);
+    std::fs::create_dir_all(&repo).unwrap();
+    std::fs::write(repo.join("server.py"), NEVER_READY).unwrap();
+    std::fs::write(
+        repo.join("inputs.jsonl"),
+        "{\"name\":\"ok\",\"path\":\"/\"}\n",
+    )
+    .unwrap();
+    let err = app::record(&RecordOptions {
+        repo: &repo,
+        run: &[python.to_string(), "server.py".to_string()],
+        inputs: Some(&repo.join("inputs.jsonl")),
+        normalize: &[],
+        name: None,
+        traps: false,
+        timeout_secs: None,
+        http: Some(true),
+        server_args: None,
+        fresh: None,
+        pace_ms: None,
+        port: None,
+        float_tolerance: None,
+        float_files: &[],
+        ready_secs: Some(1),
+        ready_request: Some("GET /health"),
+        effects: None,
+    })
+    .expect_err("a server that never answers 2xx must fail the recording");
+    let pid = std::fs::read_to_string(repo.join("server.pid"))
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    let running = !pid.is_empty() && alive(&pid);
+    if running {
+        let _ = std::process::Command::new("kill")
+            .args(["-9", &pid])
+            .status();
+    }
+    let _ = std::fs::remove_dir_all(&repo);
+    let message = format!("{err:#}");
+    assert!(message.contains("did not answer 2xx"), "{message}");
+    assert!(message.contains("status 503"), "{message}");
+    assert!(!pid.is_empty(), "the server never started");
+    assert!(
+        !running,
+        "the server (pid {pid}) is still running after the failed record"
+    );
+}
+
 #[test]
 fn a_port_that_is_taken_is_named_before_the_build_runs() {
     // Recording on a fixed port must say the port is busy, not spend the readiness timeout on it and
