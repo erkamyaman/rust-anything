@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The MCP `app_replay` tool refuses a `build` or `case`, and `app_drift` a `build`, that is not a
+  string with `` `case` must be a string, not 5 ``, instead of dropping it and replaying every case
+  or the original. A missing or `null` value still means not given (#682).
 - `docs/whole-apps.md` says six of the seven `app` commands are MCP tools and that `app shadow` is
   CLI only, instead of "All six are MCP tools too" (#672, #674 by @XiaoBinGan).
 - The MCP `app_record` tool refuses a `ready`, `name`, `db_reset` or `db_dump` that is neither a

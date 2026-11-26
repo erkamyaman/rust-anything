@@ -1225,12 +1225,14 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             let repo = path("repo")?;
             let timeout_secs = opt_timeout()?;
             let redact = opt_bool(args, "redact")?.unwrap_or(false);
+            let build = opt_string(args, "build")?;
+            let case = opt_string(args, "case")?;
             let opts = app::ReplayOptions {
                 repo: &repo,
-                build: args["build"].as_str(),
+                build: build.as_deref(),
                 timeout_secs,
                 port: opt_u16(args, "port")?,
-                case: args["case"].as_str(),
+                case: case.as_deref(),
             };
             serde_json::to_value(if redact {
                 app::replay_redacted(&opts)?
@@ -1263,9 +1265,10 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         "app_drift" => {
             let repo = path("repo")?;
             let timeout_secs = opt_timeout()?;
+            let build = opt_string(args, "build")?;
             serde_json::to_value(crate::drift::drift(&crate::drift::DriftOptions {
                 repo: &repo,
-                build: args["build"].as_str(),
+                build: build.as_deref(),
                 timeout_secs,
             })?)?
         }
@@ -1301,6 +1304,25 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert_eq!(err, "`ready` must be a string, not 42");
+    }
+
+    #[test]
+    fn app_replay_and_app_drift_refuse_a_build_or_case_that_is_not_a_string() {
+        // Issue #682: `"case": 5` was dropped, so every case was replayed, and `"build": 5` replayed
+        // the original instead of a build. Both are refused before anything runs.
+        let err = |tool: &str, args: Value| call(tool, &args).unwrap_err().to_string();
+        assert_eq!(
+            err("app_replay", json!({ "repo": ".", "case": 5 })),
+            "`case` must be a string, not 5"
+        );
+        assert_eq!(
+            err("app_replay", json!({ "repo": ".", "build": 5 })),
+            "`build` must be a string, not 5"
+        );
+        assert_eq!(
+            err("app_drift", json!({ "repo": ".", "build": 5 })),
+            "`build` must be a string, not 5"
+        );
     }
 
     #[test]
