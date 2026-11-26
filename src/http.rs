@@ -107,9 +107,24 @@ pub(crate) fn merge_config(
         config.ready_secs = (secs > 0).then_some(secs);
     }
     if let Some(request) = opts.ready_request {
+        check_ready_request(request)?;
         config.ready_request = Some(request.to_string());
     }
     Ok(Some(config))
+}
+
+/// `--ready` is `/path` (a `GET`) or `METHOD /path`. A value a server can never answer 2xx to,
+/// such as `health` or `get /health`, is refused here, before a server is started, instead of
+/// failing only after the whole `--ready-timeout`.
+fn check_ready_request(request: &str) -> Result<()> {
+    let (method, path) = request.split_once(' ').unwrap_or(("GET", request));
+    ensure!(
+        !method.is_empty()
+            && method.bytes().all(|b| b.is_ascii_uppercase())
+            && path.starts_with('/'),
+        "--ready takes `METHOD /path`, e.g. `GET /health`, not `{request}`"
+    );
+    Ok(())
 }
 
 pub(crate) const FILES_DIR: &str = "files";
@@ -2254,6 +2269,27 @@ fn decode_base64_strict(input: &str) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ready_request_needs_an_uppercase_method_and_a_path_from_root() {
+        for good in ["/health", "GET /health", "HEAD /", "POST /api/ready?x=1"] {
+            assert!(check_ready_request(good).is_ok(), "{good}");
+        }
+        for bad in [
+            "health",
+            "get /health",
+            "GET health",
+            "GET  /health",
+            " /health",
+            "GÉT /h",
+        ] {
+            let err = check_ready_request(bad).unwrap_err().to_string();
+            assert_eq!(
+                err,
+                format!("--ready takes `METHOD /path`, e.g. `GET /health`, not `{bad}`")
+            );
+        }
+    }
 
     #[test]
     fn a_ready_timeout_is_saved_kept_and_reset() {
