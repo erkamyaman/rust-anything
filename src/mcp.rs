@@ -819,7 +819,8 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             .map(PathBuf::from)
             .with_context(|| format!("missing `{key}`"))
     };
-    let opt_path = |key: &str| args[key].as_str().map(PathBuf::from);
+    let opt_path =
+        |key: &str| -> Result<Option<PathBuf>> { Ok(opt_string(args, key)?.map(PathBuf::from)) };
     let strings = |key: &str| -> Vec<String> {
         args[key]
             .as_array()
@@ -867,7 +868,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                 root: &root,
                 unit: args["unit"].as_str().context("missing `unit`")?,
                 kind,
-                out: opt_path("out"),
+                out: opt_path("out")?,
                 name: args["name"].as_str().map(str::to_string),
                 force,
                 keep: strings("keep"),
@@ -889,7 +890,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             let ignore_key_order = opt_bool(args, "ignore_key_order")?;
             let pin_clock = opt_bool(args, "pin_clock")?;
             let count = opt_usize(args, "count")?.unwrap_or(200);
-            let mut inputs = opt_path("inputs");
+            let mut inputs = opt_path("inputs")?;
             let test_command = strings("test_command");
             let captured = if test_command.is_empty() {
                 None
@@ -906,8 +907,8 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                     "tests_passed": c.tests_passed,
                 }))
             };
-            let module = opt_path("module");
-            let resolve_from = opt_path("resolve_from");
+            let module = opt_path("module")?;
+            let resolve_from = opt_path("resolve_from")?;
             if let Some(t) = float_tolerance {
                 let mut manifest = bridge::Manifest::load(&crate_dir)?;
                 manifest.float_tolerance = (t > 0.0).then_some(t);
@@ -983,8 +984,8 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                         &crate::android::Options {
                             abis: strings("abi"),
                             api,
-                            ndk: opt_path("ndk"),
-                            out: opt_path("jni_libs"),
+                            ndk: opt_path("ndk")?,
+                            out: opt_path("jni_libs")?,
                         },
                     )?)?
                 }
@@ -1002,7 +1003,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         }
         "diff" => {
             let crate_dir = path("crate")?;
-            let module = opt_path("module");
+            let module = opt_path("module")?;
             let opts = harness::DiffOptions {
                 crate_dir: &crate_dir,
                 module: module.as_deref(),
@@ -1031,7 +1032,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         }
         "bench" => {
             let crate_dir = path("crate")?;
-            let resolve_from = opt_path("resolve_from");
+            let resolve_from = opt_path("resolve_from")?;
             let rows = harness::bench(&harness::BenchOptions {
                 crate_dir: &crate_dir,
                 min_ms: opt_u64(args, "min_ms")?.unwrap_or(200),
@@ -1046,7 +1047,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         }
         "fuzz" => {
             let crate_dir = path("crate")?;
-            let resolve_from = opt_path("resolve_from");
+            let resolve_from = opt_path("resolve_from")?;
             let keep = keep_arg(args)?;
             let time = match opt_f64(args, "time")? {
                 Some(0.0) => Some(std::time::Duration::ZERO),
@@ -1069,7 +1070,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             })?)?
         }
         "shadow" => {
-            let out = opt_path("out");
+            let out = opt_path("out")?;
             serde_json::to_value(shadow::shadow(&path("crate")?, out.as_deref())?)?
         }
         "map" => {
@@ -1084,7 +1085,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                 crate_dir: &crate_dir,
                 name: args["name"].as_str().map(str::to_string),
                 version: args["version"].as_str().map(str::to_string),
-                out: opt_path("out"),
+                out: opt_path("out")?,
                 dry_run: opt_bool(args, "dry_run")?.unwrap_or(false),
                 fallback: args["fallback"].as_str().map(str::to_string),
                 bin: strings("bin"),
@@ -1158,13 +1159,13 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         )?)?)?)?,
         "report" => {
             let crate_dir = std::path::absolute(path("crate")?)?;
-            let out = opt_path("out").map(std::path::absolute).transpose()?;
+            let out = opt_path("out")?.map(std::path::absolute).transpose()?;
             serde_json::to_value(crate::card::report(&crate::card::Options {
                 crate_dir: &crate_dir,
                 out: out.as_deref(),
                 min_ms: opt_u64(args, "min_ms")?.unwrap_or(200),
                 node_args: &strings("node_args"),
-                resolve_from: opt_path("resolve_from").as_deref(),
+                resolve_from: opt_path("resolve_from")?.as_deref(),
             })?)?
         }
         "gate" => serde_json::to_value(gate::gate(
@@ -1174,7 +1175,7 @@ fn call(name: &str, args: &Value) -> Result<Value> {
         "app_record" => {
             let repo = path("repo")?;
             let timeout_secs = opt_timeout()?;
-            let inputs = opt_path("inputs");
+            let inputs = opt_path("inputs")?;
             let effect_response = match args.get("effect_response") {
                 None | Some(Value::Null) => Vec::new(),
                 Some(Value::Array(items)) => items
@@ -1301,6 +1302,19 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert_eq!(err, "`ready` must be a string, not 42");
+    }
+
+    #[test]
+    fn an_optional_path_that_is_not_a_string_is_refused_not_dropped() {
+        // Issue #686: `"out": 5` was dropped, so `package` wrote to the default `package/` directory
+        // and the caller never learned `out` had been ignored.
+        let err = call(
+            "package",
+            &json!({ "crate": "rust/math-rs", "dry_run": true, "out": 5 }),
+        )
+        .unwrap_err()
+        .to_string();
+        assert_eq!(err, "`out` must be a string, not 5");
     }
 
     #[test]
