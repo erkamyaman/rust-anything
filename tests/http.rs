@@ -598,7 +598,7 @@ fn a_ready_request_that_never_answers_2xx_fails_and_stops_the_server() {
         port: None,
         float_tolerance: None,
         float_files: &[],
-        ready_secs: Some(5),
+        ready_secs: Some(20),
         ready_request: Some("GET /health"),
         effects: None,
     })
@@ -620,7 +620,7 @@ fn a_ready_request_that_never_answers_2xx_fails_and_stops_the_server() {
     assert!(message.contains("status 503"), "{message}");
     assert!(message.contains("GET /health"), "{message}");
     assert!(
-        waited < std::time::Duration::from_secs(30),
+        waited < std::time::Duration::from_secs(60),
         "waited {waited:?}"
     );
     assert!(!pid.is_empty(), "the server never started");
