@@ -17,8 +17,8 @@
     "closeMenu": "Menyuni yopish",
     "menu": "Menyu",
     "language": "Til",
-    "home": "rust-anything bosh sahifasi",
-    "github": "GitHub'dagi rust-anything",
+    "home": "Rust Anything bosh sahifasi",
+    "github": "GitHub'dagi Rust Anything",
     "onThisPage": "Bu sahifada",
     "editPage": "Bu sahifani GitHub'da tahrirlash",
     "previous": "Oldingi",
@@ -104,7 +104,7 @@
   "hero": {
     "title1": "Ilovangizni Rust'da qayta yozing.",
     "title2": "U xuddi shunday ishlashini isbotlang.",
-    "sub": "rust-anything kodingiz nima qilishini yozib oladi, so'ng har bir yozib olingan holatni Rust portiga qarshi qayta ijro etadi. Rust kodini agentingiz yozadi. Natijalar mos kelmaguncha hech narsa chiqarilmaydi.",
+    "sub": "Rust Anything kodingiz nima qilishini yozib oladi, so'ng har bir yozib olingan holatni Rust portiga qarshi qayta ijro etadi. Rust kodini agentingiz yozadi. Natijalar mos kelmaguncha hech narsa chiqarilmaydi.",
     "cta": "Tezkor boshlashni o'qing",
     "source": "GitHub'dagi manba kodi",
     "sourceLanguage": "Manba tili",
@@ -138,10 +138,10 @@
     "installTitle": "O'rnatish",
     "installDesc": "CLI'ni o'rnating, so'ng MCP serverni va workflow skill'ini Claude Code, Codex, Cursor va Gemini CLI'da ro'yxatdan o'tkazing.",
     "installNote": "macOS, Linux va Windows uchun tayyor binary fayllar har bir [GitHub release]({releases}) sahifasida.",
-    "agentPrompt": "rust-anything'ni o'rnat: `cargo install rust-anything`, so'ng `rust-anything setup` ni ishga tushir.",
+    "agentPrompt": "Rust Anything'ni o'rnat: `cargo install rust-anything`, so'ng `rust-anything setup` ni ishga tushir.",
     "agentRestart": "Seni qachon qayta ishga tushirishim kerakligini ayt.",
     "loopTitle": "Port qanday bajariladi",
-    "loopDesc": "Asl nusxa haqiqat manbai bo'lib qoladi. rust-anything kodni tarjima qilmaydi: u agent taxmin qila olmaydigan narsalarni va port qachon tayyor ekanini aytadigan gate'ni beradi.",
+    "loopDesc": "Asl nusxa haqiqat manbai bo'lib qoladi. Rust Anything kodni tarjima qilmaydi: u agent taxmin qila olmaydigan narsalarni va port qachon tayyor ekanini aytadigan gate'ni beradi.",
     "steps": [
       {
         "title": "Yozib olish",
@@ -270,8 +270,11 @@
       "java": "JNI va binary wire. JDK fasadi: 4,492/4,492"
     },
     "sponsorsTitle": "Homiylar",
-    "sponsorsDesc": "rust-anything bepul va ochiq manbali. Agar u ishingizga yordam bersa, iltimos, unga homiylik qilishni o'ylab ko'ring. Qo'llab-quvvatlashingiz ishlab chiqishni davom ettirishga yordam beradi.",
+    "sponsorsDesc": "Rust Anything bepul va ochiq manbali. Agar u ishingizga yordam bersa, iltimos, unga homiylik qilishni o'ylab ko'ring. Qo'llab-quvvatlashingiz ishlab chiqishni davom ettirishga yordam beradi.",
     "companySponsor": "Kompaniya homiysi",
+    "domainSponsor": "Domen homiysi",
+    "peopleSponsors": "Shaxsiy homiylar",
+    "buyCoffee": "Menga qahva oling",
     "becomeSponsor": "Homiy bo'lish"
   }
 }

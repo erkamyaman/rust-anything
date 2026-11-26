@@ -17,8 +17,8 @@
     "closeMenu": "Fermer le menu",
     "menu": "Menu",
     "language": "Langue",
-    "home": "Accueil de rust-anything",
-    "github": "rust-anything sur GitHub",
+    "home": "Accueil de Rust Anything",
+    "github": "Rust Anything sur GitHub",
     "onThisPage": "Sur cette page",
     "editPage": "Modifier cette page sur GitHub",
     "previous": "Précédent",
@@ -104,7 +104,7 @@
   "hero": {
     "title1": "Réécrivez votre application en Rust.",
     "title2": "Prouvez qu'elle se comporte pareil.",
-    "sub": "rust-anything enregistre ce que fait votre code, puis rejoue chaque cas enregistré contre le portage Rust. Votre agent écrit le Rust. Rien n'est livré tant que les sorties ne correspondent pas.",
+    "sub": "Rust Anything enregistre ce que fait votre code, puis rejoue chaque cas enregistré contre le portage Rust. Votre agent écrit le Rust. Rien n'est livré tant que les sorties ne correspondent pas.",
     "cta": "Lire le démarrage rapide",
     "source": "Code source sur GitHub",
     "sourceLanguage": "Langage source",
@@ -138,10 +138,10 @@
     "installTitle": "Installation",
     "installDesc": "Installez la CLI, puis enregistrez le serveur MCP et le skill de workflow auprès de Claude Code, Codex, Cursor et Gemini CLI.",
     "installNote": "Des binaires précompilés pour macOS, Linux et Windows sont disponibles dans chaque [release GitHub]({releases}).",
-    "agentPrompt": "Installe rust-anything : lance `cargo install rust-anything`, puis `rust-anything setup`.",
+    "agentPrompt": "Installe Rust Anything : lance `cargo install rust-anything`, puis `rust-anything setup`.",
     "agentRestart": "Dis-moi quand te redémarrer.",
     "loopTitle": "Comment se fait un portage",
-    "loopDesc": "L'original reste la source de vérité. rust-anything ne traduit pas le code : il fournit ce qu'un agent ne peut pas deviner, et un gate qui dit quand un portage est terminé.",
+    "loopDesc": "L'original reste la source de vérité. Rust Anything ne traduit pas le code : il fournit ce qu'un agent ne peut pas deviner, et un gate qui dit quand un portage est terminé.",
     "steps": [
       {
         "title": "Enregistrer",
@@ -270,8 +270,11 @@
       "java": "JNI et un protocole binaire. Façade JDK : 4,492/4,492"
     },
     "sponsorsTitle": "Sponsors",
-    "sponsorsDesc": "rust-anything est gratuit et open source. S'il vous aide dans votre travail, pensez à le sponsoriser. Votre soutien fait avancer le développement.",
+    "sponsorsDesc": "Rust Anything est gratuit et open source. S'il vous aide dans votre travail, pensez à le sponsoriser. Votre soutien fait avancer le développement.",
     "companySponsor": "Sponsor entreprise",
+    "domainSponsor": "Sponsor du domaine",
+    "peopleSponsors": "Sponsors individuels",
+    "buyCoffee": "Offrez-moi un café",
     "becomeSponsor": "Devenir sponsor"
   }
 }

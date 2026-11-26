@@ -47,8 +47,8 @@ async function avatar(login, size) {
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 const THEMES = {
-  dark: { text: '#9198a1', muted: '#9198a1', ring: '#e0763f', line: '#3d444d' },
-  light: { text: '#1f2328', muted: '#59636e', ring: '#c4521d', line: '#d1d9e0' },
+  dark: { text: '#9198a1', muted: '#9198a1', ring: '#9198a1', line: '#3d444d' },
+  light: { text: '#1f2328', muted: '#59636e', ring: '#59636e', line: '#d1d9e0' },
 }
 
 const FONT = `font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif"`

@@ -5,8 +5,8 @@
   --vmd-font-mono: var(--font-mono);
   --vmd-text: var(--fg);
   --vmd-text-muted: var(--muted);
-  --vmd-link: var(--brand-ink);
-  --vmd-link-hover: var(--brand-ink);
+  --vmd-link: var(--rust);
+  --vmd-link-hover: var(--rust);
   --vmd-border: var(--line);
   --vmd-bg-soft: var(--bg-soft);
   --vmd-line-height: 1.75;
@@ -44,13 +44,13 @@
 }
 
 .void-md a:not(.header-anchor) {
-  color: var(--brand-ink);
+  color: var(--rust);
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--brand-ink) 45%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--rust) 40%, transparent);
   text-underline-offset: 3px;
 }
 .void-md a:not(.header-anchor):hover {
-  text-decoration-color: var(--brand-ink);
+  text-decoration-color: var(--rust);
 }
 .void-md a:not(.header-anchor) code {
   color: inherit;
@@ -84,10 +84,16 @@
 }
 
 .void-md div[class*='language-'] {
-  background: var(--bg-soft) !important;
-  border-radius: 4px;
-  border: 1px solid var(--line) !important;
-  border: 0;
+  background: #111111 !important;
+  border-radius: 16px;
+  border: 1px solid #111111 !important;
+}
+.void-md div[class*='language-'] pre.shiki,
+.void-md div[class*='language-'] pre.shiki span {
+  color: var(--shiki-dark) !important;
+}
+.void-md div[class*='language-'] .copy {
+  color: #c9ccce;
 }
 [data-theme='dark'] .void-md div[class*='language-'] {
   background: var(--bg-soft) !important;
@@ -122,9 +128,9 @@
   font-family: var(--font-mono);
   font-size: 0.75rem;
   line-height: 1.2;
-  color: var(--muted);
-  background: rgb(199 53 0 / 0.09);
-  border-radius: 10px 10px 0 0;
+  color: #c9ccce;
+  background: #1b1b1b;
+  border-radius: 16px 16px 0 0;
 }
 [data-theme='dark'] .void-md .code-filename {
   color: #e5e5e5;
@@ -287,4 +293,108 @@
 }
 .void-md td:first-child code {
   white-space: nowrap;
+}
+
+/* language logos in front of language names in docs tables */
+.void-md td:first-child a[href*="/docs/languages/"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.void-md td:first-child a[href$="/docs/languages/typescript"]::before {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: url(/langs/typescript.svg) center / contain no-repeat;
+}
+.void-md td:first-child a[href$="/docs/languages/python"]::before {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: url(/langs/python.svg) center / contain no-repeat;
+}
+.void-md td:first-child a[href$="/docs/languages/go"]::before {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: url(/langs/go.svg) center / contain no-repeat;
+}
+.void-md td:first-child a[href$="/docs/languages/ruby"]::before {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: url(/langs/ruby.svg) center / contain no-repeat;
+}
+.void-md td:first-child a[href$="/docs/languages/java"]::before {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: url(/langs/java.svg) center / contain no-repeat;
+}
+.void-md td:first-child a[href$="/docs/languages/c"]::before {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: url(/langs/c.svg) center / contain no-repeat;
+}
+.void-md td:first-child a[href$="/docs/languages/php"]::before {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: url(/langs/php.svg) center / contain no-repeat;
+}
+.void-md td:first-child a[href$="/docs/languages/csharp"]::before {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: url(/langs/csharp.svg) center / contain no-repeat;
+}
+.void-md td:first-child a[href$="/docs/languages/kotlin"]::before {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: url(/langs/kotlin.svg) center / contain no-repeat;
+}
+.void-md td:first-child a[href$="/docs/languages/powershell"]::before {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: url(/langs/powershell.svg) center / contain no-repeat;
+}
+.void-md td:first-child > img {
+  display: inline-block;
+  margin: 0;
+  margin-inline-end: 6px;
+  vertical-align: -3px;
+}
+.void-md td:has(> img:first-child) {
+  white-space: nowrap;
+  font-weight: 500;
+}
+.void-md tr:has(> td:first-child > img:first-child) > td {
+  vertical-align: middle;
+}
+.void-md td:has(> img:first-child) {
+  padding-inline-end: 24px !important;
+}
+.void-md td:first-child > img {
+  width: 20px;
+  height: 20px;
+  vertical-align: -5px;
+}
+.void-md tr:has(> td:first-child > img:first-child) > td:not(:first-child) {
+  min-width: 13rem;
+}
+.void-md td:first-child > img + img {
+  margin-inline-start: -2px;
 }

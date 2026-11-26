@@ -17,8 +17,8 @@
     "closeMenu": "Tutup menu",
     "menu": "Menu",
     "language": "Bahasa",
-    "home": "Beranda rust-anything",
-    "github": "rust-anything di GitHub",
+    "home": "Beranda Rust Anything",
+    "github": "Rust Anything di GitHub",
     "onThisPage": "Di halaman ini",
     "editPage": "Edit halaman ini di GitHub",
     "previous": "Sebelumnya",
@@ -54,7 +54,7 @@
       "project": "Proyek"
     },
     "items": {
-      "/docs/introduction/what-is-rust-anything": "Apa itu rust-anything",
+      "/docs/introduction/what-is-rust-anything": "Apa itu Rust Anything",
       "/docs/introduction/quick-start": "Mulai cepat",
       "/docs/introduction/install": "Instalasi",
       "/docs/introduction/agents": "Menyiapkan agen",
@@ -104,7 +104,7 @@
   "hero": {
     "title1": "Tulis ulang aplikasimu dalam Rust.",
     "title2": "Buktikan perilakunya tetap sama.",
-    "sub": "rust-anything merekam apa yang dilakukan kodemu, lalu memutar ulang setiap kasus rekaman terhadap port Rust. Agenmu yang menulis Rust-nya. Tidak ada yang dirilis sebelum keluarannya cocok.",
+    "sub": "Rust Anything merekam apa yang dilakukan kodemu, lalu memutar ulang setiap kasus rekaman terhadap port Rust. Agenmu yang menulis Rust-nya. Tidak ada yang dirilis sebelum keluarannya cocok.",
     "cta": "Baca mulai cepat",
     "source": "Kode sumber di GitHub",
     "sourceLanguage": "Bahasa sumber",
@@ -138,10 +138,10 @@
     "installTitle": "Instal",
     "installDesc": "Instal CLI, lalu daftarkan server MCP dan skill alur kerja ke Claude Code, Codex, Cursor, dan Gemini CLI.",
     "installNote": "Biner siap pakai untuk macOS, Linux, dan Windows tersedia di setiap [rilis GitHub]({releases}).",
-    "agentPrompt": "Instal rust-anything: jalankan `cargo install rust-anything`, lalu `rust-anything setup`.",
+    "agentPrompt": "Instal Rust Anything: jalankan `cargo install rust-anything`, lalu `rust-anything setup`.",
     "agentRestart": "Beri tahu aku kapan harus memulai ulang kamu.",
     "loopTitle": "Bagaimana sebuah port dibuat",
-    "loopDesc": "Aslinya tetap menjadi sumber kebenaran. rust-anything tidak menerjemahkan kode: ia menyediakan apa yang tidak bisa ditebak agen, dan gate yang menunjukkan kapan sebuah port selesai.",
+    "loopDesc": "Aslinya tetap menjadi sumber kebenaran. Rust Anything tidak menerjemahkan kode: ia menyediakan apa yang tidak bisa ditebak agen, dan gate yang menunjukkan kapan sebuah port selesai.",
     "steps": [
       {
         "title": "Rekam",
@@ -270,8 +270,11 @@
       "java": "JNI dan wire biner. Fasad JDK: 4,492/4,492"
     },
     "sponsorsTitle": "Sponsor",
-    "sponsorsDesc": "rust-anything gratis dan sumber terbuka. Jika membantu pekerjaanmu, pertimbangkan untuk menjadi sponsor. Dukunganmu menjaga pengembangan tetap berjalan.",
+    "sponsorsDesc": "Rust Anything gratis dan sumber terbuka. Jika membantu pekerjaanmu, pertimbangkan untuk menjadi sponsor. Dukunganmu menjaga pengembangan tetap berjalan.",
     "companySponsor": "Sponsor perusahaan",
+    "domainSponsor": "Sponsor domain",
+    "peopleSponsors": "Sponsor perorangan",
+    "buyCoffee": "Traktir saya kopi",
     "becomeSponsor": "Jadilah sponsor"
   }
 }

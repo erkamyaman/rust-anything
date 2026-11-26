@@ -1,5 +1,5 @@
 import { defineMiddleware } from 'void'
-import { DESCRIPTION } from '../lib/site.ts'
+import { DESCRIPTION, REPO_URL, SITE_ORIGIN } from '../lib/site.ts'
 import { publicPath } from '../lib/nav.ts'
 import { LOCALES, localeInfo, localeOf, stripLocale, withLocale } from '../lib/locales.ts'
 
@@ -9,23 +9,70 @@ declare module 'void' {
   }
 }
 
-const THEME_BOOTSTRAP = `(function(){
-var mq=matchMedia("(prefers-color-scheme: dark)");
-function read(){try{return localStorage.getItem("theme")}catch(_){return null}}
-function apply(d){document.documentElement.setAttribute("data-theme",d?"dark":"light")}
-function resolve(t){return t==="light"?false:t==="system"?mq.matches:true}
-apply(resolve(read()));
-mq.addEventListener("change",function(){if(read()==="system")apply(mq.matches)});
-})();`
+const THEME_BOOTSTRAP = `document.documentElement.setAttribute("data-theme","light")`
 
 const EXTERNAL_LINKS = `(function(){
 function mark(a){if(a.host&&a.host!==location.host&&/^https?:$/.test(a.protocol)){a.target="_blank";a.rel="noopener noreferrer"}}
 document.addEventListener("click",function(e){var a=e.target&&e.target.closest&&e.target.closest("a[href]");if(a)mark(a)},true);
-document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href]").forEach(mark)});
 })();`
 
 const LOCALE_LINKS = (rest: string) =>
-  LOCALES.map((l) => `<link rel="alternate" hreflang="${l.lang}" href="${withLocale(rest, l.code)}">`).join('')
+  LOCALES.map((l) => `<link rel="alternate" hreflang="${l.lang}" href="${SITE_ORIGIN}${withLocale(rest, l.code)}">`).join('') +
+  `<link rel="alternate" hreflang="x-default" href="${SITE_ORIGIN}${withLocale(rest, 'en')}">`
+
+const jsonLd = (data: unknown) =>
+  `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`
+
+function structuredData(path: string, title: string, description: string): string {
+  const rest = stripLocale(path)
+  const url = `${SITE_ORIGIN}${path}`
+  if (rest === '/' || rest === '') {
+    return jsonLd({
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'SoftwareApplication',
+          name: 'Rust Anything',
+          applicationCategory: 'DeveloperApplication',
+          operatingSystem: 'macOS, Linux, Windows',
+          description,
+          url: SITE_ORIGIN,
+          downloadUrl: 'https://crates.io/crates/rust-anything',
+          softwareHelp: `${SITE_ORIGIN}/docs/introduction/quick-start`,
+          codeRepository: REPO_URL,
+          license: 'https://opensource.org/licenses/MIT',
+          offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+          author: { '@type': 'Person', name: 'Erkam Yaman', url: 'https://github.com/erkamyaman' },
+        },
+        { '@type': 'WebSite', name: 'Rust Anything', url: SITE_ORIGIN },
+      ],
+    })
+  }
+  if (rest.startsWith('/docs/')) {
+    return jsonLd({
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'TechArticle',
+          headline: title,
+          description,
+          url,
+          author: { '@type': 'Person', name: 'Erkam Yaman', url: 'https://github.com/erkamyaman' },
+          publisher: { '@type': 'Organization', name: 'Rust Anything', url: SITE_ORIGIN },
+        },
+        {
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Rust Anything', item: `${SITE_ORIGIN}${withLocale('/', localeOf(path))}` },
+            { '@type': 'ListItem', position: 2, name: 'Docs', item: `${SITE_ORIGIN}${withLocale('/docs/introduction/what-is-rust-anything', localeOf(path))}` },
+            { '@type': 'ListItem', position: 3, name: title, item: url },
+          ],
+        },
+      ],
+    })
+  }
+  return ''
+}
 
 const escapeAttr = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -46,12 +93,19 @@ function ogImageFor(path: string): string {
 export default defineMiddleware(async (c, next) => {
   const raw = c.isRewritten() ? (c.originalUrl()?.pathname ?? c.req.path) : c.req.path
   const path = publicPath(raw)
+  const reqUrl = new URL(c.req.url)
+  if (reqUrl.hostname.startsWith('www.')) {
+    return new Response(null, {
+      status: 301,
+      headers: { Location: `https://${reqUrl.hostname.slice(4)}${path}${reqUrl.search}` },
+    })
+  }
   c.set('shared', { path })
   c.set('headDefaults', {
     script: [{ innerHTML: THEME_BOOTSTRAP }, { innerHTML: EXTERNAL_LINKS }],
     meta: [
-      { property: 'og:image', content: ogImageFor(path) },
-      { name: 'twitter:image', content: ogImageFor(path) },
+      { property: 'og:image', content: `${SITE_ORIGIN}${ogImageFor(path)}` },
+      { name: 'twitter:image', content: `${SITE_ORIGIN}${ogImageFor(path)}` },
     ],
   })
   await next()
@@ -71,8 +125,8 @@ export default defineMiddleware(async (c, next) => {
     return rebuild(html.replace(/<html lang="en"/, `<html lang="${info0.lang}"${'rtl' in info0 && info0.rtl ? ' dir="rtl"' : ''}`))
   const head = html.slice(0, headEnd)
   const title =
-    decode(head.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? '').replace(/\s+·\s+rust-anything\s*$/, '') ||
-    'rust-anything'
+    decode(head.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? '').replace(/\s+·\s+Rust Anything\s*$/, '') ||
+    'Rust Anything'
   const descMatch = head.match(/<meta[^>]*name="description"[^>]*content="([^"]*)"/i)
   const description = descMatch ? decode(descMatch[1]) : DESCRIPTION
   const tags = [
@@ -81,6 +135,10 @@ export default defineMiddleware(async (c, next) => {
     `<meta property="og:description" content="${escapeAttr(description)}">`,
     `<meta name="twitter:title" content="${escapeAttr(title)}">`,
     `<meta name="twitter:description" content="${escapeAttr(description)}">`,
+    `<meta property="og:url" content="${SITE_ORIGIN}${path}">`,
+    `<link rel="canonical" href="${SITE_ORIGIN}${path}">`,
+    `<link rel="alternate" type="text/plain" title="llms.txt" href="${SITE_ORIGIN}/llms.txt">`,
+    structuredData(path, title, description),
   ].join('')
   const info = localeInfo(localeOf(path))
   const htmlOpen = `<html lang="${info.lang}"${'rtl' in info && info.rtl ? ' dir="rtl"' : ''}`

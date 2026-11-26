@@ -17,8 +17,8 @@
     "closeMenu": "Cerrar menú",
     "menu": "Menú",
     "language": "Idioma",
-    "home": "Inicio de rust-anything",
-    "github": "rust-anything en GitHub",
+    "home": "Inicio de Rust Anything",
+    "github": "Rust Anything en GitHub",
     "onThisPage": "En esta página",
     "editPage": "Editar esta página en GitHub",
     "previous": "Anterior",
@@ -54,7 +54,7 @@
       "project": "Proyecto"
     },
     "items": {
-      "/docs/introduction/what-is-rust-anything": "Qué es rust-anything",
+      "/docs/introduction/what-is-rust-anything": "Qué es Rust Anything",
       "/docs/introduction/quick-start": "Inicio rápido",
       "/docs/introduction/install": "Instalación",
       "/docs/introduction/agents": "Configurar tu agente",
@@ -104,7 +104,7 @@
   "hero": {
     "title1": "Reescribe tu aplicación en Rust.",
     "title2": "Demuestra que se comporta igual.",
-    "sub": "rust-anything registra lo que hace tu código y luego reproduce cada caso registrado contra el porte en Rust. Tu agente escribe el Rust. Nada se publica hasta que las salidas coinciden.",
+    "sub": "Rust Anything registra lo que hace tu código y luego reproduce cada caso registrado contra el porte en Rust. Tu agente escribe el Rust. Nada se publica hasta que las salidas coinciden.",
     "cta": "Leer el inicio rápido",
     "source": "Código fuente en GitHub",
     "sourceLanguage": "Lenguaje de origen",
@@ -138,10 +138,10 @@
     "installTitle": "Instalación",
     "installDesc": "Instala la CLI y luego registra el servidor MCP y la skill de flujo de trabajo en Claude Code, Codex, Cursor y Gemini CLI.",
     "installNote": "Los binarios precompilados para macOS, Linux y Windows están en cada [versión de GitHub]({releases}).",
-    "agentPrompt": "Instala rust-anything: ejecuta `cargo install rust-anything` y luego `rust-anything setup`.",
+    "agentPrompt": "Instala Rust Anything: ejecuta `cargo install rust-anything` y luego `rust-anything setup`.",
     "agentRestart": "Dime cuándo debo reiniciarte.",
     "loopTitle": "Cómo se hace un porte",
-    "loopDesc": "El original sigue siendo la fuente de verdad. rust-anything no traduce código: aporta lo que un agente no puede adivinar y una puerta que dice cuándo un porte está terminado.",
+    "loopDesc": "El original sigue siendo la fuente de verdad. Rust Anything no traduce código: aporta lo que un agente no puede adivinar y una puerta que dice cuándo un porte está terminado.",
     "steps": [
       {
         "title": "Grabar",
@@ -270,8 +270,11 @@
       "java": "JNI y un wire binario. fachada del JDK: 4,492/4,492"
     },
     "sponsorsTitle": "Patrocinadores",
-    "sponsorsDesc": "rust-anything es gratuito y de código abierto. Si te ayuda en tu trabajo, considera patrocinarlo. Tu apoyo mantiene el desarrollo en marcha.",
+    "sponsorsDesc": "Rust Anything es gratuito y de código abierto. Si te ayuda en tu trabajo, considera patrocinarlo. Tu apoyo mantiene el desarrollo en marcha.",
     "companySponsor": "Patrocinador de empresa",
+    "domainSponsor": "Patrocinador del dominio",
+    "peopleSponsors": "Patrocinadores individuales",
+    "buyCoffee": "Invítame a un café",
     "becomeSponsor": "Hazte patrocinador"
   }
 }

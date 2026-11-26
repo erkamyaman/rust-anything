@@ -1,6 +1,7 @@
 import type { Messages } from '../../lib/messages/en'
 import { useState } from 'react'
 import { CheckIcon, CopyIcon } from '../site/icons'
+import Hl from '../Hl'
 
 
 export default function InstallBox({ ui, agent }: { ui: Messages['ui']; agent: [string, string] }) {
@@ -38,18 +39,23 @@ export default function InstallBox({ ui, agent }: { ui: Messages['ui']; agent: [
         <button
           type="button"
           onClick={copy}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-[#8c959c] hover:text-[var(--screen-fg)]"
+          className="ms-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-[#8c959c] hover:text-[var(--screen-fg)]"
           aria-label={ui.copyInstall}
         >
           {copied ? <CheckIcon className="text-[#63c3a7]" /> : <CopyIcon />}
-          {copied ? ui.copied : ui.copy}
+          <span className="swap-label">
+            <span aria-hidden={copied} data-on={!copied}>{ui.copy}</span>
+            <span aria-hidden={!copied} data-on={copied}>{ui.copied}</span>
+          </span>
         </button>
       </div>
       <div className="py-2">
         {current.lines.map((l) => (
           <div key={l} className="copy-line">
             <span className="prompt">{tab === 'agent' ? '>' : '$'}</span>
-            <code>{l}</code>
+            <code>
+              <Hl code={l} />
+            </code>
           </div>
         ))}
       </div>

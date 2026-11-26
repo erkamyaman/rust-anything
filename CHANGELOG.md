@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `app record --ready` refuses a value that is not `/path` or `METHOD /path` with an uppercase method,
+  such as `health`, `get /health` or `GET /health extra`, before the server starts, instead of
+  failing after the whole `--ready-timeout`. The MCP `app_record` tool checks it the same way
+  (#657, #659 by @susheelg1197).
 - `app record --ready "GET /health"` waits, after the server's port opens, until that request
   answers 2xx, so a framework that opens its port before its routes work is not recorded answering
   503. The request is saved with the cases and used by `app replay`, `app shadow` and the front

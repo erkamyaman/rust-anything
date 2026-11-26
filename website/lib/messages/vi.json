@@ -17,8 +17,8 @@
     "closeMenu": "Đóng menu",
     "menu": "Menu",
     "language": "Ngôn ngữ",
-    "home": "Trang chủ rust-anything",
-    "github": "rust-anything trên GitHub",
+    "home": "Trang chủ Rust Anything",
+    "github": "Rust Anything trên GitHub",
     "onThisPage": "Trên trang này",
     "editPage": "Chỉnh sửa trang này trên GitHub",
     "previous": "Trước",
@@ -104,7 +104,7 @@
   "hero": {
     "title1": "Viết lại ứng dụng của bạn bằng Rust.",
     "title2": "Chứng minh nó vẫn hoạt động y như cũ.",
-    "sub": "rust-anything ghi lại những gì mã của bạn làm, rồi phát lại từng trường hợp đã ghi trên bản chuyển sang Rust. Agent của bạn viết Rust. Không có gì được phát hành cho đến khi đầu ra khớp nhau.",
+    "sub": "Rust Anything ghi lại những gì mã của bạn làm, rồi phát lại từng trường hợp đã ghi trên bản chuyển sang Rust. Agent của bạn viết Rust. Không có gì được phát hành cho đến khi đầu ra khớp nhau.",
     "cta": "Đọc phần bắt đầu nhanh",
     "source": "Mã nguồn trên GitHub",
     "sourceLanguage": "Ngôn ngữ nguồn",
@@ -138,10 +138,10 @@
     "installTitle": "Cài đặt",
     "installDesc": "Cài CLI, sau đó đăng ký máy chủ MCP và skill quy trình làm việc với Claude Code, Codex, Cursor và Gemini CLI.",
     "installNote": "Tệp nhị phân dựng sẵn cho macOS, Linux và Windows có trong mỗi [bản phát hành GitHub]({releases}).",
-    "agentPrompt": "Cài đặt rust-anything: chạy `cargo install rust-anything`, rồi `rust-anything setup`.",
+    "agentPrompt": "Cài đặt Rust Anything: chạy `cargo install rust-anything`, rồi `rust-anything setup`.",
     "agentRestart": "Cho tôi biết khi nào cần khởi động lại bạn.",
     "loopTitle": "Một bản chuyển được tạo ra như thế nào",
-    "loopDesc": "Bản gốc luôn là nguồn chuẩn. rust-anything không dịch mã: nó cung cấp những gì agent không thể đoán được, cùng một gate cho biết khi nào bản chuyển hoàn tất.",
+    "loopDesc": "Bản gốc luôn là nguồn chuẩn. Rust Anything không dịch mã: nó cung cấp những gì agent không thể đoán được, cùng một gate cho biết khi nào bản chuyển hoàn tất.",
     "steps": [
       {
         "title": "Ghi",
@@ -270,8 +270,11 @@
       "java": "JNI và wire nhị phân. Mặt tiền JDK: 4,492/4,492"
     },
     "sponsorsTitle": "Nhà tài trợ",
-    "sponsorsDesc": "rust-anything miễn phí và mã nguồn mở. Nếu nó giúp ích cho công việc của bạn, hãy cân nhắc tài trợ. Sự ủng hộ của bạn giúp việc phát triển được tiếp tục.",
+    "sponsorsDesc": "Rust Anything miễn phí và mã nguồn mở. Nếu nó giúp ích cho công việc của bạn, hãy cân nhắc tài trợ. Sự ủng hộ của bạn giúp việc phát triển được tiếp tục.",
     "companySponsor": "Nhà tài trợ doanh nghiệp",
+    "domainSponsor": "Nhà tài trợ tên miền",
+    "peopleSponsors": "Nhà tài trợ cá nhân",
+    "buyCoffee": "Mời tôi một ly cà phê",
     "becomeSponsor": "Trở thành nhà tài trợ"
   }
 }

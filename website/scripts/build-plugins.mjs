@@ -34,7 +34,7 @@ export function faviconPlugin() {
   }
 }
 
-const LOCALE_CODES = ['en', 'tr', 'zh', 'zh-tw', 'de', 'fr', 'ru', 'uk', 'ja', 'ko', 'az', 'uz', 'kk', 'ky', 'tk', 'tt', 'ug', 'pt', 'ar', 'fa', 'vi', 'hi', 'es', 'it', 'id']
+const LOCALE_CODES = ['en', 'tr', 'zh', 'zh-tw', 'de', 'fr', 'ru', 'uk', 'ja', 'ko', 'az', 'uz', 'kk', 'ky', 'tk', 'tt', 'pt', 'ar', 'fa', 'vi', 'hi', 'es', 'it', 'id']
 
 function searchEntries(locale = 'en') {
   const prefix = locale === 'en' ? '/docs/' : `/${locale}/docs/`
@@ -111,7 +111,7 @@ export async function renderOg({ title, eyebrow }) {
       'div',
       { alignItems: 'center', gap: '24px' },
       h('img', { src: logo, width: 88, height: 88 }),
-      h('div', { fontSize: 36, fontWeight: 600, fontFamily: 'PlexCond' }, 'rust-anything'),
+      h('div', { fontSize: 36, fontWeight: 600, fontFamily: 'PlexCond' }, 'Rust Anything'),
     ),
     h(
       'div',

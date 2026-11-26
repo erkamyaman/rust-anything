@@ -18,11 +18,11 @@
     }
   },
   "head": {
-    "titleTemplate": "%s · rust-anything",
+    "titleTemplate": "%s · Rust Anything",
     "htmlAttrs": { "lang": "en" },
     "meta": [
       { "name": "viewport", "content": "width=device-width, initial-scale=1" },
-      { "property": "og:site_name", "content": "rust-anything" },
+      { "property": "og:site_name", "content": "Rust Anything" },
       { "property": "og:type", "content": "website" },
       { "name": "twitter:card", "content": "summary_large_image" },
       { "name": "theme-color", "content": "#a33a0f" }

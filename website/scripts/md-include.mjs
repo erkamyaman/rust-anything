@@ -98,6 +98,7 @@ function shiftHeadings(lines) {
 }
 
 export function rewriteTarget(target, sourceFile, image = false) {
+  if (target.startsWith('https://rustanything.ai/')) return target.slice('https://rustanything.ai'.length)
   if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('//') || target.startsWith('/')) {
     return target
   }

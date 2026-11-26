@@ -15,7 +15,6 @@ export const LOCALES = [
   { code: 'ky', country: 'kg', flag: '🇰🇬', name: 'Кыргызча', lang: 'ky' },
   { code: 'tk', country: 'tm', flag: '🇹🇲', name: 'Türkmençe', lang: 'tk' },
   { code: 'tt', country: 'tatarstan', flag: '🌐', name: 'Татарча', lang: 'tt' },
-  { code: 'ug', flag: '🌐', name: 'ئۇيغۇرچە', lang: 'ug', rtl: true },
   { code: 'pt', country: 'pt', flag: '🇵🇹', name: 'Português', lang: 'pt' },
   { code: 'ar', country: 'sa', flag: '🇸🇦', name: 'العربية', lang: 'ar', rtl: true },
   { code: 'fa', country: 'ir', flag: '🇮🇷', name: 'فارسی', lang: 'fa', rtl: true },

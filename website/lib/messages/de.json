@@ -17,8 +17,8 @@
     "closeMenu": "Menü schließen",
     "menu": "Menü",
     "language": "Sprache",
-    "home": "rust-anything Startseite",
-    "github": "rust-anything auf GitHub",
+    "home": "Rust Anything Startseite",
+    "github": "Rust Anything auf GitHub",
     "onThisPage": "Auf dieser Seite",
     "editPage": "Diese Seite auf GitHub bearbeiten",
     "previous": "Zurück",
@@ -54,7 +54,7 @@
       "project": "Projekt"
     },
     "items": {
-      "/docs/introduction/what-is-rust-anything": "Was ist rust-anything",
+      "/docs/introduction/what-is-rust-anything": "Was ist Rust Anything",
       "/docs/introduction/quick-start": "Schnellstart",
       "/docs/introduction/install": "Installation",
       "/docs/introduction/agents": "Agent einrichten",
@@ -104,7 +104,7 @@
   "hero": {
     "title1": "Schreib deine App in Rust neu.",
     "title2": "Beweise, dass sie sich gleich verhält.",
-    "sub": "rust-anything zeichnet auf, was dein Code tut, und spielt dann jeden aufgezeichneten Fall gegen die Rust-Portierung ab. Dein Agent schreibt das Rust. Nichts wird ausgeliefert, bevor die Ausgaben übereinstimmen.",
+    "sub": "Rust Anything zeichnet auf, was dein Code tut, und spielt dann jeden aufgezeichneten Fall gegen die Rust-Portierung ab. Dein Agent schreibt das Rust. Nichts wird ausgeliefert, bevor die Ausgaben übereinstimmen.",
     "cta": "Schnellstart lesen",
     "source": "Quellcode auf GitHub",
     "sourceLanguage": "Quellsprache",
@@ -138,10 +138,10 @@
     "installTitle": "Installation",
     "installDesc": "Installiere die CLI und registriere dann den MCP-Server und den Workflow-Skill bei Claude Code, Codex, Cursor und Gemini CLI.",
     "installNote": "Vorkompilierte Binaries für macOS, Linux und Windows gibt es bei jedem [GitHub-Release]({releases}).",
-    "agentPrompt": "Installiere rust-anything: führe `cargo install rust-anything` aus, dann `rust-anything setup`.",
+    "agentPrompt": "Installiere Rust Anything: führe `cargo install rust-anything` aus, dann `rust-anything setup`.",
     "agentRestart": "Sag mir, wann ich dich neu starten soll.",
     "loopTitle": "Wie eine Portierung entsteht",
-    "loopDesc": "Das Original bleibt die maßgebliche Quelle. rust-anything übersetzt keinen Code: Es liefert, was ein Agent nicht erraten kann, und ein Gate, das sagt, wann eine Portierung fertig ist.",
+    "loopDesc": "Das Original bleibt die maßgebliche Quelle. Rust Anything übersetzt keinen Code: Es liefert, was ein Agent nicht erraten kann, und ein Gate, das sagt, wann eine Portierung fertig ist.",
     "steps": [
       {
         "title": "Aufzeichnen",
@@ -270,8 +270,11 @@
       "java": "JNI und ein binärer Wire. JDK-Fassade: 4,492/4,492"
     },
     "sponsorsTitle": "Sponsoren",
-    "sponsorsDesc": "rust-anything ist kostenlos und Open Source. Wenn es dir bei deiner Arbeit hilft, denk bitte über ein Sponsoring nach. Deine Unterstützung hält die Entwicklung am Laufen.",
+    "sponsorsDesc": "Rust Anything ist kostenlos und Open Source. Wenn es dir bei deiner Arbeit hilft, denk bitte über ein Sponsoring nach. Deine Unterstützung hält die Entwicklung am Laufen.",
     "companySponsor": "Firmensponsor",
+    "domainSponsor": "Domain-Sponsor",
+    "peopleSponsors": "Einzelne Sponsoren",
+    "buyCoffee": "Spendier mir einen Kaffee",
     "becomeSponsor": "Sponsor werden"
   }
 }

@@ -1,4 +1,5 @@
-export const SITE_NAME = 'rust-anything'
+export const SITE_NAME = 'Rust Anything'
+export const SITE_ORIGIN = 'https://rustanything.ai'
 export const REPO = 'erkamyaman/rust-anything'
 export const REPO_URL = `https://github.com/${REPO}`
 export const EDIT_BASE = `${REPO_URL}/edit/main`

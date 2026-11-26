@@ -265,16 +265,17 @@ A server can also be checked on live traffic: `app shadow --build <rust binary>`
 
 | Language | Unit | Bridge | Recorded and replayed by |
 | --- | --- | --- | --- |
-| TypeScript/JavaScript | folder or file | napi-rs or wasm-bindgen with a generated binary wire; classes and async included | Node, running the `.ts` sources |
-| Python | package or module | PyO3 (abi3), direct conversion, typed exceptions | Python, importing the original |
-| C | `.c` file | `extern "C"` functions with the original names and a header | the original compiled to a shared library, called through ctypes, one fork per case |
-| Go | package | typed cgo calls and a generated binary wire, in a package with the original API | a generated Go driver, built as its own module |
-| Ruby | file or folder of module functions | a magnus extension under the original modules | a generated Ruby driver |
-| Java | package of `public static` methods | typed JNI and a generated binary wire, in wrapper classes with the original methods | a generated reflection driver |
-| Kotlin | Gradle module of top-level functions and `@JvmStatic` methods | the Java bridge: typed JNI in Java wrapper classes calling the compiled Kotlin statics | a generated reflection driver, with the Kotlin sources compiled by `kotlinc` |
-| PHP | file or folder of top-level functions (`public static` methods stay in PHP) | a JSON dispatcher over `ext-ffi`, in a file that redeclares the functions with the original parameters | a generated PHP driver; whole apps with `app record`, `app replay` and the front door, for CLIs and servers (`php -S`) |
-| PowerShell | `.psm1` module or `.ps1` script of functions with `param()` blocks (exported per `Export-ModuleMember`) | a JSON dispatcher over P/Invoke, declared at load time with Reflection.Emit, in a `.ps1` that redeclares each function with its original `param()` block | a generated `pwsh` driver (PowerShell 7.4+) |
-| C# | file or folder of `public static` methods | a JSON dispatcher over P/Invoke, in `<namespace>.Rust` classes with the original methods | a generated reflection driver, compiled with the project's sources by `dotnet build`; whole apps with `app record`, `app replay` and the front door, for CLIs and ASP.NET servers (`dotnet <app>.dll`) |
+| <img src="https://rustanything.ai/langs/typescript.svg" width="16" height="16" alt=""> TypeScript | folder or file | napi-rs or wasm-bindgen with a generated binary wire; classes and async included | Node, running the `.ts` sources |
+| <img src="https://rustanything.ai/langs/javascript.svg" width="16" height="16" alt=""> JavaScript | folder or file | napi-rs or wasm-bindgen with a generated binary wire; classes and async included | Node, running the `.js` sources |
+| <img src="https://rustanything.ai/langs/python.svg" width="16" height="16" alt=""> Python | package or module | PyO3 (abi3), direct conversion, typed exceptions | Python, importing the original |
+| <img src="https://rustanything.ai/langs/c.svg" width="16" height="16" alt=""> C | `.c` file | `extern "C"` functions with the original names and a header | the original compiled to a shared library, called through ctypes, one fork per case |
+| <img src="https://rustanything.ai/langs/go.svg" width="16" height="16" alt=""> Go | package | typed cgo calls and a generated binary wire, in a package with the original API | a generated Go driver, built as its own module |
+| <img src="https://rustanything.ai/langs/ruby.svg" width="16" height="16" alt=""> Ruby | file or folder of module functions | a magnus extension under the original modules | a generated Ruby driver |
+| <img src="https://rustanything.ai/langs/java.svg" width="16" height="16" alt=""> Java | package of `public static` methods | typed JNI and a generated binary wire, in wrapper classes with the original methods | a generated reflection driver |
+| <img src="https://rustanything.ai/langs/kotlin.svg" width="16" height="16" alt=""> Kotlin | Gradle module of top-level functions and `@JvmStatic` methods | the Java bridge: typed JNI in Java wrapper classes calling the compiled Kotlin statics | a generated reflection driver, with the Kotlin sources compiled by `kotlinc` |
+| <img src="https://rustanything.ai/langs/php.svg" width="16" height="16" alt=""> PHP | file or folder of top-level functions (`public static` methods stay in PHP) | a JSON dispatcher over `ext-ffi`, in a file that redeclares the functions with the original parameters | a generated PHP driver; whole apps with `app record`, `app replay` and the front door, for CLIs and servers (`php -S`) |
+| <img src="https://rustanything.ai/langs/powershell.svg" width="16" height="16" alt=""> PowerShell | `.psm1` module or `.ps1` script of functions with `param()` blocks (exported per `Export-ModuleMember`) | a JSON dispatcher over P/Invoke, declared at load time with Reflection.Emit, in a `.ps1` that redeclares each function with its original `param()` block | a generated `pwsh` driver (PowerShell 7.4+) |
+| <img src="https://rustanything.ai/langs/csharp.svg" width="16" height="16" alt=""> C# | file or folder of `public static` methods | a JSON dispatcher over P/Invoke, in `<namespace>.Rust` classes with the original methods | a generated reflection driver, compiled with the project's sources by `dotnet build`; whole apps with `app record`, `app replay` and the front door, for CLIs and ASP.NET servers (`dotnet <app>.dll`) |
 
 Every language except C, PHP, C# and PowerShell also gets batch classes (`--batch`): the items cross once and stay in
 Rust, and each call runs over all of them on all cores.
@@ -400,6 +401,8 @@ commands (see the [FAQ](docs/faq.md)).
   <a href="https://github.com/sponsors/erkamyaman"><img src="https://img.shields.io/badge/Become_a_sponsor-%E2%9D%A4-db61a2?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Become a sponsor"></a>
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
+
+<p align="center">Sponsoring as a company, or anything else? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
 
 ## Contributing
 

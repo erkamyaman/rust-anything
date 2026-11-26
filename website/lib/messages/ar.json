@@ -17,8 +17,8 @@
     "closeMenu": "أغلق القائمة",
     "menu": "القائمة",
     "language": "اللغة",
-    "home": "الصفحة الرئيسية لـ rust-anything",
-    "github": "rust-anything على GitHub",
+    "home": "الصفحة الرئيسية لـ Rust Anything",
+    "github": "Rust Anything على GitHub",
     "onThisPage": "في هذه الصفحة",
     "editPage": "حرّر هذه الصفحة على GitHub",
     "previous": "السابق",
@@ -54,7 +54,7 @@
       "project": "المشروع"
     },
     "items": {
-      "/docs/introduction/what-is-rust-anything": "ما هو rust-anything",
+      "/docs/introduction/what-is-rust-anything": "ما هو Rust Anything",
       "/docs/introduction/quick-start": "البدء السريع",
       "/docs/introduction/install": "التثبيت",
       "/docs/introduction/agents": "إعداد الوكيل",
@@ -104,7 +104,7 @@
   "hero": {
     "title1": "أعد كتابة تطبيقك بلغة Rust.",
     "title2": "وأثبت أنه يتصرف بالطريقة نفسها.",
-    "sub": "يسجّل rust-anything ما تفعله شيفرتك، ثم يعيد تشغيل كل حالة مسجلة على نسخة Rust. وكيلك هو من يكتب Rust. ولا يُشحن شيء قبل أن تتطابق المخرجات.",
+    "sub": "يسجّل Rust Anything ما تفعله شيفرتك، ثم يعيد تشغيل كل حالة مسجلة على نسخة Rust. وكيلك هو من يكتب Rust. ولا يُشحن شيء قبل أن تتطابق المخرجات.",
     "cta": "اقرأ البدء السريع",
     "source": "الشيفرة المصدرية على GitHub",
     "sourceLanguage": "لغة المصدر",
@@ -138,10 +138,10 @@
     "installTitle": "التثبيت",
     "installDesc": "ثبّت CLI، ثم سجّل خادم MCP ومهارة سير العمل في Claude Code وCodex وCursor وGemini CLI.",
     "installNote": "تتوفر ملفات ثنائية جاهزة لـ macOS وLinux وWindows في كل [إصدار على GitHub]({releases}).",
-    "agentPrompt": "ثبّت rust-anything: شغّل `cargo install rust-anything` ثم `rust-anything setup`.",
+    "agentPrompt": "ثبّت Rust Anything: شغّل `cargo install rust-anything` ثم `rust-anything setup`.",
     "agentRestart": "أخبرني متى يجب أن أعيد تشغيلك.",
     "loopTitle": "كيف يتم النقل",
-    "loopDesc": "يبقى الأصل هو المرجع. لا يترجم rust-anything الشيفرة: بل يقدّم ما لا يستطيع الوكيل تخمينه، وبوابة تخبرك متى اكتمل النقل.",
+    "loopDesc": "يبقى الأصل هو المرجع. لا يترجم Rust Anything الشيفرة: بل يقدّم ما لا يستطيع الوكيل تخمينه، وبوابة تخبرك متى اكتمل النقل.",
     "steps": [
       {
         "title": "سجّل",
@@ -270,8 +270,11 @@
       "java": "JNI وwire ثنائي. واجهة JDK: 4,492/4,492"
     },
     "sponsorsTitle": "الرعاة",
-    "sponsorsDesc": "rust-anything مجاني ومفتوح المصدر. إذا ساعدك في عملك، ففكّر في رعايته. دعمك يبقي التطوير مستمرًا.",
+    "sponsorsDesc": "Rust Anything مجاني ومفتوح المصدر. إذا ساعدك في عملك، ففكّر في رعايته. دعمك يبقي التطوير مستمرًا.",
     "companySponsor": "راعي الشركة",
+    "domainSponsor": "راعي النطاق",
+    "peopleSponsors": "الرعاة الأفراد",
+    "buyCoffee": "ادعمني بفنجان قهوة",
     "becomeSponsor": "كن راعيًا"
   }
 }
