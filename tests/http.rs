@@ -430,6 +430,7 @@ fn a_ready_request_waits_until_the_routes_answer() {
 }
 
 /// Answers 503 to every request and writes its pid next to itself, so a test can check it is gone.
+#[cfg(unix)]
 const NEVER_READY: &str = r#"import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -469,6 +470,7 @@ fn a_ready_request_that_never_answers_2xx_fails_and_stops_the_server() {
         "{\"name\":\"ok\",\"path\":\"/\"}\n",
     )
     .unwrap();
+    let started = std::time::Instant::now();
     let err = app::record(&RecordOptions {
         repo: &repo,
         run: &[python.to_string(), "server.py".to_string()],
@@ -489,6 +491,7 @@ fn a_ready_request_that_never_answers_2xx_fails_and_stops_the_server() {
         effects: None,
     })
     .expect_err("a server that never answers 2xx must fail the recording");
+    let waited = started.elapsed();
     let pid = std::fs::read_to_string(repo.join("server.pid"))
         .unwrap_or_default()
         .trim()
@@ -503,6 +506,11 @@ fn a_ready_request_that_never_answers_2xx_fails_and_stops_the_server() {
     let message = format!("{err:#}");
     assert!(message.contains("did not answer 2xx"), "{message}");
     assert!(message.contains("status 503"), "{message}");
+    assert!(message.contains("GET /health"), "{message}");
+    assert!(
+        waited < std::time::Duration::from_secs(30),
+        "waited {waited:?}"
+    );
     assert!(!pid.is_empty(), "the server never started");
     assert!(
         !running,
