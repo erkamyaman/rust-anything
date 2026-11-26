@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Every MCP tool's required path (`root`, `repo` or `crate`) that is there but not a string is
+  refused with `` `root` must be a string, not 5 `` instead of `` missing `root` ``. An absent or
+  `null` path still says `` missing `root` `` (#685).
 - `docs/whole-apps.md` says six of the seven `app` commands are MCP tools and that `app shadow` is
   CLI only, instead of "All six are MCP tools too" (#672, #674 by @XiaoBinGan).
 - The MCP `app_record` tool refuses a `ready`, `name`, `db_reset` or `db_dump` that is neither a
