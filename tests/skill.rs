@@ -57,11 +57,17 @@ fn code_snippets(markdown: &str) -> Vec<String> {
 
 fn skill_files() -> Vec<(String, String)> {
     let mut files = Vec::new();
-    for entry in std::fs::read_dir(skill_dir()).unwrap() {
-        let path = entry.unwrap().path();
-        if path.extension().is_some_and(|e| e == "md") {
-            let name = path.file_name().unwrap().to_string_lossy().into_owned();
-            files.push((name, std::fs::read_to_string(&path).unwrap()));
+    for dir in [skill_dir(), skill_dir().join("languages")] {
+        for entry in std::fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_some_and(|e| e == "md") {
+                let name = path
+                    .strip_prefix(skill_dir())
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned();
+                files.push((name, std::fs::read_to_string(&path).unwrap()));
+            }
         }
     }
     files.sort();
@@ -138,7 +144,8 @@ fn links_between_skill_files_resolve() {
                 continue;
             }
             let path = target.split('#').next().unwrap();
-            if !skill_dir().join(path).exists() {
+            let base = skill_dir().join(&file);
+            if !base.parent().unwrap().join(path).exists() {
                 broken.push(format!("{file}: {target}"));
             }
         }

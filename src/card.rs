@@ -36,9 +36,26 @@ pub struct Card {
     /// The distinct differences still left, most cases first (at most five).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub differences: Vec<crate::mismatch::Group>,
+    /// What the bindings are for once the port is done (`bridge --end-state`).
+    pub end_state: Option<crate::bridge::EndState>,
+    /// The entries of `known-diffs.jsonl`: inputs the port is meant to answer differently.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub intended: Vec<Intended>,
+    /// Exports kept in the original language, with the reason.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub kept: Vec<crate::bridge::JsOnly>,
     pub machine: String,
     pub markdown: PathBuf,
     pub svg: PathBuf,
+}
+
+/// One `known-diffs.jsonl` entry, as reviewers read it.
+#[derive(Debug, Serialize)]
+pub struct Intended {
+    pub function: String,
+    /// The recorded arguments, as JSON.
+    pub args: String,
+    pub reason: String,
 }
 
 impl Card {
@@ -117,6 +134,16 @@ pub fn report(opts: &Options) -> Result<Card> {
         fallback_cases,
         enabled: crate::enable::is_enabled(&crate_dir).ok(),
         differences: diff.groups.iter().take(5).cloned().collect(),
+        end_state: manifest.end_state,
+        intended: crate::recording::known_diffs(&crate_dir)?
+            .iter()
+            .map(|e| Intended {
+                function: e["fn"].as_str().unwrap_or_default().to_string(),
+                args: e["args"].to_string(),
+                reason: e["reason"].as_str().unwrap_or_default().to_string(),
+            })
+            .collect(),
+        kept: manifest.js_only.clone(),
         machine: machine(),
         markdown: out.join("REPORT.md"),
         svg: out.join("card.svg"),
@@ -245,7 +272,8 @@ pub fn markdown(card: &Card) -> String {
          | Recorded cases matched | {} / {} |\n\
          | Speedup, call included | {} |\n\
          | Fallback to the original | {} ({} of {} cases) |\n\
-         | Switched on | {} |\n\n",
+         | Switched on | {} |\n\
+         | End state | {} |\n\n",
         card.crate_name,
         card.crate_name,
         card.unit,
@@ -261,6 +289,10 @@ pub fn markdown(card: &Card) -> String {
         card.fallback_cases,
         card.cases,
         state(card),
+        card.end_state.map_or_else(
+            || "not chosen".to_string(),
+            |e| format!("{}: {}", e.name(), e.after_cut_over())
+        ),
     );
     if !card.bench.is_empty() {
         out.push_str(
@@ -299,6 +331,42 @@ pub fn markdown(card: &Card) -> String {
         }
         out.push('\n');
     }
+    if !card.intended.is_empty() {
+        let _ = writeln!(
+            out,
+            "### Intended differences\n\nFrom `{}`: the port is meant to differ on these \
+             inputs.\n\n| Function | Input | Reason |\n| --- | --- | --- |",
+            crate::recording::KNOWN_DIFFS
+        );
+        for i in &card.intended {
+            let _ = writeln!(
+                out,
+                "| `{}` | `{}` | {} |",
+                i.function,
+                cell(&i.args),
+                cell(&i.reason)
+            );
+        }
+        out.push('\n');
+    }
+    if !card.kept.is_empty() {
+        let _ = writeln!(
+            out,
+            "### Kept in {}\n\n| Export | Where | Reason |\n| --- | --- | --- |",
+            card.language
+        );
+        for k in &card.kept {
+            let _ = writeln!(
+                out,
+                "| `{}` | `{}:{}` | {} |",
+                k.name,
+                k.file,
+                k.line,
+                cell(&k.reason)
+            );
+        }
+        out.push('\n');
+    }
     let _ = writeln!(
         out,
         "Measured with `rust-anything report` on {}: `diff` replays every recorded case, `bench` \
@@ -307,6 +375,11 @@ pub fn markdown(card: &Card) -> String {
         card.machine
     );
     out
+}
+
+/// Text safe inside a Markdown table cell, in or out of backticks.
+fn cell(s: &str) -> String {
+    s.replace('`', "'").replace('|', "\\|")
 }
 
 fn esc(s: &str) -> String {
@@ -462,6 +535,9 @@ mod tests {
             fallback_cases: 0,
             enabled: Some(true),
             differences: Vec::new(),
+            end_state: None,
+            intended: Vec::new(),
+            kept: Vec::new(),
             machine: "Apple M4, 10 cores, macOS".into(),
             markdown: "REPORT.md".into(),
             svg: "card.svg".into(),
@@ -491,6 +567,48 @@ mod tests {
         );
         assert!(
             md.contains("| `dedupe` | 412 | 9.1 ms | 290.0 µs | 31x |"),
+            "{md}"
+        );
+    }
+
+    #[test]
+    fn reviewers_see_the_end_state_intended_differences_and_kept_exports() {
+        let md = markdown(&card());
+        assert!(md.contains("| End state | not chosen |"), "{md}");
+        assert!(!md.contains("### Intended differences"), "{md}");
+        assert!(!md.contains("### Kept in Python"), "{md}");
+
+        let mut c = card();
+        c.end_state = Some(crate::bridge::EndState::Replace);
+        c.intended = vec![Intended {
+            function: "dedupe".into(),
+            args: "[\"a|b\"]".into(),
+            reason: "keeps the first spelling, as the docs say".into(),
+        }];
+        c.kept = vec![crate::bridge::JsOnly {
+            name: "load".into(),
+            file: "app.py".into(),
+            line: 12,
+            reason: "reads files".into(),
+        }];
+        let md = markdown(&c);
+        assert!(
+            md.contains("| End state | replace: delete the original once callers use the Rust |"),
+            "{md}"
+        );
+        assert!(
+            md.contains(
+                "### Intended differences\n\nFrom `known-diffs.jsonl`: the port is meant to \
+                 differ on these inputs.\n\n| Function | Input | Reason |\n| --- | --- | --- \
+                 |\n| `dedupe` | `[\"a\\|b\"]` | keeps the first spelling, as the docs say |\n"
+            ),
+            "{md}"
+        );
+        assert!(
+            md.contains(
+                "### Kept in Python\n\n| Export | Where | Reason |\n| --- | --- | --- |\n\
+                 | `load` | `app.py:12` | reads files |\n"
+            ),
             "{md}"
         );
     }

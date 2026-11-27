@@ -68,6 +68,10 @@ O Rust Anything é gratuito e de código aberto. Se ele ajuda no seu trabalho, s
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">Patrocínio como empresa, ou qualquer outra coisa? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">Vai migrar uma base de código para Rust? Ofereço consultoria para migrações para Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## Início rápido
 
 Cole isto no seu agente de código:
@@ -85,6 +89,18 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 
 > [!TIP]
 > **Agentes:** leiam [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) para os passos de instalação, todos os comandos e o fluxo de portabilidade.
+
+## Como funciona
+
+**O que conta como concluído.** O comportamento, não os seus testes. `record` executa o original com entradas geradas e fornecidas e guarda o que cada chamada devolve, lança e imprime. Uma migração está concluída quando `gate` passa: todos os casos gravados coincidem, e fmt, clippy, `cargo test`, a verificação de `unsafe`, a verificação de stubs e a verificação de respostas gravadas coladas na migração passam todas. Os seus próprios testes também são executados.
+
+**Relatório ou migração, você escolhe.** `analyze` e `profile` apenas relatam: um plano ordenado do que migrar e do que está quente sob uma carga real. São comandos simples, por isso o relatório não gasta tokens. `go` migra uma unidade: cria a ponte para a função mais quente, grava-a, entrega a migração ao seu agente, depois compila, compara e passa-a pelo `gate`, e só a ativa quando tudo coincide (TS/JS, Python e PowerShell; `disable` volta a desativá-la).
+
+**Quanto tempo leva uma execução.** Uma execução de `go` migra uma unidade, com no máximo `--rounds` turnos do agente (3 por padrão): um para a migração e depois um por cada diff ou gate que falhe. Uma aplicação inteira é uma execução por unidade, por isso pode parar depois de qualquer uma.
+
+**Modelo barato para o plano, modelo forte para a migração.** O plano não precisa de modelo. Para a migração, passe qualquer comando de agente: `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**Agentes.** `rust-anything setup` adiciona-o ao Claude Code, Codex, Cursor, Gemini CLI e OpenCode. Qualquer outro cliente MCP pode executar `rust-anything mcp`, e a skill também se instala sozinha com `npx skills add erkamyaman/rust-anything` (veja [instalação](install.md)).
 
 ## Licença
 

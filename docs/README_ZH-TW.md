@@ -68,6 +68,10 @@ Rust Anything 免費且開源。如果它對你的工作有幫助，你的贊助
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">以公司身分贊助，或有其他事宜？ <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">要把程式碼庫遷移到 Rust？我提供 Rust 遷移諮詢： <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## 快速開始
 
 把這段貼到你的程式代理中：
@@ -85,6 +89,18 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 
 > [!TIP]
 > **代理：**閱讀 [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt)，了解安裝步驟、所有指令和移植流程。
+
+## 運作方式
+
+**怎樣才算完成。** 看行為，而不是你的測試。`record` 用產生的和給定的輸入執行原始程式，儲存每次呼叫的回傳值、拋出的例外和印出的輸出。`gate` 通過時移植才算完成：每個錄製的案例都相符，而且 fmt、clippy、`cargo test`、`unsafe` 檢查、stub 檢查，以及檢查錄製的答案是否被直接貼進移植程式碼，全部通過。你自己的測試也會執行。
+
+**只看報告還是直接遷移，由你決定。** `analyze` 和 `profile` 只產生報告：一份依優先順序排列的移植計畫，以及真實負載下哪些程式碼最熱。它們是一般指令，所以報告不耗費 token。`go` 遷移一個單元：為最熱的函式建立橋接，錄製它，把移植交給你的代理，接著建置、比對並執行 `gate`，只有全部相符時才啟用（TS/JS、Python 和 PowerShell；`disable` 可以再關閉）。
+
+**一次執行要多久。** 一次 `go` 執行移植一個單元，最多 `--rounds` 輪代理互動（預設 3）：一輪用於移植，之後每次 diff 或 gate 失敗各一輪。整個應用程式就是每個單元執行一次，所以你可以在任何一次之後停下。
+
+**計畫用便宜的模型，移植用強的模型。** 計畫不需要模型。移植時，傳入任何代理指令：`rust-anything go --agent "claude --model <model>" -- <workload>`。
+
+**代理。** `rust-anything setup` 會把它加到 Claude Code、Codex、Cursor、Gemini CLI 和 OpenCode 中。其他 MCP 用戶端可以執行 `rust-anything mcp`，這個 skill 也可以用 `npx skills add erkamyaman/rust-anything` 單獨安裝（見[安裝](install.md)）。
 
 ## 授權條款
 

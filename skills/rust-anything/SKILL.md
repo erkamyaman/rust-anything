@@ -1,6 +1,6 @@
 ---
 name: rust-anything
-description: Port TypeScript/JavaScript, Python, C, Go, Ruby, Java, Kotlin, PHP, C# and PowerShell to Rust with the rust-anything CLI or MCP tools, from one hot function up to a whole app rewritten as a pure Rust app - profile, plan, bridge one unit at a time, record the original's behavior, port, diff, bench, shadow and gate; batch hot loops so they run in Rust on all cores. Use when asked to rewrite, port or migrate code or an app to Rust, to plan such a migration, or to make slow code faster with Rust.
+description: Port or migrate TypeScript/JavaScript, Python, C, Go, Ruby, Java, Kotlin, PHP, C# and PowerShell to Rust with the rust-anything CLI or MCP tools, from one hot function up to a whole app rewritten as a pure Rust app - profile, plan, bridge one unit at a time, record the original's behavior, port, diff, bench, shadow and gate; batch hot loops so they run in Rust on all cores. Use when asked to rewrite, port or migrate code or an app to Rust, to plan such a migration, or to make slow code faster with Rust.
 ---
 
 # Migration to Rust with rust-anything
@@ -14,14 +14,14 @@ the decisions, researches the dependencies, records the whole app, puts a Rust f
 of the original, runs the steps below for every unit, then lifts the app to a standalone Rust
 binary (or, for a library, one pure Rust crate). CLIs, HTTP servers and libraries.
 
-Languages: TypeScript/JavaScript, Python, C, Go, Ruby, Java. The language is detected; `--lang`
-overrides it. The steps are the same everywhere; only the bridge differs (napi-rs or wasm for
-TS, PyO3, a C ABI, cgo, a magnus extension, JNI), and the original's callers keep their API.
-For PHP: `analyze`, and for a whole app `app record`, `app replay` and
-`app front-door` (CLIs, and servers run with `php -S 127.0.0.1:{port} router.php`); `bridge` does not
-take PHP units yet, so tell the user before planning a PHP port past the front door. C# works
-the same way: record a built app (`dotnet out/app.dll`, servers with
-`--urls http://127.0.0.1:{port}`); `bridge` does not take C# units yet.
+The language is detected; `--lang` overrides it. The steps are the same for every language; the
+bridge and the traps differ, and the original's callers keep their API. **Before writing a port,
+read the file for the unit's language** in [languages/](languages/): how its constructs map to
+Rust, and the traps that made recorded cases differ.
+[typescript.md](languages/typescript.md) (TS and JS), [python.md](languages/python.md),
+[go.md](languages/go.md), [ruby.md](languages/ruby.md), [java.md](languages/java.md),
+[kotlin.md](languages/kotlin.md), [c.md](languages/c.md), [php.md](languages/php.md),
+[csharp.md](languages/csharp.md), [powershell.md](languages/powershell.md).
 
 Tools: the `rust-anything` CLI, or the same steps as MCP tools (`rust-anything mcp`): `go`,
 `profile`, `analyze`, `bridge`, `refresh`, `record`, `build`, `diff`, `bench`, `shadow`, `gate`,
@@ -83,24 +83,30 @@ rust-anything analyze <repo> --json            # you: schema rust-anything/analy
 - Call out `keep` units (UI, editor code: they stay in the source language), `blocked` units and
   their reason, and dependencies with fit `none` or `unknown`. Do not hand-roll a missing crate
   silently: flag it.
-- **Wait for the user's approval of the plan and of the first unit.**
+- Before bridging any unit, ask the user its **end state**, which `bridge --end-state` records:
+  - `replace`: the Rust replaces the original, which is deleted after cut-over.
+  - `bindings`: callers keep importing the unit through the bindings for good, so the binding
+    surface is public API.
+  - `scaffold`: the bindings are temporary and are deleted at cut-over.
+- **Wait for the user's approval of the plan, the first unit and its end state.**
 
 ## 2. Port one unit
 
 ```sh
-rust-anything bridge <repo> <unit-id>          # crate in <repo>/rust/<name>; never overwrites
+rust-anything bridge <repo> <unit-id> --end-state <replace|bindings|scaffold>   # crate in <repo>/rust/<name>; never overwrites
 rust-anything record <crate>                   # the original's behavior on edge-case inputs -> cases.jsonl
 ```
 
 - If the original has tests, record their calls too: `record <crate> --from-tests -- npx jest`
   (TS/JS, any runner) or `-- pytest` (Python). Every call the suite makes to the unit's exported
-  functions becomes a case; the source is restored afterwards. Exports that are not function
-  declarations (`export const f = () => ...`) are listed as not captured.
+  functions becomes a case; the source is restored afterwards.
 - Add real-world inputs with `--inputs cases.jsonl` (`{"fn": name, "args": [...]}` per line) when
   the generated ones cannot reach the interesting paths (structured arguments, domain strings).
-- TS that cannot run directly in Node (extensionless imports, path aliases): record from built
-  output with `--module dist/x.mjs`, or pass `--node-arg=--import=tsx`.
 - If the original has no tests, `record` is the characterization suite: keep `cases.jsonl`.
+
+**A port keeps behavior, bugs included.** Port a known bug as it is, and fix it in its own change
+once the port's `gate` passes, with each case the fix changes listed in `known-diffs.jsonl` and its
+reason (step 3). A change that ports and fixes at once cannot be told apart from a regression.
 
 Write the port in `src/port.rs` only; `src/lib.rs` and the wrappers are generated. After changing
 a signature in `port.rs`, run `rust-anything refresh <crate>`.
@@ -111,33 +117,10 @@ it right away with `rust-anything rules <repo> --add "<the rule, in one sentence
 unit and the next agent keep it.
 
 - Read each risk the plan lists for the unit, at its `file:line`, before writing code.
-- String offsets: JS and Java index UTF-16 code units, Rust UTF-8 bytes: use `src/utf16.rs`.
-- Errors: return `Err("TypeName: message")`; it becomes that exception in Python, Ruby and Java,
-  and the `error` text in Go. In Python a built-in exception goes by its name; the original's own
-  class by its dotted path, `Err("mypkg.errors.ParseError: message")`, which the bindings import.
-  Inside `port.rs`, a small error enum is clearer; turn it into that string only in the exported
+- Errors: return `Err("TypeName: message")`; the bindings raise that type in the caller's
+  language (the language file says how names resolve and what `diff` compares). Inside
+  `port.rs`, a small error enum is clearer; turn it into that string only in the exported
   function.
-- Letters and digits: Rust's `char::is_alphanumeric` takes more than Java's
-  `Character.isLetterOrDigit` (letters and decimal digits, per UTF-16 unit, so nothing beyond
-  U+FFFF) or Python's `str.isalpha` (letters only). Match the original's rule by general category.
-- Numbers in Python and Ruby: ints that the original passes through must come back as ints;
-  in Python ports use `crate::pynum::Num` for int-or-float, not `serde_json::Value`.
-- C: inputs recorded as `crash:` are undefined behavior; any result passes.
-- C pointers: a byte pointer with a length parameter is `&[u8]` (or `&mut [u8]` when the
-  function writes it), a pointer to one scalar is `Option<&mut T>`, and a returned pointer into
-  a parameter is its offset (`Option<usize>`). In `--inputs`, give buffers as hex text (a number
-  means that many zero bytes, `null` is `NULL`) and leave length parameters out; recorded
-  results then hold the return value and what the function wrote. A struct of scalar fields
-  passed or returned by value is a `#[repr(C)]` struct at the crate root (`crate::AVRational`),
-  and an object of its fields in cases. A `char **` / `const char **` the function points into
-  the first `char` string argument is `Option<&mut Option<usize>>` (the offset into it); in
-  cases give the starting offset, `true` for a `NULL` start, or `null` for a `NULL` `**`.
-  Contexts, other structs and other `**` stay blocked: bridge a small wrapper with plain
-  arguments, and say so. Pass the
-  project's build flags in `CFLAGS` (`-DHAVE_CONFIG_H`, `-I<root>`) when its sources need them.
-- C strings: `const char *` is `Option<&[u8]>`, which costs a `strlen` per argument. Where that
-  dominates (short-string helpers), type the parameter `Option<crate::CChars<'_>>` in `port.rs`
-  and run `refresh`: the port reads the bytes as it goes (`next`, `peek`, `to_bytes`).
 - Ordered maps and object keys: `indexmap` where order reaches output.
 - Regex lookaround or backreferences: `fancy-regex`, not `regex`. Either way, `\w`, `\b`, `\d`
   and case-insensitive matching treat non-ASCII text differently from the source language's
@@ -193,10 +176,10 @@ rust-anything bench <crate>                    # original vs Rust, bridge includ
 where each first differs (`at`: the channel, the JSON path, the character). To hand a failing diff
 to someone else, `diff --redact` shows only shapes and hashes, no arguments or outputs.
 
-A mismatch is a behavior difference: fix the port, never the recording. If the difference is
-intended (the user wants the port to fix a bug of the original), ask the user first, then add one
-line per case to `<crate>/known-diffs.jsonl`: `{"fn", "args", "actual", "reason"}`, with `fn`,
-`args` and `actual` copied from `diff --json`. That case then passes only with exactly that result,
+A mismatch is a behavior difference: fix the port, never the recording. An intended difference
+(the bug fix that follows a passing `gate`, or a value Rust cannot hold, such as a lone surrogate)
+needs the user's yes first, then one line per case in `<crate>/known-diffs.jsonl`:
+`{"fn", "args", "actual", "reason"}`, with `fn`, `args` and `actual` copied from `diff --json`. That case then passes only with exactly that result,
 and `gate` fails once it no longer differs, so remove the line then. If `gate` says the recording
 is stale, the original changed: record again before porting further. After pulling upstream
 changes, run `rust-anything map` (the `map` tool): every port marked changed needs `record`, then

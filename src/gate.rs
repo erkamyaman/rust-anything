@@ -674,6 +674,9 @@ pub struct TestCounts {
     pub ignored: usize,
     #[serde(default)]
     pub should_panic: usize,
+    /// Entries of `known-diffs.jsonl`; `None` in a baseline saved before they were counted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub known_diffs: Option<usize>,
 }
 
 pub fn test_counts(crate_dir: &Path) -> TestCounts {
@@ -705,6 +708,48 @@ pub fn test_counts(crate_dir: &Path) -> TestCounts {
         asserts,
         ignored,
         should_panic,
+        known_diffs: Some(known_diff_entries(crate_dir)),
+    }
+}
+
+fn known_diff_entries(crate_dir: &Path) -> usize {
+    crate::recording::known_diffs(crate_dir).map_or(0, |e| e.len())
+}
+
+fn tests_baseline(crate_dir: &Path) -> Option<TestCounts> {
+    std::fs::read_to_string(crate_dir.join(TESTS_BASELINE))
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+}
+
+/// Entries added to `known-diffs.jsonl` since the last passing gate: each one is a behavior
+/// change, which reviewers can only tell from a regression when it lands apart from the port.
+fn known_diffs_added(crate_dir: &Path) -> usize {
+    tests_baseline(crate_dir)
+        .and_then(|b| b.known_diffs)
+        .map_or(0, |before| {
+            known_diff_entries(crate_dir).saturating_sub(before)
+        })
+}
+
+fn behavior_detail(passed: usize, total: usize, accepted: usize, added: usize) -> String {
+    let matched = format!("{passed}/{total} recorded cases match");
+    match (accepted, added) {
+        (0, 0) => matched,
+        (_, 0) => format!(
+            "{matched} ({accepted} by {})",
+            crate::recording::KNOWN_DIFFS
+        ),
+        _ => format!(
+            "{matched} ({accepted} by {}, {} added since the last passing gate: land behavior \
+             changes apart from the port)",
+            crate::recording::KNOWN_DIFFS,
+            if added == 1 {
+                "1 entry".to_string()
+            } else {
+                format!("{added} entries")
+            }
+        ),
     }
 }
 
@@ -730,10 +775,7 @@ pub fn tests_check(crate_dir: &Path) -> Check {
         crate::report::count(now.tests, "test"),
         crate::report::count(now.asserts, "assertion")
     );
-    let baseline: Option<TestCounts> = std::fs::read_to_string(crate_dir.join(TESTS_BASELINE))
-        .ok()
-        .and_then(|t| serde_json::from_str(&t).ok());
-    let Some(before) = baseline else {
+    let Some(before) = tests_baseline(crate_dir) else {
         return Check {
             fix: None,
             name: "tests",
@@ -900,17 +942,12 @@ pub fn gate(crate_dir: &Path, node_args: &[String]) -> Result<GateOutcome> {
                     fix: None,
                     name: "behavior",
                     passed: d.failed == 0,
-                    detail: if d.accepted > 0 {
-                        format!(
-                            "{}/{} recorded cases match ({} by {})",
-                            d.passed,
-                            d.total,
-                            d.accepted,
-                            crate::recording::KNOWN_DIFFS
-                        )
-                    } else {
-                        format!("{}/{} recorded cases match", d.passed, d.total)
-                    },
+                    detail: behavior_detail(
+                        d.passed,
+                        d.total,
+                        d.accepted,
+                        known_diffs_added(crate_dir),
+                    ),
                 });
                 if !d.stale_known.is_empty() {
                     checks.push(Check {
@@ -1321,7 +1358,55 @@ fn strip_code(line: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{CASES, Check, GateOutcome, fix_for, spawn_fix, stubs, unsafe_blocks};
+    use super::{
+        CASES, Check, GateOutcome, TESTS_BASELINE, behavior_detail, fix_for, known_diffs_added,
+        spawn_fix, stubs, unsafe_blocks,
+    };
+
+    #[test]
+    fn the_behavior_line_names_known_diffs_added_since_the_last_pass() {
+        assert_eq!(behavior_detail(10, 10, 0, 0), "10/10 recorded cases match");
+        assert_eq!(
+            behavior_detail(10, 10, 3, 0),
+            "10/10 recorded cases match (3 by known-diffs.jsonl)"
+        );
+        assert_eq!(
+            behavior_detail(10, 10, 3, 2),
+            "10/10 recorded cases match (3 by known-diffs.jsonl, 2 entries added since the \
+             last passing gate: land behavior changes apart from the port)"
+        );
+        assert_eq!(
+            behavior_detail(10, 10, 1, 1),
+            "10/10 recorded cases match (1 by known-diffs.jsonl, 1 entry added since the \
+             last passing gate: land behavior changes apart from the port)"
+        );
+    }
+
+    #[test]
+    fn known_diffs_added_counts_from_the_last_passing_gate_only() {
+        let dir = std::env::temp_dir().join(format!("ra-known-added-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join(".rust-anything")).unwrap();
+        let entry = r#"{"fn":"f","args":[1],"actual":2,"reason":"rounding"}"#;
+        std::fs::write(
+            dir.join("known-diffs.jsonl"),
+            format!("{entry}\n{entry}\n{entry}\n"),
+        )
+        .unwrap();
+        assert_eq!(known_diffs_added(&dir), 0, "no baseline yet");
+        std::fs::write(dir.join(TESTS_BASELINE), r#"{"tests":1,"asserts":1}"#).unwrap();
+        assert_eq!(
+            known_diffs_added(&dir),
+            0,
+            "a baseline from before the count"
+        );
+        std::fs::write(
+            dir.join(TESTS_BASELINE),
+            r#"{"tests":1,"asserts":1,"known_diffs":1}"#,
+        )
+        .unwrap();
+        assert_eq!(known_diffs_added(&dir), 2);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn counts_every_kind_of_stub() {

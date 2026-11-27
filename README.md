@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-Rewrite your app in Rust, and prove it still behaves the same.
+Migrate your app to Rust, and prove it still behaves the same.
 </p>
 
 <p align="center">
@@ -74,6 +74,8 @@ Rewrite your app in Rust, and prove it still behaves the same.
 
 <p align="center">Sponsoring as a company, or anything else? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
 
+<p align="center">Moving a codebase to Rust? I offer consulting for Rust migrations: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## Quick start
 
 Paste this into your coding agent:
@@ -91,6 +93,18 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 
 > [!TIP]
 > **Agents:** read [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) for the install steps, every command and the porting workflow.
+
+## How it works
+
+**What counts as done.** Behavior, not your tests. `record` runs the original on generated and given inputs and saves what each call returns, throws and prints. A port is done when `gate` passes: every recorded case matches, and fmt, clippy, `cargo test`, the `unsafe` check, the stub check and the check for recorded answers pasted into the port all pass. Your own tests run too.
+
+**Report or migrate, you pick.** `analyze` and `profile` only report: a ranked plan of what to port, and what is hot under a real workload. They are plain commands, so the report costs no tokens. `go` migrates one unit: it bridges the hottest function, records it, hands the port to your agent, then builds, diffs and gates it, and switches it on only when everything matches (TS/JS, Python and PowerShell; `disable` switches it back off).
+
+**How long a run takes.** One `go` run ports one unit, with at most `--rounds` agent turns (3 by default): one for the port, then one per failing diff or gate. A whole app is one run per unit, so you can stop after any of them.
+
+**Cheap model for the plan, strong model for the port.** The plan needs no model. For the port, pass any agent command: `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**Agents.** `rust-anything setup` adds it to Claude Code, Codex, Cursor, Gemini CLI and OpenCode. Any other MCP client can run `rust-anything mcp`, and the skill also installs on its own with `npx skills add erkamyaman/rust-anything` (see [install](docs/install.md)).
 
 ## License
 

@@ -104,6 +104,11 @@ enum Cmd {
         /// or `rusty_alloc` (pure Rust, no C compiler; wasm too). Kept in `rust-anything.json`.
         #[arg(long, value_enum, default_value = "mimalloc")]
         allocator: bridge::Allocator,
+        /// What the bindings are for once the port is done: `replace` (the original is deleted
+        /// after cut-over), `bindings` (callers keep importing it: public API) or `scaffold`
+        /// (the bindings are deleted at cut-over). Kept in `rust-anything.json`.
+        #[arg(long, value_enum)]
+        end_state: Option<bridge::EndState>,
     },
     /// 2b. Regenerate the bindings and the language wrapper from the signatures in `port.rs`.
     Refresh {
@@ -901,6 +906,7 @@ fn run() -> Result<ExitCode> {
             batch,
             as_json,
             allocator,
+            end_state,
         } => {
             let outcome = bridge::bridge(&bridge::Options {
                 root: &root,
@@ -918,6 +924,9 @@ fn run() -> Result<ExitCode> {
                 as_json,
                 allocator,
             })?;
+            if let Some(end_state) = end_state {
+                bridge::set_end_state(&outcome.crate_dir, end_state)?;
+            }
             say!(
                 "Created {} ({}) for {}",
                 outcome.crate_dir.display(),

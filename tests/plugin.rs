@@ -6,8 +6,17 @@ fn read(path: &str) -> String {
 
 #[test]
 fn the_plugin_ships_the_same_skill_and_mcp_server() {
+    let mut files = vec!["SKILL.md".to_string(), "whole-app.md".to_string()];
+    for entry in std::fs::read_dir(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("skills/rust-anything/languages"),
+    )
+    .unwrap()
+    {
+        let name = entry.unwrap().file_name().to_string_lossy().into_owned();
+        files.push(format!("languages/{name}"));
+    }
     for dir in ["plugin", "directory"] {
-        for file in ["SKILL.md", "whole-app.md"] {
+        for file in &files {
             assert_eq!(
                 read(&format!("{dir}/skills/rust-anything/{file}")),
                 read(&format!("skills/rust-anything/{file}")),

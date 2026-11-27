@@ -2149,6 +2149,7 @@ public class Wildcards {
             allocator: Default::default(),
             float_tolerance: None,
             ignore_key_order: false,
+            end_state: None,
         };
         let mut api = crate::codegen::parse_port(&crate::codegen::port_rs(&manifest));
         crate::bridge::match_export_names(&manifest, &mut api);
@@ -2181,6 +2182,7 @@ public class Wildcards {
             allocator: Default::default(),
             float_tolerance: None,
             ignore_key_order: false,
+            end_state: None,
         };
         let native = native_class(&m, &crate::codegen::PortApi::default());
         assert!(native.contains("throw RustAnythingError.from(message);"));
@@ -2219,6 +2221,7 @@ public class Sets {
             allocator: Default::default(),
             float_tolerance: None,
             ignore_key_order: false,
+            end_state: None,
         };
         let mut api = crate::codegen::parse_port(&crate::codegen::port_rs(&manifest));
         crate::bridge::match_export_names(&manifest, &mut api);
@@ -2284,6 +2287,7 @@ public class Ping {
             allocator: Default::default(),
             float_tolerance: None,
             ignore_key_order: false,
+            end_state: None,
         };
         let mut api = crate::codegen::parse_port(
             "pub fn pong() -> Result<String, String> { Ok(\"pong\".into()) }\n\

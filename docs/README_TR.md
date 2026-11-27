@@ -68,6 +68,10 @@ Rust Anything ücretsiz ve açık kaynaktır. İşinize yarıyorsa, sponsor olma
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">Şirket olarak sponsorluk ya da başka bir konu mu? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">Bir kod tabanını Rust'a mı taşıyorsunuz? Rust geçişleri için danışmanlık veriyorum: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## Hızlı başlangıç
 
 Bunu kodlama ajanınıza yapıştırın:
@@ -85,6 +89,18 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 
 > [!TIP]
 > **Ajanlar:** kurulum adımları, tüm komutlar ve port etme akışı için [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) dosyasını okuyun.
+
+## Nasıl çalışır
+
+**Ne zaman bitmiş sayılır.** Testleriniz değil, davranış. `record` orijinali üretilmiş ve verilmiş girdilerle çalıştırır ve her çağrının döndürdüğünü, fırlattığını ve yazdırdığını kaydeder. Bir port, `gate` geçtiğinde biter: kaydedilen her vaka eşleşir; fmt, clippy, `cargo test`, `unsafe` kontrolü, stub kontrolü ve porta yapıştırılmış kayıtlı cevap kontrolü de geçer. Kendi testleriniz de çalışır.
+
+**Rapor mu, taşıma mı, siz seçin.** `analyze` ve `profile` yalnızca rapor verir: neyin port edileceğine dair sıralı bir plan ve gerçek bir iş yükü altında neyin sıcak olduğu. Bunlar düz komutlardır, bu yüzden rapor hiç token harcamaz. `go` bir birimi taşır: en sıcak fonksiyon için köprü kurar, onu kaydeder, portu ajanınıza verir, sonra derler, karşılaştırır ve `gate`'ten geçirir; yalnızca her şey eşleşirse devreye alır (TS/JS, Python ve PowerShell; `disable` yeniden kapatır).
+
+**Bir çalıştırma ne kadar sürer.** Bir `go` çalıştırması bir birimi port eder ve en fazla `--rounds` ajan turu kullanır (varsayılan 3): biri port için, sonra başarısız her diff ya da gate için bir tane. Bütün bir uygulama birim başına bir çalıştırmadır, yani herhangi birinden sonra durabilirsiniz.
+
+**Plan için ucuz model, port için güçlü model.** Plan için model gerekmez. Port için herhangi bir ajan komutu verin: `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**Ajanlar.** `rust-anything setup` onu Claude Code, Codex, Cursor, Gemini CLI ve OpenCode'a ekler. Diğer MCP istemcileri `rust-anything mcp` çalıştırabilir; skill ayrıca `npx skills add erkamyaman/rust-anything` ile tek başına da kurulur (bkz. [kurulum](install.md)).
 
 ## Lisans
 

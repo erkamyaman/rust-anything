@@ -22,6 +22,46 @@ pub(crate) const SKILL_FILES: &[(&str, &str)] = &[
         "whole-app.md",
         include_str!("../skills/rust-anything/whole-app.md"),
     ),
+    (
+        "languages/typescript.md",
+        include_str!("../skills/rust-anything/languages/typescript.md"),
+    ),
+    (
+        "languages/python.md",
+        include_str!("../skills/rust-anything/languages/python.md"),
+    ),
+    (
+        "languages/go.md",
+        include_str!("../skills/rust-anything/languages/go.md"),
+    ),
+    (
+        "languages/ruby.md",
+        include_str!("../skills/rust-anything/languages/ruby.md"),
+    ),
+    (
+        "languages/java.md",
+        include_str!("../skills/rust-anything/languages/java.md"),
+    ),
+    (
+        "languages/kotlin.md",
+        include_str!("../skills/rust-anything/languages/kotlin.md"),
+    ),
+    (
+        "languages/c.md",
+        include_str!("../skills/rust-anything/languages/c.md"),
+    ),
+    (
+        "languages/php.md",
+        include_str!("../skills/rust-anything/languages/php.md"),
+    ),
+    (
+        "languages/csharp.md",
+        include_str!("../skills/rust-anything/languages/csharp.md"),
+    ),
+    (
+        "languages/powershell.md",
+        include_str!("../skills/rust-anything/languages/powershell.md"),
+    ),
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum, Serialize)]
@@ -552,6 +592,7 @@ fn skill(agent: Agent, dir: &Path, opts: &Options) -> Result<Change> {
         }
         if action == "removed" {
             // The folder is ours; leave it only if someone put other files in it.
+            let _ = std::fs::remove_dir(dir.join("languages"));
             let _ = std::fs::remove_dir(dir);
         }
     }
@@ -703,6 +744,13 @@ mod tests {
             home.join(".codex/skills/rust-anything/whole-app.md")
                 .exists()
         );
+        for lang in ["typescript", "python", "powershell"] {
+            assert!(
+                home.join(format!(".claude/skills/rust-anything/languages/{lang}.md"))
+                    .exists(),
+                "{lang}.md missing"
+            );
+        }
         let cursor: Value =
             serde_json::from_str(&std::fs::read_to_string(home.join(".cursor/mcp.json")).unwrap())
                 .unwrap();
