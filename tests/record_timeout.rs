@@ -53,7 +53,24 @@ fn record_stuck(root: &Path, unit: &str) -> (String, Vec<serde_json::Value>) {
 }
 
 fn check((printed, cases): &(String, Vec<serde_json::Value>)) {
-    assert!(printed.contains("Left out "), "{printed}");
+    let count: usize = printed
+        .lines()
+        .find_map(|l| {
+            l.strip_prefix("Left out ")?
+                .split_whitespace()
+                .next()?
+                .parse()
+                .ok()
+        })
+        .unwrap_or(0);
+    assert!(count > 0, "{printed}");
+    let noun = if count == 1 { "input" } else { "inputs" };
+    assert!(
+        printed.contains(&format!(
+            "Left out {count} {noun} the original ran too long on"
+        )),
+        "{printed}"
+    );
     assert!(cases.len() > 5, "{printed}");
     let hangs =
         |v: &serde_json::Value| v.as_f64().is_some_and(|n| n > 1000.0) || v["$num"] == "Infinity";

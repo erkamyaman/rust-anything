@@ -305,7 +305,10 @@ fn a_language_the_folder_lacks_is_an_error_not_an_empty_plan() {
     assert_eq!(frontend.unwrap().summary.ui_files, 1);
     let err = hidden.unwrap_err().to_string();
     assert!(err.contains("no Python source files"), "{err}");
-    assert!(err.contains("excluded by ignore rules"), "{err}");
+    assert!(
+        err.contains("1 Python file under") && err.contains("is excluded by ignore rules"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -526,7 +529,42 @@ fn ignore_rules_above_the_repository_are_skipped_and_hiding_everything_warns() {
     let report = analyze(&repo).unwrap();
     assert_eq!(report.summary.source_files, 0);
     assert_eq!(report.warnings.len(), 1);
-    assert!(report.warnings[0].contains("1 TypeScript/JavaScript files"));
+    assert!(
+        report.warnings[0].contains("1 TypeScript/JavaScript file under")
+            && report.warnings[0].contains("is excluded by ignore rules"),
+        "{}",
+        report.warnings[0]
+    );
+
+    std::fs::write(
+        repo.join("src/b.ts"),
+        "export function g(t: string): string { return t; }\n",
+    )
+    .unwrap();
+    let report = analyze(&repo).unwrap();
+    assert!(
+        report.warnings[0].contains("2 TypeScript/JavaScript files under")
+            && report.warnings[0].contains("are excluded by ignore rules"),
+        "{}",
+        report.warnings[0]
+    );
+
+    let compiled_dir = tmp.join("compiled");
+    std::fs::create_dir_all(&compiled_dir).unwrap();
+    std::fs::write(compiled_dir.join("app.pyc"), "x").unwrap();
+    let report = analyze(&compiled_dir).unwrap();
+    assert!(
+        report.warnings[0].contains("only 1 compiled or packaged file."),
+        "{}",
+        report.warnings[0]
+    );
+    std::fs::write(compiled_dir.join("lib.pyc"), "x").unwrap();
+    let report = analyze(&compiled_dir).unwrap();
+    assert!(
+        report.warnings[0].contains("only 2 compiled or packaged files."),
+        "{}",
+        report.warnings[0]
+    );
 
     std::fs::remove_dir_all(&tmp).unwrap();
 }

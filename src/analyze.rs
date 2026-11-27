@@ -652,17 +652,19 @@ fn build(
             .count();
         if hidden == 0 && compiled > 0 {
             warnings.push(format!(
-                "no source files were found, only {compiled} compiled or packaged files. {}",
+                "no source files were found, only {}. {}",
+                crate::report::count(compiled, "compiled or packaged file"),
                 compiled_hint()
             ));
         }
         if hidden > 0 {
             warnings.push(format!(
-                "no source files were analyzed, but {hidden} {} files under {} are excluded by \
+                "no source files were analyzed, but {} under {} {} excluded by \
                  ignore rules (.gitignore or .ignore files in this repository); the plan is empty \
                  because of them, not because there is nothing to port",
-                lang.name(),
-                root.display()
+                crate::report::count(hidden, &format!("{} file", lang.name())),
+                root.display(),
+                if hidden == 1 { "is" } else { "are" },
             ));
         }
         if hidden == 0

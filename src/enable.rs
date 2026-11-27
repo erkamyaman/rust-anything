@@ -90,8 +90,13 @@ pub fn enable_only(
             if !unknown.is_empty() {
                 let available: Vec<&str> =
                     manifest.exports.iter().map(|f| f.name.as_str()).collect();
+                let noun = if unknown.len() == 1 {
+                    "export"
+                } else {
+                    "exports"
+                };
                 bail!(
-                    "unknown export(s) in {}: {} (exports: {})",
+                    "unknown {noun} in {}: {} (exports: {})",
                     manifest.crate_name,
                     unknown.join(", "),
                     available.join(", ")
@@ -252,16 +257,26 @@ pub fn select_matching(
         }
         if !unknown.is_empty() {
             let available: Vec<&str> = manifest.exports.iter().map(|f| f.name.as_str()).collect();
+            let noun = if unknown.len() == 1 {
+                "export"
+            } else {
+                "exports"
+            };
             bail!(
-                "unknown export(s) in {}: {} (exports: {})",
+                "unknown {noun} in {}: {} (exports: {})",
                 manifest.crate_name,
                 unknown.join(", "),
                 available.join(", ")
             );
         }
         if !failures.is_empty() {
+            let (noun, verb) = if failures.len() == 1 {
+                ("function", "does")
+            } else {
+                ("functions", "do")
+            };
             bail!(
-                "requested function(s) do not match all recorded cases ({}); pass --force to switch them on anyway",
+                "requested {noun} {verb} not match all recorded cases ({}); pass --force to switch them on anyway",
                 failures.join("; ")
             );
         }
@@ -675,16 +690,48 @@ mod tests {
         assert_eq!(selected, ["slug"]);
         assert_eq!(skipped.len(), 2);
 
-        // --only rejects a failing requested function.
+        // --only rejects a failing requested function (singular for 1, plural for 2+).
         let err = select_matching(&manifest, &outcome, &counts, &["words".into()]).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("requested function does not match all recorded cases"),
+            "{err:#}"
+        );
         assert!(format!("{err:#}").contains("words: 0/223 match"), "{err:#}");
 
-        // --only rejects an unknown export name.
+        let err_multi = select_matching(
+            &manifest,
+            &outcome,
+            &counts,
+            &["words".into(), "missing_fn".into()],
+        )
+        .unwrap_err();
+        assert!(
+            format!("{err_multi:#}")
+                .contains("requested functions do not match all recorded cases"),
+            "{err_multi:#}"
+        );
+
+        // --only rejects an unknown export name (singular for 1, plural for 2+).
         let err = select_matching(&manifest, &outcome, &counts, &["nope".into()]).unwrap_err();
-        assert!(format!("{err:#}").contains("unknown export(s)"), "{err:#}");
+        assert!(
+            format!("{err:#}").contains("unknown export in util-rs: nope"),
+            "{err:#}"
+        );
         assert!(
             format!("{err:#}").contains("(exports: slug, words, missing_fn)"),
             "{err:#}"
+        );
+
+        let err_two = select_matching(
+            &manifest,
+            &outcome,
+            &counts,
+            &["nope".into(), "nada".into()],
+        )
+        .unwrap_err();
+        assert!(
+            format!("{err_two:#}").contains("unknown exports in util-rs: nope, nada"),
+            "{err_two:#}"
         );
 
         // --partial fails clearly when nothing matches.
