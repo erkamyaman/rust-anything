@@ -3,7 +3,8 @@
 ## Unreleased
 
 - `map` names a crate folder whose `rust-anything.json` does not parse with `/` between folders
-  on Windows too (`rust/util-rs`), as it names every readable port, instead of `rust\util-rs`.
+  on Windows too (`rust/util-rs`), as it names every readable port, instead of `rust\util-rs`
+  (#760 by @Layfate).
 - `profile` on a Java workload keeps JFR's "Started recording" banner off stdout
   (`-Xlog:jfr+startup=error`). Every JVM the workload starts inherits the JFR options, so a build
   tool that runs `java` to read a JDK's version, as Gradle does for its toolchains, failed on the
