@@ -181,3 +181,104 @@ pub fn build(crate_dir: &Path, m: &Manifest) -> Result<PathBuf> {
     std::fs::copy(&lib, &target)?;
     Ok(target)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bridge::JsOnly;
+    use crate::lang::Lang;
+    use crate::ts::exports::ExportedFn;
+
+    fn export(name: &str, file: &str) -> ExportedFn {
+        ExportedFn {
+            name: name.into(),
+            file: file.into(),
+            ..Default::default()
+        }
+    }
+
+    fn manifest(root: &Path, exports: Vec<ExportedFn>, js_only: Vec<JsOnly>) -> Manifest {
+        Manifest {
+            schema: String::new(),
+            root: root.to_path_buf(),
+            root_written: None,
+            unit: "TextTools.psm1".into(),
+            language: Lang::Powershell,
+            kind: crate::bridge::Kind::Ffi,
+            crate_name: "text-tools".into(),
+            exports,
+            classes: Vec::new(),
+            js_only,
+            batches: Vec::new(),
+            allocator: Default::default(),
+            float_tolerance: None,
+            ignore_key_order: false,
+        }
+    }
+
+    fn js_only(name: &str, file: &str) -> JsOnly {
+        JsOnly {
+            name: name.into(),
+            file: file.into(),
+            line: 1,
+            reason: String::new(),
+        }
+    }
+
+    #[test]
+    fn original_files_are_joined_to_the_root_sorted_and_unique() {
+        let root = PathBuf::from("proj");
+        let m = manifest(
+            &root,
+            vec![export("b", "z/Tools.psm1"), export("a", "z/Tools.psm1")],
+            vec![js_only("c", "a/Other.ps1")],
+        );
+        let got = files(Path::new("unused"), &m, false).unwrap();
+        assert_eq!(
+            got,
+            vec![root.join("a/Other.ps1"), root.join("z/Tools.psm1")]
+        );
+    }
+
+    #[test]
+    fn original_files_with_no_functions_are_empty() {
+        let m = manifest(Path::new("proj"), Vec::new(), Vec::new());
+        assert!(files(Path::new("unused"), &m, false).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_js_only_function_in_an_export_file_is_listed_once() {
+        let root = PathBuf::from("proj");
+        let m = manifest(
+            &root,
+            vec![export("a", "Tools.psm1")],
+            vec![js_only("b", "Tools.psm1")],
+        );
+        let got = files(Path::new("unused"), &m, false).unwrap();
+        assert_eq!(got, vec![root.join("Tools.psm1")]);
+    }
+
+    #[test]
+    fn the_port_lists_only_the_generated_wrapper() {
+        let crate_dir = std::env::temp_dir().join(format!("ra-ps-files-{}", std::process::id()));
+        let m = manifest(
+            Path::new("proj"),
+            vec![export("a", "Tools.psm1")],
+            vec![js_only("b", "Other.ps1")],
+        );
+        let wrapper = crate_dir.join(crate::codegen_powershell::wrapper_path(&m));
+        std::fs::create_dir_all(wrapper.parent().unwrap()).unwrap();
+        std::fs::write(&wrapper, "# wrapper").unwrap();
+        let got = files(&crate_dir, &m, true);
+        let expected = wrapper.canonical().unwrap();
+        std::fs::remove_dir_all(&crate_dir).ok();
+        assert_eq!(got.unwrap(), vec![expected]);
+    }
+
+    #[test]
+    fn the_port_fails_when_the_wrapper_is_missing() {
+        let crate_dir = std::env::temp_dir().join(format!("ra-ps-nowrap-{}", std::process::id()));
+        let m = manifest(Path::new("proj"), Vec::new(), Vec::new());
+        assert!(files(&crate_dir, &m, true).is_err());
+    }
+}
