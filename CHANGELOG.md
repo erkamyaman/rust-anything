@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- On Windows, a debug build of the CLI (`cargo run`, and every test that runs the binary) no
+  longer overflows the 1 MB main-thread stack before it parses its arguments: the CLI runs on a
+  thread with an 8 MB stack on every OS. Release builds were not affected (#710 by @Layfate).
 - A napi export called without an optional structured argument, such as an array, now gets
   `None` on the JSON path that async calls always take, instead of failing with
   `invalid type: map, expected a sequence` before the port runs. A `serde_json::Value` parameter
