@@ -1,9 +1,11 @@
-//! Integration tests that run `profile` on real Python (cProfile) and Node (`--cpu-prof`)
-//! workloads instead of hand-built profiler fixtures.
+//! Integration tests that run `profile` on real Python (cProfile), Node (`--cpu-prof`) and Java
+//! (JFR) workloads instead of hand-built profiler fixtures.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
+
+mod common;
 
 use rust_anything::lang::Lang;
 use rust_anything::profile;
@@ -170,4 +172,102 @@ if (total !== 240000) throw new Error(`unexpected ${total}`);
         md.contains("rust-anything bridge"),
         "expected bridge command in markdown:\n{md}"
     );
+}
+
+/// A Java workload: `demo/Hot.java` holds the hot function, `demo/Main.java` drives it. Compiled
+/// into `out`, run as `java -cp out demo.Main`.
+fn java_workload(dir: &Path, main: &str) {
+    let demo = dir.join("demo");
+    std::fs::create_dir_all(&demo).unwrap();
+    std::fs::write(
+        demo.join("Hot.java"),
+        r#"package demo;
+
+public class Hot {
+    public static int lev(String a, String b) {
+        int[] dp = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) dp[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            int prev = dp[0];
+            dp[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int cur = dp[j];
+                dp[j] = a.charAt(i - 1) == b.charAt(j - 1)
+                    ? prev
+                    : 1 + Math.min(prev, Math.min(dp[j], dp[j - 1]));
+                prev = cur;
+            }
+        }
+        return dp[b.length()];
+    }
+
+    /// About two seconds of work, so JFR's 10 ms sampling sees it.
+    public static void spin() {
+        long total = 0;
+        long end = System.nanoTime() + 2_000_000_000L;
+        while (System.nanoTime() < end) {
+            for (int i = 0; i < 1000; i++) total += lev("kitten", "sitting");
+        }
+        if (total <= 0) throw new IllegalStateException("no work");
+    }
+}
+"#,
+    )
+    .unwrap();
+    std::fs::write(demo.join("Main.java"), main).unwrap();
+    let status = Command::new("javac")
+        .args(["-d", "out", "demo/Hot.java", "demo/Main.java"])
+        .current_dir(dir)
+        .status()
+        .unwrap();
+    assert!(status.success(), "javac failed");
+}
+
+#[test]
+fn profile_java_workload_whose_child_jvm_prints_to_a_pipe() {
+    if !common::have("java") || !common::have("javac") {
+        return;
+    }
+    let tmp = TempDir::new("profile-java-probe");
+    // Like Gradle reading a JDK's version: run another JVM, which inherits JAVA_TOOL_OPTIONS,
+    // and fail when its stdout holds anything but what it printed.
+    java_workload(
+        tmp.path(),
+        r#"package demo;
+
+import java.nio.charset.StandardCharsets;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        if (args.length > 0) {
+            System.out.println("probe ok");
+            return;
+        }
+        String java = ProcessHandle.current().info().command().orElse("java");
+        Process probe = new ProcessBuilder(
+                java, "-cp", System.getProperty("java.class.path"), "demo.Main", "probe")
+            .redirectError(ProcessBuilder.Redirect.DISCARD)
+            .start();
+        String out = new String(probe.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        if (probe.waitFor() != 0 || !out.strip().equals("probe ok")) {
+            System.err.println("unexpected probe output: " + out);
+            System.exit(3);
+        }
+        Hot.spin();
+    }
+}
+"#,
+    );
+
+    let _guard = PROFILE_LOCK.lock().unwrap();
+    let cmd: Vec<String> = ["java", "-cp", "out", "demo.Main"]
+        .map(String::from)
+        .to_vec();
+    let report = profile::profile(tmp.path(), &cmd, Some(Lang::Java)).unwrap();
+    assert_eq!(report.language, Lang::Java);
+    report
+        .hot
+        .iter()
+        .find(|h| h.name == "lev" && h.file.ends_with("Hot.java"))
+        .unwrap_or_else(|| panic!("expected `lev` in `Hot.java`, got: {:?}", report.hot));
 }

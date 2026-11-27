@@ -7,6 +7,7 @@ mod common;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use rust_anything::walk::Canonical;
 use rust_anything::{bridge, cache, enable};
 
 fn copy_tree(from: &Path, to: &Path) {
@@ -36,7 +37,8 @@ fn scratch(name: &str, fixture: &str) -> PathBuf {
             .join(fixture),
         &dir,
     );
-    dir.canonicalize().unwrap()
+    // Without Windows' `\\?\` prefix, as the paths `enable` and `disable` report.
+    dir.canonical().unwrap()
 }
 
 fn bridged(root: &Path, unit: &str, name: &str, keep: &[&str]) -> PathBuf {

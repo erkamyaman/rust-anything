@@ -1,1 +1,6 @@
+# Check text files out with LF line endings on every OS. Git for Windows turns on
+# core.autocrlf by default, and tests compare committed files (docs/tools.md,
+# skills/rust-anything/SKILL.md) byte for byte.
+* text=auto eol=lf
+
 tests/fixtures/cli/**/input.txt text eol=lf

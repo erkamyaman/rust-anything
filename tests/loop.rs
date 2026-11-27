@@ -11,6 +11,7 @@ use std::process::Command;
 use rust_anything::bridge::{self, Kind, Manifest};
 use rust_anything::harness::{self, DiffOptions, RecordOptions};
 use rust_anything::shadow;
+use rust_anything::walk::Canonical;
 
 fn fixture() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mini")
@@ -372,14 +373,22 @@ fn shadow_returns_the_original_and_reports_mismatches() {
     stand_in(&dir, true);
     let out = shadow::shadow(&dir, None).unwrap();
     let script = dir.join("use.ts");
+    // Relative, with `/`: a Windows path pasted into the string turns its `\` into escapes.
+    let module = out
+        .path
+        .canonical()
+        .unwrap()
+        .strip_prefix(dir.canonical().unwrap())
+        .unwrap()
+        .to_string_lossy()
+        .replace('\\', "/");
     std::fs::write(
         &script,
         format!(
-            "import {{ count, shadowStats, onMismatch }} from '{}'\n\
+            "import {{ count, shadowStats, onMismatch }} from './{module}'\n\
              const seen: string[] = []\n\
              onMismatch(m => seen.push(m.fn))\n\
-             console.log(JSON.stringify([count('a b'), count('a\\tb'), shadowStats.calls, seen]))\n",
-            out.path.display()
+             console.log(JSON.stringify([count('a b'), count('a\\tb'), shadowStats.calls, seen]))\n"
         ),
     )
     .unwrap();

@@ -164,3 +164,48 @@ fn a_front_door_in_a_symlinked_rust_dir_finds_the_original() {
     let _ = std::fs::remove_dir_all(&repo);
     let _ = std::fs::remove_dir_all(&elsewhere);
 }
+
+#[cfg(unix)]
+#[test]
+fn a_case_that_reads_the_folder_keeps_the_snapshot_when_the_list_is_cleared() {
+    // Issue #749 review: `fs.base = "."` reaches `files/` through an ancestor, so removing the
+    // snapshot would break a case that stays. The cleanup used to look only inside the folder.
+    let repo = repo();
+    record(&repo);
+    let cases = app::cases_dir(&repo);
+    // A case of its own, read through the case folder, that no recording wrote.
+    std::fs::write(
+        cases.join("by-hand.toml"),
+        "fs.base = \".\"\nstdout = \"...\"\n",
+    )
+    .unwrap();
+
+    app::record(&RecordOptions {
+        repo: &repo,
+        run: &["sh".to_string(), "tool.sh".to_string()],
+        inputs: Some(&repo.join("inputs.jsonl")),
+        normalize: &[],
+        name: Some("tool"),
+        traps: false,
+        timeout_secs: None,
+        http: None,
+        server_args: None,
+        fresh: Some(&[]),
+        pace_ms: None,
+        port: None,
+        float_tolerance: None,
+        float_files: &[],
+        effects: None,
+        ready_secs: None,
+        ready_request: None,
+    })
+    .unwrap();
+
+    let snapshot = cases.join("files");
+    let kept = snapshot.is_dir();
+    let _ = std::fs::remove_dir_all(&repo);
+    assert!(
+        kept,
+        "the snapshot is gone although by-hand.toml reads it through `fs.base = \".\"`"
+    );
+}

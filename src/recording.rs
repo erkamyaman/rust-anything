@@ -13,6 +13,7 @@ use serde_json::{Value, json};
 
 use crate::bridge::Manifest;
 use crate::harness::DiffOutcome;
+use crate::walk::Canonical;
 
 pub const RECORDED_FROM: &str = "recorded-from.json";
 pub const KNOWN_DIFFS: &str = "known-diffs.jsonl";
@@ -167,10 +168,12 @@ pub fn node_coverage(dir: &Path, m: &Manifest) -> Option<Value> {
         .collect();
     unit.sort();
     unit.dedup();
-    let root = m.root.canonicalize().unwrap_or_else(|_| m.root.clone());
+    // `canonical`, not `canonicalize`: on Windows the latter gives `\\?\C:\...`, which no
+    // `file:///C:/...` URL in the report would match.
+    let root = m.root.canonical().unwrap_or_else(|_| m.root.clone());
     let mut files: Vec<std::path::PathBuf> = crate::gate::with_local_imports(&m.root, unit)
         .into_iter()
-        .filter_map(|p| p.canonicalize().ok())
+        .filter_map(|p| p.canonical().ok())
         .collect();
     files.sort();
     files.dedup();
@@ -265,14 +268,10 @@ pub fn node_coverage(dir: &Path, m: &Manifest) -> Option<Value> {
     (!out.is_empty()).then(|| json!({ "lines": total, "reached": total_reached, "files": out }))
 }
 
+/// Whether a V8 `file://` URL names `real`. On Windows the URL is `file:///C:/...`, so the slash
+/// before the drive letter goes (`walk::file_url_path`) and `/` and `\` compare as separators.
 fn same_file(url: &str, real: &Path) -> bool {
-    url.strip_prefix("file://")
-        .map(|p| {
-            percent_encoding::percent_decode_str(p)
-                .decode_utf8_lossy()
-                .into_owned()
-        })
-        .is_some_and(|p| Path::new(&p) == real)
+    crate::walk::file_url_path(url, real).is_some_and(|p| Path::new(&p) == real)
 }
 
 fn spans(lines: impl Iterator<Item = usize>) -> String {

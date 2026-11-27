@@ -138,6 +138,22 @@ fn fuzz_finds_a_mismatch_the_recording_missed_and_keep_makes_gate_fail() {
         before.lines().count() + usize::try_from(failed).unwrap()
     );
     assert!(!behavior(&dir), "gate checks the kept cases");
+
+    // Also check the printed line once without --json.
+    std::fs::write(dir.join(harness::CASES), &before).unwrap();
+    let raw = Command::new(CLI)
+        .args(["fuzz", "--seed", "7", "--cases", "100", "--keep"])
+        .arg(&dir)
+        .output()
+        .unwrap();
+    assert_eq!(raw.status.code(), Some(1));
+    let stdout = String::from_utf8_lossy(&raw.stdout);
+    let case_noun = if failed == 1 { "case" } else { "cases" };
+    assert!(
+        stdout.contains(&format!("Kept {failed} {case_noun} in ")),
+        "{stdout}"
+    );
+
     std::fs::remove_dir_all(&repo).unwrap();
 }
 
