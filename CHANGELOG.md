@@ -5,7 +5,8 @@
 - `record`, `diff` and `bench` on a Java unit use the `CLASSPATH` variable for classes from outside
   the source tree (a Gradle or Maven module's libraries). `javac` already read it, but the driver
   ran with its own `-cp`, so every case recorded `NoClassDefFoundError` instead of a result. When
-  `javac` fails on missing packages or symbols, the error now says to set `CLASSPATH` (#744).
+  `javac` fails on missing packages or symbols, the error now says to set `CLASSPATH`
+  (#744, #765 by @Layfate).
 - `record` on Windows reports how much of a TS/JS original the cases ran, as it does elsewhere.
   V8 names files `file:///C:/...` and the unit's files were compared as `\\?\C:\...`, so no file
   matched and the coverage line was missing (#763 by @Layfate).
