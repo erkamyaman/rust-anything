@@ -1276,7 +1276,9 @@ fn java_declaration(text: &str, name: &str, near: u32) -> Option<u32> {
 
 /// Java: Flight Recorder's execution samples, read with `jfr print --json`.
 fn java(root: &Path, command: &[String], work: &Path) -> Result<(HashMap<Key, Acc>, f64)> {
-    let recording = work.join("profile.jfr");
+    let recordings = work.join("jfr");
+    let _ = std::fs::remove_dir_all(&recordings);
+    std::fs::create_dir_all(&recordings)?;
     let mut options = std::env::var("JAVA_TOOL_OPTIONS").unwrap_or_default();
     // Every JVM the workload starts inherits these options. JFR announces its recording on
     // stdout, and a build tool that runs `java` to read a JDK's version (Gradle's toolchain
@@ -1284,7 +1286,7 @@ fn java(root: &Path, command: &[String], work: &Path) -> Result<(HashMap<Key, Ac
     // `error` or `off` (`warning`, the default, does not count), so set it to `error`.
     options.push_str(&format!(
         " -XX:StartFlightRecording=filename={},settings=profile -XX:FlightRecorderOptions=stackdepth=256 -Xlog:jfr+startup=error",
-        recording.display()
+        recordings.join("profile-%p.jfr").display()
     ));
     let status = crate::process::status(
         Command::new(&command[0])
@@ -1298,31 +1300,43 @@ fn java(root: &Path, command: &[String], work: &Path) -> Result<(HashMap<Key, Ac
     if !status.success() {
         bail!("the workload failed ({status})");
     }
-    let printed = work.join("profile.json");
-    let errors = work.join("jfr-print.err");
-    let status = crate::process::status(
-        Command::new("jfr")
-            .args([
-                "print",
-                "--json",
-                "--stack-depth",
-                "256",
-                "--events",
-                "jdk.ExecutionSample",
-            ])
-            .arg(&recording)
-            .stdout(std::fs::File::create(&printed)?)
-            .stderr(std::fs::File::create(&errors)?),
-        crate::process::TESTS,
-    )
-    .context("running jfr (it comes with the JDK)")?;
-    if !status.success() {
-        bail!(
-            "jfr print failed: {}",
-            std::fs::read_to_string(&errors).unwrap_or_default()
-        );
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&recordings)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|x| x == "jfr"))
+        .collect();
+    files.sort();
+    let mut events: Vec<Value> = Vec::new();
+    for (i, recording) in files.iter().enumerate() {
+        let printed = work.join(format!("profile-{i}.json"));
+        let errors = work.join(format!("jfr-print-{i}.err"));
+        let status = crate::process::status(
+            Command::new("jfr")
+                .args([
+                    "print",
+                    "--json",
+                    "--stack-depth",
+                    "256",
+                    "--events",
+                    "jdk.ExecutionSample",
+                ])
+                .arg(recording)
+                .stdout(std::fs::File::create(&printed)?)
+                .stderr(std::fs::File::create(&errors)?),
+            crate::process::TESTS,
+        )
+        .context("running jfr (it comes with the JDK)")?;
+        if !status.success() {
+            bail!(
+                "jfr print failed: {}",
+                std::fs::read_to_string(&errors).unwrap_or_default()
+            );
+        }
+        let json: Value =
+            serde_json::from_slice(&std::fs::read(&printed)?).context("jfr output")?;
+        if let Some(found) = json["recording"]["events"].as_array() {
+            events.extend(found.iter().cloned());
+        }
     }
-    let json: Value = serde_json::from_slice(&std::fs::read(&printed)?).context("jfr output")?;
     // Sources by class: `com/example/text/Strings` -> its file in the repository.
     let mut sources: HashMap<String, String> = HashMap::new();
     for entry in crate::walk::builder(root).build() {
@@ -1355,7 +1369,7 @@ fn java(root: &Path, command: &[String], work: &Path) -> Result<(HashMap<Key, Ac
     }
     const SAMPLE_MS: f64 = 10.0; // the `profile` settings sample Java threads every 10 ms
     let mut raw: Vec<Vec<Option<(String, String, u32)>>> = Vec::new();
-    for event in json["recording"]["events"].as_array().into_iter().flatten() {
+    for event in &events {
         let frames = event["values"]["stackTrace"]["frames"]
             .as_array()
             .cloned()

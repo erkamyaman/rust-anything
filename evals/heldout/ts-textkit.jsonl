@@ -1,0 +1,40 @@
+{"fn":"slugify","args":["ÆON Flux"]}
+{"fn":"slugify","args":["İstanbul Guide"]}
+{"fn":"slugify","args":["ﬁle Ｎame"]}
+{"fn":"slugify","args":["a--b__c"]}
+{"fn":"slugify","args":["日本語"]}
+{"fn":"slugify","args":["Ⅻ chapter"]}
+{"fn":"slugify","args":[""]}
+{"fn":"slugify","args":["ß straße"]}
+{"fn":"truncate","args":["héllo wörld",5]}
+{"fn":"truncate","args":["a😀b",2]}
+{"fn":"truncate","args":["😀😀😀",3]}
+{"fn":"truncate","args":["😀😀😀",2]}
+{"fn":"truncate","args":["word \u00a0\u2003tail",7]}
+{"fn":"truncate","args":["abc",2.5]}
+{"fn":"truncate","args":["abc",3]}
+{"fn":"truncate","args":["abcd",1]}
+{"fn":"formatBytes","args":[0]}
+{"fn":"formatBytes","args":[1023]}
+{"fn":"formatBytes","args":[1024]}
+{"fn":"formatBytes","args":[1.5]}
+{"fn":"formatBytes","args":[1e-07]}
+{"fn":"formatBytes","args":[1048575]}
+{"fn":"formatBytes","args":[1125899906842624]}
+{"fn":"formatBytes","args":[2.5e+18,0]}
+{"fn":"formatBytes","args":[1536,0]}
+{"fn":"formatBytes","args":[2560,0]}
+{"fn":"formatBytes","args":[1536,3]}
+{"fn":"formatBytes","args":[1536,101]}
+{"fn":"formatBytes","args":[1536,-1]}
+{"fn":"formatBytes","args":[-0.0]}
+{"fn":"parseDuration","args":["  2h  "]}
+{"fn":"parseDuration","args":["0s"]}
+{"fn":"parseDuration","args":["1h 2m 3s"]}
+{"fn":"parseDuration","args":["90m"]}
+{"fn":"parseDuration","args":["1H"]}
+{"fn":"parseDuration","args":["٣s"]}
+{"fn":"parseDuration","args":["\u00a01m\u3000"]}
+{"fn":"parseDuration","args":["99999999999999999999h"]}
+{"fn":"parseDuration","args":[""]}
+{"fn":"parseDuration","args":["1m1h"]}

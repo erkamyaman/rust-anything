@@ -29,6 +29,8 @@
 
 <p align="center"><a href="translations.md">🌐 Башка тилдер</a></p>
 
+<p align="center">Код базаңызды Rust'ка көчүрүп жатасызбы? Rust'ка көчүү боюнча кеңеш берем: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>Бул котормону коомчулук колдойт, ошондуктан ал <a href="../README.md">англисче README</a> нускасынан артта калышы мүмкүн.</sub></p>
 
 ## Демөөрчүлөр
@@ -68,6 +70,10 @@ Rust Anything акысыз жана ачык булактуу. Ишиңизге 
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">Компания катары демөөрчүлүкпү же башка нерсеби? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">Код базаңызды Rust'ка көчүрүп жатасызбы? Rust'ка көчүү боюнча кеңеш берем: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## Тез баштоо
 
 Муну код жазуучу агентиңизге коюңуз:
@@ -85,6 +91,25 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 
 > [!TIP]
 > **Агенттерге:** орнотуу кадамдары, бардык буйруктар жана порттоо тартиби үчүн [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) окуңуз.
+
+## Бул кантип иштейт
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/ky-dark.svg">
+    <img src="assets/how-it-works/ky-light.svg" width="880" alt="analyze эмнени порттоону пландайт; rust-anything go көпүрө курат, жазат, портту агентиңизге берет жана gate аркылуу өткөрөт, жазылган ар бир учур дал келгенче кайталайт; андан кийин enable чакырууларды Rust'ка которот">
+  </picture>
+</p>
+
+**Эмне даяр деп эсептелет.** Сиздин тесттериңиз эмес, жүрүм-турум. `record` түп нусканы генерацияланган жана берилген киргизүүлөр менен иштетип, ар бир чакыруу эмне кайтарарын, эмне ыргытарын жана эмне чыгарарын сактайт. Порт `gate` өткөндө даяр: жазылган ар бир учур дал келет, ошондой эле fmt, clippy, `cargo test`, `unsafe` текшерүүсү, stub текшерүүсү жана портко чапталган жазылган жоопторду текшерүү да өтөт. Өз тесттериңиз да иштейт.
+
+**Отчет же көчүрүү, өзүңүз тандайсыз.** `analyze` жана `profile` отчет гана берет: эмнени порттоо керектигинин иреттелген планы жана чыныгы жүктөмдө эмне эң көп убакыт аларын. Булар жөнөкөй буйруктар, ошондуктан отчет эч кандай токен коротпойт. `go` бир бирдикти көчүрөт: эң ысык функцияга көпүрө курат, аны жазат, портту агентиңизге берет, андан кийин курайт, салыштырат жана `gate` аркылуу өткөрөт, баары дал келгенде гана күйгүзөт (TS/JS, Python жана PowerShell; `disable` кайра өчүрөт).
+
+**Бир иштетүү канча убакыт алат.** Бир `go` иштетүүсү бир бирдикти порттойт, эң көп `--rounds` агент айлампасы менен (демейки боюнча 3): бири порт үчүн, андан кийин ар бир ийгиликсиз diff же gate үчүн бирден. Бүтүн колдонмо ар бир бирдикке бир иштетүүдөн турат, ошондуктан каалаганынан кийин токтосоңуз болот.
+
+**План үчүн арзан модель, порт үчүн күчтүү модель.** План үчүн модель керек эмес. Порт үчүн каалаган агент буйругун бериңиз: `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**Агенттер.** `rust-anything setup` аны Claude Code, Codex, Cursor, Gemini CLI жана OpenCode'го кошот. Каалаган башка MCP кардары `rust-anything mcp` иштете алат, ал эми skill `npx skills add erkamyaman/rust-anything` аркылуу өзүнчө да орнотулат ([орнотуу](install.md) бөлүмүн караңыз).
 
 ## Лицензия
 
