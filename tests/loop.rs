@@ -11,6 +11,7 @@ use std::process::Command;
 use rust_anything::bridge::{self, Kind, Manifest};
 use rust_anything::harness::{self, DiffOptions, RecordOptions};
 use rust_anything::shadow;
+use rust_anything::walk::Canonical;
 
 fn fixture() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mini")
@@ -375,7 +376,9 @@ fn shadow_returns_the_original_and_reports_mismatches() {
     // Relative, with `/`: a Windows path pasted into the string turns its `\` into escapes.
     let module = out
         .path
-        .strip_prefix(&dir)
+        .canonical()
+        .unwrap()
+        .strip_prefix(dir.canonical().unwrap())
         .unwrap()
         .to_string_lossy()
         .replace('\\', "/");
