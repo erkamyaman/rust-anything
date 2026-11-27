@@ -1116,4 +1116,66 @@ use Other\Three;
         assert_eq!(src.as_deref(), Some("src"));
         assert_eq!(own_namespaces(text), ["Acme", "Acme\\Tests"]);
     }
+
+    #[test]
+    fn a_builtin_type_survives_a_nullable_mark_and_a_union_or_intersection() {
+        // `?` at the front and `|` or `&` between parts are the only things stripped, and the
+        // parts may carry spaces and any case. Parentheses are trimmed from each part's ends, so
+        // a parenthesized union of built-ins is plain too.
+        for plain in [
+            "int",
+            "?int",
+            "INT",
+            "string | null",
+            "int|string",
+            "(int|string)",
+            "?array",
+            "mixed",
+            "true|false",
+            "void",
+            "never",
+        ] {
+            assert!(plain_type(plain), "{plain}");
+        }
+        // One class name anywhere makes the whole type unknown: `(A&B)|null` is split on the `&`
+        // inside the parentheses, so `A` and `B` are read as parts of their own.
+        for known in ["User", "\\App\\User", "(A&B)|null", "int|User"] {
+            assert!(!plain_type(known), "{known}");
+        }
+    }
+
+    #[test]
+    fn a_bare_array_is_array_iterable_or_null_and_nothing_else() {
+        for bare in [
+            "array",
+            "?array",
+            "iterable",
+            "iterable|null",
+            "NULL",
+            "?ITERABLE",
+        ] {
+            assert!(bare_array(bare), "{bare}");
+        }
+        // A key type, another built-in or a class name is more than a bare array.
+        for typed in ["array<string>", "array|string", "int", "User"] {
+            assert!(!bare_array(typed), "{typed}");
+        }
+    }
+
+    #[test]
+    fn a_literal_default_names_its_dialect_type() {
+        // Quotes come first, so a numeric-looking string stays a string.
+        assert_eq!(literal_type("'-'"), Some("string"));
+        assert_eq!(literal_type("\"x\""), Some("string"));
+        assert_eq!(literal_type("'0'"), Some("string"));
+        assert_eq!(literal_type("TRUE"), Some("boolean"));
+        assert_eq!(literal_type("false"), Some("boolean"));
+        assert_eq!(literal_type("0"), Some("int"));
+        assert_eq!(literal_type("-3"), Some("int"));
+        assert_eq!(literal_type("1.5"), Some("number"));
+        assert_eq!(literal_type("[]"), Some("unknown[]"));
+        // A class constant, a global constant or a bare name is not a literal default.
+        assert_eq!(literal_type("self::X"), None);
+        assert_eq!(literal_type("PHP_EOL"), None);
+    }
 }
