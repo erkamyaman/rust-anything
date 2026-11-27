@@ -86,6 +86,8 @@ paths in what you commit. CI runs it on every file.
     the table there when a mapping changes.
   - `tests/plugin.rs`: the plugin ships the same skill and MCP server, at the crate version.
   - `tests/skill.rs`: every command the skill names exists in the CLI.
+  - `tests/rules.rs`: `rules --add` appends to `rust/RULES.md` once per rule, a crate folder stands
+    for its original's repository, and the agent prompt `go` writes carries the rules.
   - `tests/recording.rs`, `tests/record_cwd.rs` and `tests/record_timeout.rs`: `record` flags a
     stale recording, leaves the working directory alone, and stops a case that never returns.
   - `tests/float_files.rs`: float files compared within the tolerance.
@@ -103,10 +105,12 @@ paths in what you commit. CI runs it on every file.
   - `tests/untyped_js_types.rs`: types for untyped JavaScript from JSDoc or a sibling declaration
     file.
   - `tests/android_device.rs`: on-device recording over adb; skipped without a device.
+  - `tests/diff_before_build.rs`: `diff`, `bench` and `fuzz` on an unbuilt crate stop before starting
+    node, python or go, with "no built library ... (run `rust-anything build <crate>` first)".
   - `tests/diff_missing_folder.rs` and `tests/missing_crate.rs`: commands run on a crate folder
-  that is missing (e.g. `diff` not suggesting `record` when the crate folder has no manifest,
-  and `disable`, `report` and `shadow` on a non-existent crate folder naming the folder and
-  suggesting `bridge` first).
+    that is missing (e.g. `diff` not suggesting `record` when the crate folder has no manifest,
+    and `disable`, `report` and `shadow` on a non-existent crate folder naming the folder and
+    suggesting `bridge` first).
   - Unit tests live next to the code.
 - **Fixtures** are small apps under `tests/fixtures/`. The CLI and HTTP fixtures implement the same
   commands and routes in every language (`tcli upper|len|div|words|copy|now`, `/hello`, `/upper`,
