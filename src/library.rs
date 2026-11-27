@@ -362,3 +362,109 @@ pub(crate) fn shadow_for(crate_dir: &Path, previous: Option<&str>) -> Result<Opt
         Err(e) => Err(e),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{api_unit, pending};
+    use crate::front_door::{State, WiredUnit};
+
+    /// `state(api, wired)`: the public API, and the units that are wired, each with its exports.
+    fn state(api: &[(&str, &[&str])], wired: &[(&str, Option<&str>, &[&str])]) -> State {
+        State {
+            schema: String::new(),
+            name: "lib".into(),
+            commands: Vec::new(),
+            units: wired
+                .iter()
+                .map(|(name, unit, kept)| WiredUnit {
+                    name: (*name).into(),
+                    crate_name: format!("{name}-rs"),
+                    path: format!("../{name}-rs"),
+                    commands: Vec::new(),
+                    routes: Vec::new(),
+                    switch: format!("RUST_ANYTHING_UNIT_{}", name.to_uppercase()),
+                    unit: unit.map(ToString::to_string),
+                    shadow: None,
+                    kept: kept.iter().map(|k| (*k).to_string()).collect(),
+                })
+                .collect(),
+            lifted: false,
+            kind: crate::front_door::AppKind::Library,
+            routes: Vec::new(),
+            api: api
+                .iter()
+                .map(|(unit, exports)| crate::library::ApiUnit {
+                    unit: (*unit).to_string(),
+                    module: (*unit).replace('/', "_"),
+                    exports: exports.iter().map(|e| (*e).to_string()).collect(),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn every_export_is_pending_until_its_unit_is_wired() {
+        // Issue #719: the fallback rate comes from this list, so an unwired unit has to list every
+        // export it still answers for.
+        let s = state(
+            &[("src/textkit", &["split", "join"]), ("src/net", &["get"])],
+            &[],
+        );
+        assert_eq!(
+            pending(&s),
+            vec!["src/textkit: split", "src/textkit: join", "src/net: get"]
+        );
+    }
+
+    #[test]
+    fn a_wired_unit_is_pending_only_for_the_exports_it_kept() {
+        let s = state(
+            &[("src/textkit", &["split", "join"])],
+            &[("textkit", Some("src/textkit"), &["join"])],
+        );
+        assert_eq!(pending(&s), vec!["src/textkit: join"]);
+    }
+
+    #[test]
+    fn nothing_is_pending_once_every_unit_is_wired_and_keeps_nothing() {
+        let s = state(
+            &[("src/textkit", &["split"]), ("src/net", &["get"])],
+            &[
+                ("textkit", Some("src/textkit"), &[]),
+                ("net", Some("src/net"), &[]),
+            ],
+        );
+        assert!(pending(&s).is_empty(), "{:?}", pending(&s));
+    }
+
+    #[test]
+    fn a_unit_is_found_with_or_without_a_trailing_slash() {
+        let s = state(&[("src/textkit", &["split"])], &[]);
+        assert_eq!(api_unit(&s, "src/textkit").unwrap().unit, "src/textkit");
+        assert_eq!(
+            api_unit(&s, "src/textkit/").unwrap().unit,
+            "src/textkit",
+            "a trailing slash on the argument still finds the unit"
+        );
+        // The other way round: the saved unit carries the slash and the argument does not.
+        let slashed = state(&[("src/textkit/", &["split"])], &[]);
+        assert_eq!(
+            api_unit(&slashed, "src/textkit").unwrap().unit,
+            "src/textkit/"
+        );
+    }
+
+    #[test]
+    fn an_unknown_unit_names_itself_and_the_units_that_exist() {
+        let s = state(&[("src/textkit", &["split"]), ("src/net", &["get"])], &[]);
+        let err = api_unit(&s, "src/missing").unwrap_err().to_string();
+        assert!(
+            err.contains("`src/missing` is not part of the public API"),
+            "{err}"
+        );
+        assert!(
+            err.contains("src/textkit, src/net"),
+            "the units are listed: {err}"
+        );
+    }
+}

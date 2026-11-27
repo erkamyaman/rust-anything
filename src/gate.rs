@@ -1458,16 +1458,9 @@ mod tests {
             assert!(!check.passed);
             check.detail
         };
-        let one = detail(
-            "pub fn a() -> i32 { todo!() }
-",
-        );
+        let one = detail("pub fn a() -> i32 { todo!() }\n");
         assert!(one.starts_with("1 place in port.rs "), "{one}");
-        let two = detail(
-            "pub fn a() -> i32 { todo!() }
-pub fn b() -> i32 { unimplemented!() }
-",
-        );
+        let two = detail("pub fn a() -> i32 { todo!() }\npub fn b() -> i32 { unimplemented!() }\n");
         assert!(two.starts_with("2 places in port.rs "), "{two}");
     }
 
