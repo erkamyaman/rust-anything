@@ -216,7 +216,7 @@ bad it usually is and gives one example. The severities are the ones `analyze` s
 | Implicit output and the pipeline | medium | PowerShell: `Write-Output`, `echo` and values left uncaptured go to the pipeline |
 | Case-insensitive comparison | medium | PowerShell `-eq`, `-like`, `-match`, `-contains` and `switch` ignore case |
 | Implicit type conversion | medium | PowerShell: casts such as `[int]"abc"`, and `/` on integers giving a double |
-| Intl and locale-aware strings | high | TS/JS `Intl.*`, `localeCompare`, `toLocaleLowerCase`, `normalize("NFC")`: engine ICU data; ICU4X covers most, CJK word breaks differ |
+| Intl and locale-aware strings | high | TS/JS `Intl.*`, `localeCompare`, `toLocaleLowerCase`, `toLocaleString` (and its `Date` and `Time` forms), `normalize("NFC")`: engine ICU data; ICU4X covers most, CJK word breaks differ |
 | Date parsing | high | TS/JS `Date.parse`, `new Date(string)`: V8's legacy formats and local time; test with a date generator |
 | URL and encoding APIs | medium | TS/JS `new URL`, `URLSearchParams`, `TextEncoder`/`TextDecoder`, `atob`/`btoa`: the `url` crate follows the same standard |
 

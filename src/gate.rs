@@ -785,11 +785,14 @@ pub fn text(outcome: &GateOutcome) -> String {
         let first = check.detail.lines().next().unwrap_or_default();
         let _ = writeln!(out, "{mark}  {:<width$} {first}", check.name);
         if !check.passed {
+            // Continuation lines start in the detail's column: the mark, two spaces, the
+            // padded name and one space.
+            let indent = " ".repeat(mark.len() + 2 + width + 1);
             for line in check.detail.lines().skip(1) {
-                let _ = writeln!(out, "            {line}");
+                let _ = writeln!(out, "{indent}{line}");
             }
             if let Some(fix) = &check.fix {
-                let _ = writeln!(out, "            fix: {fix}");
+                let _ = writeln!(out, "{indent}fix: {fix}");
             }
         }
     }
@@ -1142,7 +1145,8 @@ pub fn ported_check(crate_dir: &Path) -> Check {
             "nothing in port.rs is `unimplemented!`, `todo!` or only a `panic!`".into()
         } else {
             format!(
-                "{todo} place(s) in port.rs still `unimplemented!`, `todo!` or a function that only panics"
+                "{} in port.rs still `unimplemented!`, `todo!` or a function that only panics",
+                crate::report::count(todo, "place")
             )
         },
     }
@@ -1447,6 +1451,23 @@ mod tests {
     }
 
     #[test]
+    fn ported_check_counts_one_place_and_several_places() {
+        let detail = |port: &str| {
+            let dir = crate::app::temp_dir("gate-ported").unwrap();
+            std::fs::create_dir_all(dir.join("src")).unwrap();
+            std::fs::write(dir.join("src/port.rs"), port).unwrap();
+            let check = super::ported_check(&dir);
+            std::fs::remove_dir_all(dir).unwrap();
+            assert!(!check.passed);
+            check.detail
+        };
+        let one = detail("pub fn a() -> i32 { todo!() }\n");
+        assert!(one.starts_with("1 place in port.rs "), "{one}");
+        let two = detail("pub fn a() -> i32 { todo!() }\npub fn b() -> i32 { unimplemented!() }\n");
+        assert!(two.starts_with("2 places in port.rs "), "{two}");
+    }
+
+    #[test]
     fn scan_finds_literals_outside_comments_and_tests() {
         let port = "// \"a comment string\" 123456\n\
                     /* 987654 /* nested */ \"no\" */\n\
@@ -1688,5 +1709,46 @@ mod tests {
             );
         }
         assert!(text.contains("Gate passed."));
+    }
+
+    #[test]
+    fn text_aligns_continuation_and_fix_lines_with_the_detail() {
+        let outcome = GateOutcome {
+            passed: false,
+            checks: vec![
+                Check {
+                    name: "ported",
+                    passed: false,
+                    detail: "1 place in port.rs still `todo!`\nsecond line of the detail".into(),
+                    fix: Some("port the functions still stubbed in src/port.rs".into()),
+                },
+                Check {
+                    name: "error cases",
+                    passed: true,
+                    detail: "every failing function has a recorded failing case".into(),
+                    fix: None,
+                },
+            ],
+        };
+        let text = super::text(&outcome);
+        let col = "FAIL  error cases ".len();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(&lines[0][col..], "1 place in port.rs still `todo!`");
+        assert_eq!(
+            lines[1],
+            format!("{}second line of the detail", " ".repeat(col))
+        );
+        assert_eq!(
+            lines[2],
+            format!(
+                "{}fix: port the functions still stubbed in src/port.rs",
+                " ".repeat(col)
+            )
+        );
+        assert_eq!(
+            &lines[3][col..],
+            "every failing function has a recorded failing case"
+        );
+        assert_eq!(lines[4], "Gate failed.");
     }
 }

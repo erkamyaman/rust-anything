@@ -4,7 +4,21 @@
 
 - The Android 16 KB page-size check says "1 LOAD segment is not 16 KB aligned" for one
   misaligned segment and "2 LOAD segments are not 16 KB aligned" for more, instead of
-  "LOAD segment(s) are" (#718 by @MannXo).
+  "LOAD segment(s) are" (#718, #728 by @MannXo).
+- `app record --fresh` writes the files a case removed (`<case>.removed`) with `/` between folders
+  on Windows too, so a recording made on Windows replays on Linux and macOS instead of failing on
+  `stale\old.txt`. Recordings made on Windows before need a fresh `app record`
+  (#727 by @Layfate).
+- `gate` starts a failed check's extra detail lines and its `fix:` line in the same column as the
+  first line of its detail, instead of a fixed 12 spaces that no longer lined up after #707
+  (#713, #725 by @Layfate).
+- `gate`'s `ported` check says "1 place in port.rs" for one stub and "N places" for more,
+  instead of "1 place(s)" (#712, #724 by @Layfate).
+- `analyze` also counts `toLocaleString`, `toLocaleDateString` and `toLocaleTimeString` calls as
+  `Intl and locale-aware strings`: they format numbers and dates with the same ICU data as
+  `localeCompare` (#714, #722 by @chuenchen309).
+- `analyze` no longer flags `new Date(-1)` (a negative number literal) as `Date parsing`
+  (#715, #721 by @brixtonpham).
 - `app record` no longer keeps a separator that two runs' random values happen to share: request
   ids `k2Pq_x9Lm4` and `Zt7w_bR3nV` now record as `[..]` instead of `[..]_[..]`, so a replay whose id
   has no `_` passes. A separator next to a part both runs agree on stays, so `id=[..]` keeps its
