@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- `analyze`'s empty-plan warnings say "1 TypeScript/JavaScript file under ... is excluded" and
+  "only 1 compiled or packaged file" for one file, instead of "1 ... files ... are"
+  (#738, #746 by @brixtonpham).
+- `npx rust-anything@latest setup` now leaves agents that keep working: a copy run from npx's
+  cache sets each agent to start `npx -y rust-anything@<version> mcp` (`cmd /c npx ...` on
+  Windows) instead of the cached binary, which npm may delete. `doctor` reads that entry as
+  current.
+- A GitHub Action runs `rust-anything gate` in CI on every push:
+  `uses: erkamyaman/rust-anything@main` with `crates:` listing the crate folders. It installs
+  rust-anything from npm and fails the job when any crate fails the gate.
 - `analyze` also counts `Number.parseInt` and `Number.parseFloat` calls as `Number semantics`,
   alongside global `parseInt` and `parseFloat` (#730 by @brixtonpham).
 - `--db-dump` output is recorded with `\n` line endings: on Windows, Python's `print` and `sqlite3`
