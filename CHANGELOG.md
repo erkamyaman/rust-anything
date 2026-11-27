@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The Android 16 KB page-size check says "1 LOAD segment is not 16 KB aligned" for one
+  misaligned segment and "2 LOAD segments are not 16 KB aligned" for more, instead of
+  "LOAD segment(s) are" (#718 by @MannXo).
 - `app record` no longer keeps a separator that two runs' random values happen to share: request
   ids `k2Pq_x9Lm4` and `Zt7w_bR3nV` now record as `[..]` instead of `[..]_[..]`, so a replay whose id
   has no `_` passes. A separator next to a part both runs agree on stays, so `id=[..]` keeps its

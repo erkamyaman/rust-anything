@@ -493,8 +493,9 @@ fn check_alignment(readelf: &str) -> Result<()> {
         .collect();
     if !misaligned.is_empty() {
         bail!(
-            "{} LOAD segment(s) are not 16 KB aligned: {}",
-            misaligned.len(),
+            "{} {} not 16 KB aligned: {}",
+            crate::report::count(misaligned.len(), "LOAD segment"),
+            if misaligned.len() == 1 { "is" } else { "are" },
             misaligned[0]
         );
     }
@@ -564,7 +565,14 @@ mod tests {
             check_alignment(&bad)
                 .unwrap_err()
                 .to_string()
-                .contains("16 KB")
+                .starts_with("2 LOAD segments are not 16 KB aligned: ")
+        );
+        let one_bad = aligned.replacen("0x4000\n", "0x1000\n", 1);
+        assert!(
+            check_alignment(&one_bad)
+                .unwrap_err()
+                .to_string()
+                .starts_with("1 LOAD segment is not 16 KB aligned: ")
         );
         assert!(check_alignment("no segments here").is_err());
     }
