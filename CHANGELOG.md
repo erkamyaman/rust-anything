@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `profile` on a Java workload keeps JFR's "Started recording" banner off stdout
+  (`-Xlog:jfr+startup=error`). Every JVM the workload starts inherits the JFR options, so a build
+  tool that runs `java` to read a JDK's version, as Gradle does for its toolchains, failed on the
+  banner with `Unable to determine version for JDK` before the build began (#742).
 - `analyze` also counts `Number.parseInt` and `Number.parseFloat` calls as `Number semantics`,
   alongside global `parseInt` and `parseFloat` (#730 by @brixtonpham).
 - `--db-dump` output is recorded with `\n` line endings: on Windows, Python's `print` and `sqlite3`

@@ -1278,8 +1278,12 @@ fn java_declaration(text: &str, name: &str, near: u32) -> Option<u32> {
 fn java(root: &Path, command: &[String], work: &Path) -> Result<(HashMap<Key, Acc>, f64)> {
     let recording = work.join("profile.jfr");
     let mut options = std::env::var("JAVA_TOOL_OPTIONS").unwrap_or_default();
+    // Every JVM the workload starts inherits these options. JFR announces its recording on
+    // stdout, and a build tool that runs `java` to read a JDK's version (Gradle's toolchain
+    // probe) fails on that banner. JFR turns the banner on unless its startup log is set to
+    // `error` or `off` (`warning`, the default, does not count), so set it to `error`.
     options.push_str(&format!(
-        " -XX:StartFlightRecording=filename={},settings=profile -XX:FlightRecorderOptions=stackdepth=256",
+        " -XX:StartFlightRecording=filename={},settings=profile -XX:FlightRecorderOptions=stackdepth=256 -Xlog:jfr+startup=error",
         recording.display()
     ));
     let status = crate::process::status(
