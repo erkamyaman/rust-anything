@@ -216,6 +216,25 @@ mod tests {
         }
     }
 
+    /// A fresh directory from `app::temp_dir`, removed when the guard goes out of scope.
+    struct TempDir(PathBuf);
+
+    impl TempDir {
+        fn new(tag: &str) -> Self {
+            TempDir(crate::app::temp_dir(tag).unwrap())
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            if let Err(e) = std::fs::remove_dir_all(&self.0)
+                && !std::thread::panicking()
+            {
+                panic!("removing {}: {e}", self.0.display());
+            }
+        }
+    }
+
     fn js_only(name: &str, file: &str) -> JsOnly {
         JsOnly {
             name: name.into(),
@@ -260,7 +279,8 @@ mod tests {
 
     #[test]
     fn the_port_lists_only_the_generated_wrapper() {
-        let crate_dir = std::env::temp_dir().join(format!("ra-ps-files-{}", std::process::id()));
+        let tmp = TempDir::new("ps-files");
+        let crate_dir = &tmp.0;
         let m = manifest(
             Path::new("proj"),
             vec![export("a", "Tools.psm1")],
@@ -269,16 +289,15 @@ mod tests {
         let wrapper = crate_dir.join(crate::codegen_powershell::wrapper_path(&m));
         std::fs::create_dir_all(wrapper.parent().unwrap()).unwrap();
         std::fs::write(&wrapper, "# wrapper").unwrap();
-        let got = files(&crate_dir, &m, true);
+        let got = files(crate_dir, &m, true);
         let expected = wrapper.canonical().unwrap();
-        std::fs::remove_dir_all(&crate_dir).ok();
         assert_eq!(got.unwrap(), vec![expected]);
     }
 
     #[test]
     fn the_port_fails_when_the_wrapper_is_missing() {
-        let crate_dir = std::env::temp_dir().join(format!("ra-ps-nowrap-{}", std::process::id()));
+        let tmp = TempDir::new("ps-nowrap");
         let m = manifest(Path::new("proj"), Vec::new(), Vec::new());
-        assert!(files(&crate_dir, &m, true).is_err());
+        assert!(files(&tmp.0, &m, true).is_err());
     }
 }
