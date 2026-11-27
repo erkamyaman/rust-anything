@@ -282,7 +282,11 @@ impl<'a> Visit<'a> for Collector {
                         self.add(Risk::NumberSemantics, it.span);
                     }
                     (Some("Intl"), _)
-                    | (_, "localeCompare" | "toLocaleLowerCase" | "toLocaleUpperCase") => {
+                    | (
+                        _,
+                        "localeCompare" | "toLocaleLowerCase" | "toLocaleUpperCase"
+                        | "toLocaleString" | "toLocaleDateString" | "toLocaleTimeString",
+                    ) => {
                         self.add(Risk::Intl, it.span);
                     }
                     // `s.normalize("NFC")` or `s.normalize()`, not `path.normalize(p)`.
@@ -534,9 +538,12 @@ mod tests {
              export const epoch = () => new Date(0)\n\
              export const host = (u: string) => new URL(u).host\n\
              export const b = (s: string) => atob(s)\n\
-             export const t = (b: Uint8Array) => new TextDecoder().decode(b)\n",
+             export const t = (b: Uint8Array) => new TextDecoder().decode(b)\n\
+             export const price = (n: number) => n.toLocaleString('de-DE')\n\
+             export const day = (d: Date) => d.toLocaleDateString('en-US')\n\
+             export const hour = (d: Date) => d.toLocaleTimeString()\n",
         );
-        assert_eq!(facts.risks[&Risk::Intl], [1, 2, 3]);
+        assert_eq!(facts.risks[&Risk::Intl], [1, 2, 3, 12, 13, 14]);
         assert_eq!(facts.risks[&Risk::DateParsing], [6, 7]);
         assert_eq!(facts.risks[&Risk::WebApis], [9, 10, 11]);
     }

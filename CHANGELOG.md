@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `analyze` also counts `toLocaleString`, `toLocaleDateString` and `toLocaleTimeString` calls as
+  `Intl and locale-aware strings`: they format numbers and dates with the same ICU data as
+  `localeCompare` (#714).
 - `app record` no longer keeps a separator that two runs' random values happen to share: request
   ids `k2Pq_x9Lm4` and `Zt7w_bR3nV` now record as `[..]` instead of `[..]_[..]`, so a replay whose id
   has no `_` passes. A separator next to a part both runs agree on stays, so `id=[..]` keeps its
