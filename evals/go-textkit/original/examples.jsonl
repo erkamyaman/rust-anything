@@ -1,0 +1,10 @@
+{"fn":"Humanize","args":[1234567]}
+{"fn":"Humanize","args":[-42]}
+{"fn":"Humanize","args":[0]}
+{"fn":"Abbrev","args":["Hello, World",8]}
+{"fn":"Abbrev","args":["hi",5]}
+{"fn":"Abbrev","args":["anything",3]}
+{"fn":"ParseRange","args":["1-3,5"]}
+{"fn":"ParseRange","args":["7-6"]}
+{"fn":"Percent","args":[1,3,2]}
+{"fn":"Percent","args":[5,0,1]}

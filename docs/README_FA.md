@@ -31,6 +31,8 @@
 
 <p align="center"><a href="translations.md">🌐 زبان‌های دیگر</a></p>
 
+<p align="center">کدبیس‌تان را به Rust منتقل می‌کنید؟ برای مهاجرت به Rust مشاوره می‌دهم: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>این ترجمه را جامعه نگهداری می‌کند و ممکن است از <a href="../README.md">README انگلیسی</a> عقب بماند.</sub></p>
 
 ## حامیان
@@ -70,6 +72,10 @@ Rust Anything رایگان و متن‌باز است. اگر به کارتان �
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">حمایت مالی به‌عنوان شرکت، یا هر موضوع دیگری؟ <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">کدبیس‌تان را به Rust منتقل می‌کنید؟ برای مهاجرت به Rust مشاوره می‌دهم: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## شروع سریع
 
 این را در ایجنت برنامه‌نویسی خود بچسبانید:
@@ -86,6 +92,25 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 ```
 
 > **ایجنت‌ها:** برای مراحل نصب، همهٔ دستورها و روند پورت، [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) را بخوانید.
+
+## چطور کار می‌کند
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/fa-dark.svg">
+    <img src="assets/how-it-works/fa-light.svg" width="880" alt="analyze برنامه می‌ریزد چه چیزی پورت شود؛ rust-anything go پل می‌سازد، ضبط می‌کند، پورت را به ایجنت شما می‌سپارد و از gate می‌گذراند، و تا وقتی همهٔ موردهای ضبط‌شده مطابقت کنند تکرار می‌کند؛ سپس enable فراخوانی‌ها را به Rust می‌برد">
+  </picture>
+</p>
+
+**چه چیزی تمام‌شده حساب می‌شود.** رفتار، نه تست‌های شما. `record` نسخهٔ اصلی را روی ورودی‌های تولیدشده و داده‌شده اجرا می‌کند و آنچه هر فراخوانی برمی‌گرداند، پرتاب می‌کند و چاپ می‌کند را ذخیره می‌کند. پورت وقتی تمام است که `gate` پاس شود: همهٔ موردهای ضبط‌شده مطابقت دارند، و fmt، clippy، `cargo test`، بررسی `unsafe`، بررسی stub و بررسی پاسخ‌های ضبط‌شده‌ای که در پورت چسبانده شده‌اند همگی پاس می‌شوند. تست‌های خودتان هم اجرا می‌شوند.
+
+**گزارش یا مهاجرت، انتخاب با شماست.** `analyze` و `profile` فقط گزارش می‌دهند: یک برنامهٔ رتبه‌بندی‌شده از اینکه چه چیزی را پورت کنید، و اینکه زیر بار کاری واقعی چه بخشی داغ است. این‌ها دستورهای ساده‌اند، پس گزارش هیچ توکنی مصرف نمی‌کند. `go` یک واحد را مهاجرت می‌دهد: برای داغ‌ترین تابع پل می‌سازد، آن را ضبط می‌کند، پورت را به ایجنت شما می‌سپارد، سپس آن را build می‌کند، diff می‌گیرد و از `gate` می‌گذراند، و فقط وقتی همه چیز مطابقت داشت آن را روشن می‌کند (TS/JS، Python و PowerShell؛ `disable` دوباره خاموشش می‌کند).
+
+**هر اجرا چقدر طول می‌کشد.** هر اجرای `go` یک واحد را پورت می‌کند، با حداکثر `--rounds` نوبت ایجنت (پیش‌فرض 3): یکی برای پورت، سپس یکی به ازای هر diff یا gate ناموفق. کل برنامه یعنی یک اجرا برای هر واحد، پس می‌توانید بعد از هر کدام متوقف شوید.
+
+**مدل ارزان برای برنامه، مدل قوی برای پورت.** برنامه به مدل نیازی ندارد. برای پورت، هر دستور ایجنتی را بدهید: `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**ایجنت‌ها.** `rust-anything setup` آن را به Claude Code، Codex، Cursor، Gemini CLI و OpenCode اضافه می‌کند. هر کلاینت MCP دیگری می‌تواند `rust-anything mcp` را اجرا کند، و اسکیل هم به‌تنهایی با `npx skills add erkamyaman/rust-anything` نصب می‌شود ([نصب](install.md) را ببینید).
 
 ## مجوز
 
