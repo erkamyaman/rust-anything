@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `record`, `diff` and `bench` on a Java unit use the `CLASSPATH` variable for classes from outside
+  the source tree (a Gradle or Maven module's libraries). `javac` already read it, but the driver
+  ran with its own `-cp`, so every case recorded `NoClassDefFoundError` instead of a result. When
+  `javac` fails on missing packages or symbols, the error now says to set `CLASSPATH` (#744).
 - `analyze` also counts `Number.parseInt` and `Number.parseFloat` calls as `Number semantics`,
   alongside global `parseInt` and `parseFloat` (#730 by @brixtonpham).
 - `--db-dump` output is recorded with `\n` line endings: on Windows, Python's `print` and `sqlite3`

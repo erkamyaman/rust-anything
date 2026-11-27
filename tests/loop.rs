@@ -1519,6 +1519,90 @@ end
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A Java unit that imports a class from outside its source tree, as a Gradle or Maven module
+/// imports its dependencies, records with that class on CLASSPATH.
+#[test]
+fn java_record_reads_classpath_for_classes_outside_the_tree() {
+    if !common::have("javac") {
+        return;
+    }
+    let tmp = std::env::temp_dir().join(format!(
+        "rust-anything-java-classpath-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&tmp);
+    let (repo, deps) = (tmp.join("repo"), tmp.join("deps"));
+    let pads = repo.join("src/main/java/com/example/pad");
+    std::fs::create_dir_all(&pads).unwrap();
+    std::fs::create_dir_all(deps.join("dep")).unwrap();
+    std::fs::write(
+        deps.join("dep/Fill.java"),
+        "package dep;\n\npublic final class Fill {\n    \
+         public static String left(String s, int n) {\n        \
+         StringBuilder b = new StringBuilder();\n        \
+         for (int i = s.length(); i < n; i++) b.append('.');\n        \
+         return b.append(s).toString();\n    }\n}\n",
+    )
+    .unwrap();
+    let status = Command::new("javac")
+        .args(["-d", "classes", "dep/Fill.java"])
+        .current_dir(&deps)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    std::fs::write(
+        pads.join("Pads.java"),
+        "package com.example.pad;\n\nimport dep.Fill;\n\npublic final class Pads {\n    \
+         public static String pad(String s, int n) {\n        return Fill.left(s, n);\n    }\n}\n",
+    )
+    .unwrap();
+    let crate_dir = tmp.join("pad-rs");
+    bridge::bridge(&bridge::Options {
+        root: &repo,
+        unit: "src/main/java/com/example/pad/",
+        kind: None,
+        out: Some(crate_dir.clone()),
+        name: Some("pad-rs".into()),
+        force: false,
+        keep: Vec::new(),
+        lang: None,
+        batch: Vec::new(),
+        as_json: Vec::new(),
+        allocator: Default::default(),
+    })
+    .unwrap();
+    let inputs = tmp.join("inputs.jsonl");
+    std::fs::write(&inputs, "{\"fn\": \"pad\", \"args\": [\"ab\", 4]}\n").unwrap();
+    let record = |classpath: Option<&Path>| {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_rust-anything"));
+        cmd.arg("record")
+            .arg(&crate_dir)
+            .arg("--inputs")
+            .arg(&inputs)
+            .args(["--count", "0"])
+            .env_remove("CLASSPATH");
+        if let Some(cp) = classpath {
+            cmd.env("CLASSPATH", cp);
+        }
+        cmd.output().unwrap()
+    };
+
+    let without = record(None);
+    let stderr = String::from_utf8_lossy(&without.stderr);
+    assert!(!without.status.success(), "{stderr}");
+    assert!(stderr.contains("Set CLASSPATH"), "{stderr}");
+
+    let with = record(Some(&deps.join("classes")));
+    assert!(
+        with.status.success(),
+        "{}",
+        String::from_utf8_lossy(&with.stderr)
+    );
+    let cases = std::fs::read_to_string(crate_dir.join("cases.jsonl")).unwrap();
+    assert!(cases.contains("\"..ab\""), "{cases}");
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
 #[test]
 fn java_classes_bridge_record_and_diff() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/java");

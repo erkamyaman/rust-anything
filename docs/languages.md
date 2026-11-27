@@ -25,6 +25,14 @@ Java, Kotlin and C# signatures, Ruby YARD tags, PHP types and phpdoc; untyped pa
 numbers are inferred as numbers. [Types](types.md) lists what each one becomes in the port,
 and which keep a function in its language.
 
+A Java unit is compiled with the rest of its source tree. When those sources import classes from
+outside it (the module's libraries, or another module), set `CLASSPATH` to the jars and class
+folders the project builds against before `record`, `diff` and `bench`; `javac` and the driver both
+use it. With Gradle, print it from the module's compile classpath
+(`configurations.compileClasspath.asPath`, or `<variant>CompileClasspath` on Android); with Maven,
+`mvn dependency:build-classpath`. Without it, `javac` fails on the missing types and the error says
+to set it.
+
 For Android, `rust-anything build <crate> --profile android` builds the same JNI library with the
 NDK for `arm64-v8a`, `armeabi-v7a` and `x86_64` (or the `--abi` values you pass) and installs it
 into `<crate>/jniLibs/<abi>/`; `--api` sets the API level (minimum 26, which the generated Java

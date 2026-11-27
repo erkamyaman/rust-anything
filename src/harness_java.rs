@@ -83,18 +83,55 @@ fn compile(crate_dir: &Path, m: &Manifest, rust: bool) -> Result<PathBuf> {
                 .map(|f| m.root.join(&f.path)),
         );
     }
+    let mut javac = Command::new("javac");
+    javac.args(["-encoding", "UTF-8", "-nowarn"]);
+    let user = user_classpath();
+    if !user.is_empty() {
+        javac.arg("-cp").arg(std::env::join_paths(user)?);
+    }
     run(
-        Command::new("javac")
-            .args(["-encoding", "UTF-8", "-nowarn", "-d"])
-            .arg(&classes)
-            .args(&sources),
+        javac.arg("-d").arg(&classes).args(&sources),
         if rust {
             "javac (driver and wrapper classes)"
         } else {
             "javac (driver and original sources)"
         },
-    )?;
+    )
+    .map_err(|e| {
+        let text = format!("{e:#}");
+        if missing_classes(&text) {
+            anyhow::anyhow!(
+                "{text}\n\nThe sources use classes from outside their tree (a library or another \
+                 module). Set CLASSPATH to the jars and class folders the project builds against \
+                 and run again: javac and the driver both read it."
+            )
+        } else {
+            e
+        }
+    })?;
     Ok(classes)
+}
+
+/// Whether javac failed on types it could not find, as a Gradle or Maven module compiled
+/// without its dependencies does.
+fn missing_classes(javac: &str) -> bool {
+    javac.lines().any(|l| {
+        l.contains(": error: cannot find symbol")
+            || (l.contains(": error: package ") && l.ends_with(" does not exist"))
+    })
+}
+
+/// The CLASSPATH variable's entries, which `-cp` would otherwise replace. Made absolute, since
+/// javac and java run in a scratch folder; a `lib/*` entry keeps its `*`.
+fn user_classpath() -> Vec<PathBuf> {
+    std::env::var_os("CLASSPATH")
+        .map(|v| {
+            std::env::split_paths(&v)
+                .filter(|p| !p.as_os_str().is_empty())
+                .map(|p| std::path::absolute(&p).unwrap_or(p))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn driver(
@@ -133,12 +170,12 @@ fn driver_command(
     rust: bool,
 ) -> Result<Command> {
     let classes = compile(crate_dir, m, rust)?;
-    let classpath = if rust {
-        let original_classes = compile(crate_dir, m, false)?;
-        std::env::join_paths([&classes, &original_classes])?
-    } else {
-        classes.into_os_string()
-    };
+    let mut classpath = vec![classes];
+    if rust {
+        classpath.push(compile(crate_dir, m, false)?);
+    }
+    classpath.extend(user_classpath());
+    let classpath = std::env::join_paths(classpath)?;
     let work = crate_dir.join(WORK_DIR);
     let targets = work.join("targets.json");
     std::fs::write(&targets, crate::codegen_java::targets(m).to_string())?;
