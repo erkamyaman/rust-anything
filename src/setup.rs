@@ -136,9 +136,42 @@ pub struct Change {
 #[derive(Debug, Serialize)]
 pub struct Report {
     pub command: PathBuf,
+    pub args: Vec<String>,
     pub agents: Vec<Agent>,
     pub changes: Vec<Change>,
     pub dry_run: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Launcher {
+    pub command: String,
+    pub args: Vec<String>,
+}
+
+pub fn npx_package() -> String {
+    format!("{NAME}@{}", env!("CARGO_PKG_VERSION"))
+}
+
+pub fn launcher(exe: &Path) -> Launcher {
+    if exe.components().any(|c| c.as_os_str() == "_npx") {
+        let args = vec!["-y".to_string(), npx_package(), "mcp".into()];
+        if cfg!(windows) {
+            let mut wrapped = vec!["/c".to_string(), "npx".into()];
+            wrapped.extend(args);
+            return Launcher {
+                command: "cmd".into(),
+                args: wrapped,
+            };
+        }
+        return Launcher {
+            command: "npx".into(),
+            args,
+        };
+    }
+    Launcher {
+        command: exe.to_string_lossy().into_owned(),
+        args: vec!["mcp".into()],
+    }
 }
 
 /// The home directory: `HOME`, or `USERPROFILE` on Windows.
@@ -164,21 +197,22 @@ pub fn setup(opts: &Options) -> Result<Report> {
              name one with --agent claude|codex|cursor|gemini|opencode"
         );
     }
-    let command = opts.command.to_string_lossy().into_owned();
+    let run = launcher(&opts.command);
     let mut changes = Vec::new();
     for &agent in &agents {
         let config = agent.config(opts.home);
         changes.push(match agent {
-            Agent::Codex => codex_server(agent, &config, &command, opts)?,
-            Agent::OpenCode => opencode_server(agent, &config, &command, opts)?,
-            _ => json_server(agent, &config, &command, opts, agent == Agent::Claude)?,
+            Agent::Codex => codex_server(agent, &config, &run, opts)?,
+            Agent::OpenCode => opencode_server(agent, &config, &run, opts)?,
+            _ => json_server(agent, &config, &run, opts, agent == Agent::Claude)?,
         });
         if let Some(dir) = agent.skill_dir(opts.home) {
             changes.push(skill(agent, &dir, opts)?);
         }
     }
     Ok(Report {
-        command: opts.command.clone(),
+        command: PathBuf::from(&run.command),
+        args: run.args,
         agents,
         changes,
         dry_run: opts.dry_run,
@@ -222,7 +256,7 @@ fn write(path: &Path, text: &str) -> Result<()> {
 fn json_server(
     agent: Agent,
     path: &Path,
-    command: &str,
+    run: &Launcher,
     opts: &Options,
     stdio_type: bool,
 ) -> Result<Change> {
@@ -265,8 +299,8 @@ fn json_server(
             .and_then(Value::as_object)
             .cloned()
             .unwrap_or_default();
-        entry.insert("command".into(), json!(command));
-        entry.insert("args".into(), json!(["mcp"]));
+        entry.insert("command".into(), json!(run.command));
+        entry.insert("args".into(), json!(run.args));
         if stdio_type || entry.contains_key("type") {
             entry.insert("type".into(), json!("stdio"));
         }
@@ -323,7 +357,7 @@ fn opencode_servers<'a>(
 
 /// `mcp.servers.rust-anything` in OpenCode's `opencode.json`: a local server whose `command`
 /// is the whole argv, so the executable and `mcp` go in one array.
-fn opencode_server(agent: Agent, path: &Path, command: &str, opts: &Options) -> Result<Change> {
+fn opencode_server(agent: Agent, path: &Path, run: &Launcher, opts: &Options) -> Result<Change> {
     let text = match std::fs::read_to_string(path) {
         Ok(t) => Some(t),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
@@ -365,7 +399,9 @@ fn opencode_server(agent: Agent, path: &Path, command: &str, opts: &Options) -> 
             .cloned()
             .unwrap_or_default();
         entry.insert("type".into(), json!("local"));
-        entry.insert("command".into(), json!([command, "mcp"]));
+        let mut argv = vec![run.command.clone()];
+        argv.extend(run.args.iter().cloned());
+        entry.insert("command".into(), json!(argv));
         // OpenCode keeps a server out of the way with `disabled`, and older files wrote the
         // opposite `enabled`: setting one up means neither key.
         entry.shift_remove("disabled");
@@ -400,7 +436,7 @@ fn opencode_server(agent: Agent, path: &Path, command: &str, opts: &Options) -> 
 }
 
 /// `[mcp_servers.rust-anything]` in Codex's `config.toml`, keeping the rest of the file as is.
-fn codex_server(agent: Agent, path: &Path, command: &str, opts: &Options) -> Result<Change> {
+fn codex_server(agent: Agent, path: &Path, run: &Launcher, opts: &Options) -> Result<Change> {
     let text = match std::fs::read_to_string(path) {
         Ok(t) => t,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
@@ -425,10 +461,15 @@ fn codex_server(agent: Agent, path: &Path, command: &str, opts: &Options) -> Res
         .get(NAME)
         .and_then(|t| t.as_table_like())
         .is_some_and(|t| {
-            t.get("command").and_then(|c| c.as_str()) == Some(command)
+            t.get("command").and_then(|c| c.as_str()) == Some(run.command.as_str())
                 && t.get("url").is_none()
                 && t.get("args").and_then(|a| a.as_array()).is_some_and(|a| {
-                    a.iter().map(|v| v.as_str()).collect::<Vec<_>>() == [Some("mcp")]
+                    a.iter().map(|v| v.as_str()).collect::<Vec<_>>()
+                        == run
+                            .args
+                            .iter()
+                            .map(|a| Some(a.as_str()))
+                            .collect::<Vec<_>>()
                 })
         });
     let action = if opts.remove {
@@ -449,9 +490,11 @@ fn codex_server(agent: Agent, path: &Path, command: &str, opts: &Options) -> Res
             }
             _ => toml_edit::Table::new(),
         };
-        entry["command"] = toml_edit::value(command);
+        entry["command"] = toml_edit::value(run.command.as_str());
         let mut args = toml_edit::Array::new();
-        args.push("mcp");
+        for a in &run.args {
+            args.push(a.as_str());
+        }
         entry["args"] = toml_edit::value(args);
         entry.remove("url");
         servers.insert(NAME, toml_edit::Item::Table(entry));
@@ -543,9 +586,10 @@ pub fn text(r: &Report) -> String {
             .any(|c| c.action != "removed" && c.action != "absent")
     {
         out.push_str(&format!(
-            "\nThe agents run `{} mcp`. Restart them, then ask, for example:\n  \
+            "\nThe agents run `{} {}`. Restart them, then ask, for example:\n  \
              \"Profile this repo's slowest workflow with rust-anything and move the hot loop to Rust.\"\n",
-            r.command.display()
+            r.command.display(),
+            r.args.join(" ")
         ));
     }
     out
@@ -894,6 +938,70 @@ mod tests {
         let r = setup(&dry).unwrap();
         assert_eq!(r.changes[0].action, "added");
         assert!(!home.join(".gemini").exists());
+        std::fs::remove_dir_all(&home).unwrap();
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn a_copy_run_by_npx_is_set_up_to_start_through_npx() {
+        let package = format!("{NAME}@{}", env!("CARGO_PKG_VERSION"));
+        let cached = PathBuf::from(
+            "/home/u/.npm/_npx/0a1b2c/node_modules/rust-anything/binaries/linux-x64/rust-anything",
+        );
+        assert_eq!(
+            launcher(&cached),
+            Launcher {
+                command: "npx".into(),
+                args: vec!["-y".into(), package.clone(), "mcp".into()],
+            }
+        );
+        assert_eq!(
+            launcher(Path::new("/opt/bin/rust-anything")),
+            Launcher {
+                command: "/opt/bin/rust-anything".into(),
+                args: vec!["mcp".into()],
+            }
+        );
+
+        let home = temp_home("npx");
+        std::fs::create_dir_all(home.join(".codex")).unwrap();
+        let mut options = opts(&home, vec![Agent::Claude, Agent::Codex, Agent::OpenCode]);
+        options.command = cached;
+        let report = setup(&options).unwrap();
+        let claude: Value =
+            serde_json::from_str(&std::fs::read_to_string(home.join(".claude.json")).unwrap())
+                .unwrap();
+        assert_eq!(claude["mcpServers"][NAME]["command"], "npx");
+        assert_eq!(
+            claude["mcpServers"][NAME]["args"],
+            json!(["-y", package, "mcp"])
+        );
+        let codex = std::fs::read_to_string(home.join(".codex/config.toml")).unwrap();
+        assert!(
+            codex.contains(&format!(
+                "command = \"npx\"\nargs = [\"-y\", \"{package}\", \"mcp\"]"
+            )),
+            "{codex}"
+        );
+        let opencode: Value = serde_json::from_str(
+            &std::fs::read_to_string(home.join(".config/opencode/opencode.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            opencode["mcp"]["servers"][NAME]["command"],
+            json!(["npx", "-y", package, "mcp"])
+        );
+        assert!(
+            text(&report).contains(&format!("`npx -y {package} mcp`")),
+            "{}",
+            text(&report)
+        );
+        let again = setup(&options).unwrap();
+        assert!(
+            again.changes.iter().all(|c| c.action == "unchanged"),
+            "{:?}",
+            again.changes
+        );
         std::fs::remove_dir_all(&home).unwrap();
     }
 }

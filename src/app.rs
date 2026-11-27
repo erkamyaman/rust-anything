@@ -1718,6 +1718,13 @@ fn any_base_reads(read: &BTreeSet<PathBuf>, path: &Path, resolved: Option<&Path>
         .any(|base| base.starts_with(path) || resolved.is_some_and(|r| base.starts_with(r)))
 }
 
+fn any_base_reaches(read: &BTreeSet<PathBuf>, path: &Path, resolved: Option<&Path>) -> bool {
+    any_base_reads(read, path, resolved)
+        || read
+            .iter()
+            .any(|base| path.starts_with(base) || resolved.is_some_and(|r| r.starts_with(base)))
+}
+
 /// The `fs.base` folders that the cases in `dir` other than `going` read, each as written (joined
 /// to `dir`) and, when it exists, resolved.
 fn bases_read(dir: &Path, going: &BTreeSet<&str>) -> BTreeSet<PathBuf> {
@@ -2234,7 +2241,7 @@ pub fn record(opts: &RecordOptions) -> Result<RecordOutcome> {
         let fresh_dir = dir.join(FRESH_DIR);
         let retained_reads = bases_read(&dir, &BTreeSet::new());
         let resolved = fresh_dir.canonicalize().ok();
-        if !any_base_reads(&retained_reads, &fresh_dir, resolved.as_deref()) {
+        if !any_base_reaches(&retained_reads, &fresh_dir, resolved.as_deref()) {
             let _ = std::fs::remove_dir_all(&fresh_dir);
         }
     }
