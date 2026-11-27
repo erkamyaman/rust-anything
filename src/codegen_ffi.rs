@@ -252,3 +252,91 @@ pub fn cargo_toml(m: &Manifest) -> String {
         m.crate_name, m.unit
     )
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bridge::Kind;
+    use std::path::PathBuf;
+
+    fn manifest(crate_name: &str) -> Manifest {
+        Manifest {
+            schema: String::new(),
+            root: PathBuf::new(),
+            root_written: None,
+            unit: "unit.ts".into(),
+            language: Lang::default(),
+            kind: Kind::Ffi,
+            crate_name: crate_name.into(),
+            exports: vec![],
+            classes: vec![],
+            js_only: vec![],
+            batches: vec![],
+            allocator: Default::default(),
+            float_tolerance: None,
+            ignore_key_order: false,
+        }
+    }
+
+    fn port_fn(params: &[&str], ret: &str) -> PortFn {
+        PortFn {
+            js_name: "f".into(),
+            rust_name: "f".into(),
+            params: params
+                .iter()
+                .enumerate()
+                .map(|(i, ty)| (format!("p{i}"), (*ty).into()))
+                .collect(),
+            ret: ret.into(),
+            fallible: false,
+            is_async: false,
+        }
+    }
+
+    #[test]
+    fn java_native_class_capitalizes_each_lib_name_part() {
+        assert_eq!(java_native_class(&manifest("kit")), "KitNative");
+        assert_eq!(
+            java_native_class(&manifest("text-kit-rs")),
+            "TextKitRsNative"
+        );
+        assert_eq!(java_native_class(&manifest("text--kit")), "TextKitNative");
+    }
+
+    #[test]
+    fn arg_expr_maps_every_float_and_default_branch() {
+        let cases = [
+            ("f64", "num(args, 0)?"),
+            ("Option<f64>", "opt_num(args, 0)?"),
+            ("Vec<f64>", "num_vec(args, 0)?"),
+            ("Option<Vec<f64>>", "opt_num_vec(args, 0)?"),
+            ("String", "arg(args, 0)?"),
+            ("Option<String>", "arg(args, 0)?"),
+        ];
+        for (ty, want) in cases {
+            assert_eq!(arg_expr(&port_fn(&[ty], "()"), 0), want);
+        }
+
+        let second = port_fn(&["String", "f64"], "()");
+        assert_eq!(arg_expr(&second, 1), "num(args, 1)?");
+    }
+
+    #[test]
+    fn out_expr_maps_every_return_branch() {
+        let cases = [
+            ("f64", "out_num(out)"),
+            ("Option<f64>", "out.map_or(Value::Null, out_num)"),
+            (
+                "Vec<f64>",
+                "Value::Array(out.into_iter().map(out_num).collect())",
+            ),
+            ("()", "Value::Null"),
+            (
+                "Thing",
+                "serde_json::to_value(out).map_err(|e| e.to_string())?",
+            ),
+        ];
+        for (ret, want) in cases {
+            assert_eq!(out_expr(&port_fn(&[], ret)), want);
+        }
+    }
+}
