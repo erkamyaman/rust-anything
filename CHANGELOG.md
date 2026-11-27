@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `map` names a crate folder whose `rust-anything.json` does not parse with `/` between folders
+  on Windows too (`rust/util-rs`), as it names every readable port, instead of `rust\util-rs`.
 - `analyze` also counts `Number.parseInt` and `Number.parseFloat` calls as `Number semantics`,
   alongside global `parseInt` and `parseFloat` (#730 by @brixtonpham).
 - `--db-dump` output is recorded with `\n` line endings: on Windows, Python's `print` and `sqlite3`

@@ -139,11 +139,12 @@ pub fn map(root: &Path, extra: &[PathBuf]) -> Result<PortMap> {
                 if let Some(unit) = raw.as_ref().and_then(|v| v["unit"].as_str()) {
                     covered_by_broken.push(unit.to_string());
                 }
+                // With `/` on every OS, as a readable port's `crate_dir` is.
                 let shown = dir
                     .strip_prefix(&root)
                     .unwrap_or(&dir)
-                    .display()
-                    .to_string();
+                    .to_string_lossy()
+                    .replace('\\', "/");
                 crate_errors.push(format!("`{shown}`: {e:#}"));
                 continue;
             }
