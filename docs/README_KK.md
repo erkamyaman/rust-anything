@@ -29,6 +29,8 @@
 
 <p align="center"><a href="translations.md">🌐 Басқа тілдер</a></p>
 
+<p align="center">Код базаңызды Rust-қа көшіріп жатырсыз ба? Rust-қа көшу бойынша кеңес беремін: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>Бұл аударманы қауымдастық жүргізеді, сондықтан ол <a href="../README.md">ағылшынша README</a> нұсқасынан артта қалуы мүмкін.</sub></p>
 
 ## Демеушілер
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **Агенттерге:** орнату қадамдары, барлық командалар және порттау тәртібі үшін [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) оқыңыз.
 
 ## Бұл қалай жұмыс істейді
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/kk-dark.svg">
+    <img src="assets/how-it-works/kk-light.svg" width="880" alt="analyze нені порттауды жоспарлайды; rust-anything go көпір жасайды, жазады, портты агентіңізге береді және gate арқылы өткізеді, жазылған әр жағдай сәйкес келгенше қайталайды; содан кейін enable шақыруларды Rust-қа ауыстырады">
+  </picture>
+</p>
 
 **Не дайын деп саналады.** Сіздің тесттеріңіз емес, мінез-құлық. `record` түпнұсқаны генерацияланған және берілген кіріс деректерімен іске қосып, әр шақырудың нені қайтаратынын, лақтыратынын және шығаратынын сақтайды. Порт `gate` өткенде дайын: жазылған әр жағдай сәйкес келеді, сондай-ақ fmt, clippy, `cargo test`, `unsafe` тексерісі, stub тексерісі және портқа қойылған жазылған жауаптарды тексеру де өтеді. Өз тесттеріңіз де іске қосылады.
 

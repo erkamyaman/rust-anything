@@ -29,6 +29,8 @@ Programmaňyzy Rust-da täzeden ýazyň we onuň henizem öňküsi ýaly işleý
 
 <p align="center"><a href="translations.md">🌐 Beýleki diller</a></p>
 
+<p align="center">Kod bazaňyzy Rust-a geçirýärsiňizmi? Rust-a geçiş boýunça maslahat hyzmatyny hödürleýärin: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>Bu terjimäni jemgyýetçilik goldaýar, şonuň üçin ol <a href="../README.md">iňlisçe README</a> faýlyndan yzda galyp biler.</sub></p>
 
 ## Hemaýatkärler
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **Agentler üçin:** gurnamak ädimleri, ähli buýruklar we portlamak tertibi üçin [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) okaň.
 
 ## Bu nähili işleýär
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/tk-dark.svg">
+    <img src="assets/how-it-works/tk-light.svg" width="880" alt="analyze nämäni portlamalydygyny meýilleşdirýär; rust-anything go köpri gurýar, ýazga alýar, porty agentiňize berýär we gate arkaly geçirýär, ýazga alnan her ýagdaý gabat gelýänçä gaýtalaýar; soňra enable çagyryşlary Rust-a geçirýär">
+  </picture>
+</p>
 
 **Näme taýyn hasaplanýar.** Siziň testleriňiz däl-de, özüni alyp barşy. `record` asyl programmany döredilen we berlen girişler bilen işledýär we her çagyryşyň näme gaýtarýandygyny, näme zyňýandygyny we näme çap edýändigini saklaýar. Port `gate` geçende taýyn bolýar: ýazga alnan her ýagdaý gabat gelýär, şeýle hem fmt, clippy, `cargo test`, `unsafe` barlagy, stub barlagy we porta goýlan ýazga alnan jogaplaryň barlagy hem geçýär. Öz testleriňiz hem işleýär.
 

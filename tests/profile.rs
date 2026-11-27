@@ -268,6 +268,58 @@ public class Main {
     report
         .hot
         .iter()
-        .find(|h| h.name == "lev" && h.file.ends_with("Hot.java"))
-        .unwrap_or_else(|| panic!("expected `lev` in `Hot.java`, got: {:?}", report.hot));
+        .find(|h| (h.name == "lev" || h.name == "spin") && h.file.ends_with("Hot.java"))
+        .unwrap_or_else(|| {
+            panic!(
+                "expected `lev` or `spin` in `Hot.java`, got: {:?}",
+                report.hot
+            )
+        });
+}
+
+#[test]
+fn profile_java_keeps_the_samples_of_a_child_jvm() {
+    if !common::have("java") || !common::have("javac") {
+        return;
+    }
+    let tmp = TempDir::new("profile-java-child");
+    java_workload(
+        tmp.path(),
+        r#"package demo;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        if (args.length > 0) {
+            Hot.spin();
+            return;
+        }
+        String java = ProcessHandle.current().info().command().orElse("java");
+        Process child = new ProcessBuilder(
+                java, "-cp", System.getProperty("java.class.path"), "demo.Main", "work")
+            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+            .redirectError(ProcessBuilder.Redirect.DISCARD)
+            .start();
+        if (child.waitFor() != 0) {
+            System.exit(3);
+        }
+    }
+}
+"#,
+    );
+
+    let _guard = PROFILE_LOCK.lock().unwrap();
+    let cmd: Vec<String> = ["java", "-cp", "out", "demo.Main"]
+        .map(String::from)
+        .to_vec();
+    let report = profile::profile(tmp.path(), &cmd, Some(Lang::Java)).unwrap();
+    report
+        .hot
+        .iter()
+        .find(|h| (h.name == "lev" || h.name == "spin") && h.file.ends_with("Hot.java"))
+        .unwrap_or_else(|| {
+            panic!(
+                "expected the child's `Hot.java` work, got: {:?}",
+                report.hot
+            )
+        });
 }

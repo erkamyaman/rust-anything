@@ -29,6 +29,8 @@ Reescreva a sua aplicação em Rust e prove que continua a comportar-se da mesma
 
 <p align="center"><a href="translations.md">🌐 Outros idiomas</a></p>
 
+<p align="center">Vai migrar uma base de código para Rust? Ofereço consultoria para migrações para Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>Esta tradução é mantida pela comunidade e pode estar desatualizada em relação ao <a href="../README.md">README em inglês</a>.</sub></p>
 
 ## Patrocinadores
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **Agentes:** leiam [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) para os passos de instalação, todos os comandos e o fluxo de portabilidade.
 
 ## Como funciona
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/pt-dark.svg">
+    <img src="assets/how-it-works/pt-light.svg" width="880" alt="analyze planeja o que migrar; rust-anything go cria a ponte, grava, deixa seu agente migrar e passa pelo gate, repetindo até todos os casos gravados coincidirem; depois enable passa as chamadas para Rust">
+  </picture>
+</p>
 
 **O que conta como concluído.** O comportamento, não os seus testes. `record` executa o original com entradas geradas e fornecidas e guarda o que cada chamada devolve, lança e imprime. Uma migração está concluída quando `gate` passa: todos os casos gravados coincidem, e fmt, clippy, `cargo test`, a verificação de `unsafe`, a verificação de stubs e a verificação de respostas gravadas coladas na migração passam todas. Os seus próprios testes também são executados.
 

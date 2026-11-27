@@ -31,6 +31,8 @@
 
 <p align="center"><a href="translations.md">🌐 زبان‌های دیگر</a></p>
 
+<p align="center">کدبیس‌تان را به Rust منتقل می‌کنید؟ برای مهاجرت به Rust مشاوره می‌دهم: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>این ترجمه را جامعه نگهداری می‌کند و ممکن است از <a href="../README.md">README انگلیسی</a> عقب بماند.</sub></p>
 
 ## حامیان
@@ -92,6 +94,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **ایجنت‌ها:** برای مراحل نصب، همهٔ دستورها و روند پورت، [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) را بخوانید.
 
 ## چطور کار می‌کند
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/fa-dark.svg">
+    <img src="assets/how-it-works/fa-light.svg" width="880" alt="analyze برنامه می‌ریزد چه چیزی پورت شود؛ rust-anything go پل می‌سازد، ضبط می‌کند، پورت را به ایجنت شما می‌سپارد و از gate می‌گذراند، و تا وقتی همهٔ موردهای ضبط‌شده مطابقت کنند تکرار می‌کند؛ سپس enable فراخوانی‌ها را به Rust می‌برد">
+  </picture>
+</p>
 
 **چه چیزی تمام‌شده حساب می‌شود.** رفتار، نه تست‌های شما. `record` نسخهٔ اصلی را روی ورودی‌های تولیدشده و داده‌شده اجرا می‌کند و آنچه هر فراخوانی برمی‌گرداند، پرتاب می‌کند و چاپ می‌کند را ذخیره می‌کند. پورت وقتی تمام است که `gate` پاس شود: همهٔ موردهای ضبط‌شده مطابقت دارند، و fmt، clippy، `cargo test`، بررسی `unsafe`، بررسی stub و بررسی پاسخ‌های ضبط‌شده‌ای که در پورت چسبانده شده‌اند همگی پاس می‌شوند. تست‌های خودتان هم اجرا می‌شوند.
 

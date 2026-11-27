@@ -29,6 +29,8 @@ Tulis ulang aplikasi Anda dalam Rust, dan buktikan perilakunya tetap sama.
 
 <p align="center"><a href="translations.md">🌐 Bahasa lain</a></p>
 
+<p align="center">Memindahkan codebase ke Rust? Saya menawarkan konsultasi untuk migrasi ke Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>Terjemahan ini dikelola oleh komunitas dan bisa tertinggal dari <a href="../README.md">README berbahasa Inggris</a>.</sub></p>
 
 ## Sponsor
@@ -93,6 +95,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **Agen:** baca [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) untuk langkah instalasi, semua perintah, dan alur porting.
 
 ## Cara kerjanya
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/id-dark.svg">
+    <img src="assets/how-it-works/id-light.svg" width="880" alt="analyze merencanakan apa yang di-port; rust-anything go membuat jembatan, merekam, membiarkan agen Anda mem-port dan menjalankan gate, berulang sampai setiap kasus yang direkam cocok; lalu enable mengalihkan pemanggil ke Rust">
+  </picture>
+</p>
 
 **Apa yang dianggap selesai.** Perilaku, bukan tes Anda. `record` menjalankan versi asli dengan input yang dihasilkan dan yang diberikan, lalu menyimpan apa yang dikembalikan, dilempar, dan dicetak setiap panggilan. Port selesai saat `gate` lolos: setiap kasus yang direkam cocok, dan fmt, clippy, `cargo test`, pemeriksaan `unsafe`, pemeriksaan stub, serta pemeriksaan jawaban rekaman yang ditempel ke port semuanya lolos. Tes Anda sendiri juga dijalankan.
 

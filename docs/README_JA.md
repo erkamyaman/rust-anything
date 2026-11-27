@@ -29,6 +29,8 @@
 
 <p align="center"><a href="translations.md">🌐 他の言語</a></p>
 
+<p align="center">コードベースを Rust に移行しますか？ Rust 移行のコンサルティングを行っています: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>この翻訳はコミュニティによって管理されており、<a href="../README.md">英語版 README</a> より古い場合があります。</sub></p>
 
 ## スポンサー
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **エージェント向け:** インストール手順、すべてのコマンド、移植の流れは [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) を読んでください。
 
 ## 仕組み
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/ja-dark.svg">
+    <img src="assets/how-it-works/ja-light.svg" width="880" alt="analyze が何を移植するかのプランを立て、rust-anything go がブリッジ、記録、エージェントによる移植、gate を、記録したすべてのケースが一致するまで繰り返し、最後に enable が呼び出しを Rust に切り替えます">
+  </picture>
+</p>
 
 **何をもって完了とするか。** あなたのテストではなく、振る舞いです。`record` は生成した入力と与えた入力でオリジナルを実行し、各呼び出しが返す値、投げる例外、出力する内容を保存します。`gate` が通れば移植は完了です。つまり、記録したすべてのケースが一致し、fmt、clippy、`cargo test`、`unsafe` チェック、スタブチェック、記録済みの答えを移植版に貼り付けていないかのチェックがすべて通ることです。あなた自身のテストも実行されます。
 

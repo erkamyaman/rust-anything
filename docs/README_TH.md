@@ -29,6 +29,8 @@
 
 <p align="center"><a href="translations.md">🌐 ภาษาอื่น</a></p>
 
+<p align="center">กำลังย้ายโค้ดเบสไปเป็น Rust อยู่หรือเปล่า? มีบริการให้คำปรึกษาด้านการย้ายระบบไปใช้ Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>คำแปลนี้ดูแลโดยชุมชน และอาจอัปเดตช้ากว่า <a href="../README.md">README ภาษาอังกฤษ</a></sub></p>
 
 ## ผู้สนับสนุน
@@ -93,6 +95,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **สำหรับเอเจนต์:** อ่าน [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) เพื่อดูขั้นตอนติดตั้ง คำสั่งทั้งหมด และขั้นตอนการพอร์ต
 
 ## วิธีการทำงาน
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/th-dark.svg">
+    <img src="assets/how-it-works/th-light.svg" width="880" alt="analyze วางแผนว่าจะพอร์ตอะไร rust-anything go สร้างบริดจ์ บันทึก ให้เอเจนต์ของคุณพอร์ต และตรวจด้วย gate วนซ้ำจนทุกเคสที่บันทึกไว้ตรงกัน จากนั้น enable สลับการเรียกไปใช้ Rust">
+  </picture>
+</p>
 
 **อะไรนับว่าเสร็จ** พฤติกรรม ไม่ใช่เทสต์ของคุณ `record` รันโค้ดต้นฉบับกับอินพุตที่สร้างขึ้นและอินพุตที่กำหนดให้ แล้วบันทึกสิ่งที่แต่ละการเรียกคืนค่า โยนออกมา และพิมพ์ออกมา การพอร์ตถือว่าเสร็จเมื่อ `gate` ผ่าน: ทุกเคสที่บันทึกไว้ตรงกัน และ fmt, clippy, `cargo test`, การตรวจ `unsafe`, การตรวจ stub และการตรวจว่ามีคำตอบที่บันทึกไว้ถูกแปะลงในโค้ดที่พอร์ตหรือไม่ ผ่านทั้งหมด เทสต์ของคุณเองก็รันด้วย
 
