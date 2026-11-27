@@ -277,3 +277,123 @@ pub fn build(crate_dir: &Path, m: &Manifest) -> Result<PathBuf> {
     std::fs::copy(&lib, &target)?;
     Ok(target)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::Lang;
+    use crate::ts::exports::ExportedFn;
+
+    const CSPROJ_A: &str = "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><AssemblyName>Alpha</AssemblyName></PropertyGroup></Project>";
+    const CSPROJ_B: &str = "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><AssemblyName>Beta</AssemblyName></PropertyGroup></Project>";
+
+    fn manifest(root: &Path, export_files: &[&str]) -> Manifest {
+        Manifest {
+            schema: String::new(),
+            root: root.to_path_buf(),
+            root_written: None,
+            unit: "Text.cs".into(),
+            language: Lang::Csharp,
+            kind: crate::bridge::Kind::Ffi,
+            crate_name: "text-tools".into(),
+            exports: export_files
+                .iter()
+                .map(|f| ExportedFn {
+                    name: "F".into(),
+                    file: (*f).into(),
+                    ..Default::default()
+                })
+                .collect(),
+            classes: Vec::new(),
+            js_only: Vec::new(),
+            batches: Vec::new(),
+            allocator: Default::default(),
+            float_tolerance: None,
+            ignore_key_order: false,
+        }
+    }
+
+    fn write(root: &Path, rel: &str, text: &str) {
+        let path = root.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    }
+
+    fn two_projects(tag: &str) -> PathBuf {
+        let root = crate::app::temp_dir(tag).unwrap();
+        write(&root, "Alpha/Alpha.csproj", CSPROJ_A);
+        write(&root, "Alpha/Text.cs", "class T {}");
+        write(&root, "Alpha/Extra.cs", "class E {}");
+        write(&root, "Beta/Beta.csproj", CSPROJ_B);
+        write(&root, "Beta/Other.cs", "class O {}");
+        root
+    }
+
+    #[test]
+    fn only_the_exporting_projects_files_come_back_with_its_csproj() {
+        let root = two_projects("cs-sources-a");
+        let (files, project) = sources(&manifest(&root, &["Alpha/Text.cs"])).unwrap();
+        std::fs::remove_dir_all(&root).ok();
+        assert_eq!(
+            files,
+            vec![root.join("Alpha/Extra.cs"), root.join("Alpha/Text.cs")]
+        );
+        assert_eq!(project.as_deref(), Some(CSPROJ_A));
+    }
+
+    #[test]
+    fn the_other_project_is_chosen_by_where_the_export_lives() {
+        let root = two_projects("cs-sources-b");
+        let (files, project) = sources(&manifest(&root, &["Beta/Other.cs"])).unwrap();
+        std::fs::remove_dir_all(&root).ok();
+        assert_eq!(files, vec![root.join("Beta/Other.cs")]);
+        assert_eq!(project.as_deref(), Some(CSPROJ_B));
+    }
+
+    #[test]
+    fn test_files_are_left_out_and_the_result_is_sorted() {
+        let root = two_projects("cs-sources-c");
+        write(&root, "Alpha/AaTests.cs", "class AaTests {}");
+        write(&root, "Alpha/Zed.cs", "class Z {}");
+        let (files, _) = sources(&manifest(&root, &["Alpha/Text.cs"])).unwrap();
+        std::fs::remove_dir_all(&root).ok();
+        assert_eq!(
+            files,
+            vec![
+                root.join("Alpha/Extra.cs"),
+                root.join("Alpha/Text.cs"),
+                root.join("Alpha/Zed.cs"),
+            ]
+        );
+    }
+
+    #[test]
+    fn exports_in_two_projects_use_the_first_projects_csproj() {
+        let root = two_projects("cs-sources-d");
+        let (files, project) =
+            sources(&manifest(&root, &["Beta/Other.cs", "Alpha/Text.cs"])).unwrap();
+        std::fs::remove_dir_all(&root).ok();
+        assert_eq!(files.len(), 3);
+        assert_eq!(project.as_deref(), Some(CSPROJ_B));
+    }
+
+    #[test]
+    fn an_export_in_no_known_file_gives_nothing() {
+        let root = two_projects("cs-sources-e");
+        let (files, project) = sources(&manifest(&root, &["Missing/Nope.cs"])).unwrap();
+        std::fs::remove_dir_all(&root).ok();
+        assert!(files.is_empty());
+        assert_eq!(project, None);
+    }
+
+    #[test]
+    fn a_folder_without_a_csproj_gives_its_files_and_no_project_text() {
+        let root = crate::app::temp_dir("cs-sources-f").unwrap();
+        write(&root, "Text.cs", "class T {}");
+        write(&root, "Zed.cs", "class Z {}");
+        let (files, project) = sources(&manifest(&root, &["Text.cs"])).unwrap();
+        std::fs::remove_dir_all(&root).ok();
+        assert_eq!(files, vec![root.join("Text.cs"), root.join("Zed.cs")]);
+        assert_eq!(project, None);
+    }
+}
