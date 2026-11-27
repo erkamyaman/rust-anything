@@ -68,6 +68,10 @@ Rust Anything bepul va ochiq manbali. Agar ishingizga yordam bersa, homiyligingi
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">Kompaniya sifatida homiylik yoki boshqa biror narsa? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">Kod bazangizni Rust'ga ko'chiryapsizmi? Rust'ga migratsiya bo'yicha konsalting xizmatini taklif qilaman: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## Tezkor boshlash
 
 Buni kod yozuvchi agentingizga joylashtiring:
@@ -85,6 +89,18 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 
 > [!TIP]
 > **Agentlar:** o'rnatish qadamlari, barcha buyruqlar va portlash jarayoni uchun [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) ni o'qing.
+
+## Qanday ishlaydi
+
+**Nima tayyor hisoblanadi.** Sizning testlaringiz emas, xatti-harakat. `record` asl dasturni generatsiya qilingan va berilgan kirish ma'lumotlarida ishga tushiradi va har bir chaqiruv nima qaytarishi, nima tashlashi va nima chop etishini saqlaydi. Port `gate` o'tganda tayyor bo'ladi: yozib olingan har bir holat mos keladi, shuningdek fmt, clippy, `cargo test`, `unsafe` tekshiruvi, stub tekshiruvi va portga qo'yilgan yozib olingan javoblarni tekshirish ham o'tadi. O'z testlaringiz ham ishga tushadi.
+
+**Hisobot yoki migratsiya, o'zingiz tanlaysiz.** `analyze` va `profile` faqat hisobot beradi: nimani portlash kerakligi bo'yicha tartiblangan reja va real yuklama ostida nima eng ko'p vaqt olishi. Bular oddiy buyruqlar, shuning uchun hisobot hech qanday token sarflamaydi. `go` bitta birlikni ko'chiradi: eng qaynoq funksiya uchun ko'prik quradi, uni yozib oladi, portni agentingizga beradi, so'ng yig'adi, solishtiradi va `gate` orqali o'tkazadi, hammasi mos kelgandagina yoqadi (TS/JS, Python va PowerShell; `disable` uni qayta o'chiradi).
+
+**Bitta ishga tushirish qancha davom etadi.** Bitta `go` ishga tushirishi bitta birlikni portlaydi, ko'pi bilan `--rounds` agent navbati bilan (standart 3): biri port uchun, so'ng har bir muvaffaqiyatsiz diff yoki gate uchun bittadan. Butun ilova har bir birlik uchun bitta ishga tushirishdan iborat, shuning uchun istalganidan keyin to'xtashingiz mumkin.
+
+**Reja uchun arzon model, port uchun kuchli model.** Rejaga model kerak emas. Port uchun istalgan agent buyrug'ini bering: `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**Agentlar.** `rust-anything setup` uni Claude Code, Codex, Cursor, Gemini CLI va OpenCode'ga qo'shadi. Har qanday boshqa MCP mijozi `rust-anything mcp` ni ishga tushira oladi, skill esa `npx skills add erkamyaman/rust-anything` orqali alohida ham o'rnatiladi ([o'rnatish](install.md) bo'limiga qarang).
 
 ## Litsenziya
 

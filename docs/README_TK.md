@@ -68,6 +68,10 @@ Rust Anything mugt we açyk çeşmeli. Işiňize kömek etse, hemaýatkärligiň
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">Kompaniýa hökmünde hemaýatkärlik ýa-da başga bir zat? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">Kod bazaňyzy Rust-a geçirýärsiňizmi? Rust-a geçiş boýunça maslahat hyzmatyny hödürleýärin: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## Çalt başlangyç
 
 Muny kod ýazýan agentiňize goýuň:
@@ -85,6 +89,18 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 
 > [!TIP]
 > **Agentler üçin:** gurnamak ädimleri, ähli buýruklar we portlamak tertibi üçin [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) okaň.
+
+## Bu nähili işleýär
+
+**Näme taýyn hasaplanýar.** Siziň testleriňiz däl-de, özüni alyp barşy. `record` asyl programmany döredilen we berlen girişler bilen işledýär we her çagyryşyň näme gaýtarýandygyny, näme zyňýandygyny we näme çap edýändigini saklaýar. Port `gate` geçende taýyn bolýar: ýazga alnan her ýagdaý gabat gelýär, şeýle hem fmt, clippy, `cargo test`, `unsafe` barlagy, stub barlagy we porta goýlan ýazga alnan jogaplaryň barlagy hem geçýär. Öz testleriňiz hem işleýär.
+
+**Hasabat ýa-da geçiş, özüňiz saýlaň.** `analyze` we `profile` diňe hasabat berýär: nämäni portlamalydygynyň tertipleşdirilen meýilnamasy we hakyky ýük astynda nämäniň iň köp wagt alýandygy. Bular ýönekeý buýruklar, şonuň üçin hasabat hiç hili token sarp etmeýär. `go` bir birligi geçirýär: iň gyzgyn funksiýa üçin köpri gurýar, ony ýazga alýar, porty agentiňize berýär, soňra ýygnaýar, deňeşdirýär we `gate` arkaly geçirýär, diňe hemme zat gabat gelende ony işe goýberýär (TS/JS, Python we PowerShell; `disable` ony ýene öçürýär).
+
+**Bir işletmek näçe wagt alýar.** Bir `go` işletmesi bir birligi portlaýar, iň köp `--rounds` agent aýlawy bilen (adaty ýagdaýda 3): biri port üçin, soňra şowsuz her diff ýa-da gate üçin birden. Tutuş programma her birlik üçin bir işletmeden ybarat, şonuň üçin islendik birinden soň durup bilersiňiz.
+
+**Meýilnama üçin arzan model, port üçin güýçli model.** Meýilnama model gerek däl. Port üçin islendik agent buýrugyny beriň: `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**Agentler.** `rust-anything setup` ony Claude Code, Codex, Cursor, Gemini CLI we OpenCode-a goşýar. Islendik beýleki MCP müşderisi `rust-anything mcp` işledip biler, skill bolsa `npx skills add erkamyaman/rust-anything` arkaly aýratyn hem gurnalýar ([gurnamak](install.md) bölümine serediň).
 
 ## Ygtyýarnama
 

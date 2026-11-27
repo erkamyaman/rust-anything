@@ -659,6 +659,7 @@ mod tests {
             allocator: Default::default(),
             float_tolerance: None,
             ignore_key_order: false,
+            end_state: None,
         };
         let outcome = DiffOutcome {
             total: 446,

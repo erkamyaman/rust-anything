@@ -1,0 +1,9 @@
+{
+  "name": "textkit",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cli": "node cli.ts"
+  }
+}

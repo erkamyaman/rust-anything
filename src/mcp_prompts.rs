@@ -16,6 +16,7 @@ pub fn list() -> Value {
             "arguments": [
                 { "name": "path", "description": "Repository root.", "required": true },
                 { "name": "unit", "description": "Unit id from analyze; the best first port from `start_here` when omitted.", "required": false },
+                { "name": "language", "description": "The unit's language (typescript, python, go, ruby, java, kotlin, c, php, csharp or powershell): adds how its constructs map to Rust and the traps that make cases differ.", "required": false },
             ],
         },
         {
@@ -44,10 +45,14 @@ pub fn get(name: &str, arguments: &Value) -> Result<Value, String> {
                      analyze on it first and take the best first port from `start_here`."
                 ),
             };
+            let language = match arg("language") {
+                Some(lang) => format!("\n\n{}", language_file(lang)?.trim()),
+                None => String::new(),
+            };
             (
                 "Port one unit to Rust",
                 format!(
-                    "{target} Call the port done only when gate passes.\n\nFollow this guide:\n\n{}",
+                    "{target} Call the port done only when gate passes.\n\nFollow this guide:\n\n{}{language}",
                     body(SKILL)
                 ),
             )
@@ -76,6 +81,24 @@ pub fn get(name: &str, arguments: &Value) -> Result<Value, String> {
     }))
 }
 
+/// `languages/<name>.md` from the skill, or the names there are.
+fn language_file(name: &str) -> Result<&'static str, String> {
+    let languages = crate::setup::SKILL_FILES.iter().filter_map(|(file, text)| {
+        Some((file.strip_prefix("languages/")?.strip_suffix(".md")?, *text))
+    });
+    let mut names = Vec::new();
+    for (lang, text) in languages {
+        if lang == name {
+            return Ok(text);
+        }
+        names.push(lang);
+    }
+    Err(format!(
+        "`language` is one of {}, not `{name}`",
+        names.join(", ")
+    ))
+}
+
 fn body(markdown: &str) -> &str {
     let rest = markdown
         .strip_prefix("---\r\n")
@@ -92,6 +115,22 @@ fn body(markdown: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn port_unit_adds_the_language_file_it_is_given() {
+        let dir = crate::app::temp_dir("prompt-language").unwrap();
+        let text = |args: Value| {
+            get("port_unit", &args).unwrap()["messages"][0]["content"]["text"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        };
+        let python = include_str!("../skills/rust-anything/languages/python.md");
+        assert!(!text(json!({ "path": dir })).contains(python.trim()));
+        assert!(text(json!({ "path": dir, "language": "python" })).contains(python.trim()));
+        let err = get("port_unit", &json!({ "path": dir, "language": "cobol" })).unwrap_err();
+        assert!(err.contains("typescript"), "{err}");
+    }
 
     #[test]
     fn both_prompts_carry_the_project_rules() {

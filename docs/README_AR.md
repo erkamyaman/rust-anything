@@ -70,6 +70,10 @@ Rust Anything مجاني ومفتوح المصدر. إن كان يفيدك في 
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">رعاية بصفتك شركة، أو أي أمر آخر؟ <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">تنقل قاعدة شيفرة إلى Rust؟ أقدّم استشارات لعمليات الترحيل إلى Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## البدء السريع
 
 الصق هذا في وكيل البرمجة لديك:
@@ -86,6 +90,18 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 ```
 
 > **للوكلاء:** اقرأ [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) لخطوات التثبيت وكل الأوامر وسير عمل النقل.
+
+## كيف يعمل
+
+**ما الذي يُعدّ منجزًا.** السلوك، لا اختباراتك. يشغّل `record` الأصل على مدخلات مولّدة ومعطاة، ويحفظ ما يعيده كل استدعاء وما يرميه وما يطبعه. يكتمل النقل عندما ينجح `gate`: تتطابق كل حالة مسجّلة، وتنجح جميعها: fmt وclippy و`cargo test` وفحص `unsafe` وفحص البدائل الفارغة (stub) وفحص الإجابات المسجّلة الملصوقة في النقل. وتُشغَّل اختباراتك أيضًا.
+
+**تقرير أو ترحيل، الخيار لك.** يكتفي `analyze` و`profile` بالتقرير: خطة مرتّبة لما يجب نقله، وما هو الأكثر استهلاكًا للوقت تحت حمل عمل حقيقي. إنهما أمران عاديان، فلا يكلّف التقرير أي رموز (tokens). أما `go` فيرحّل وحدة واحدة: يبني جسرًا لأكثر دالة استهلاكًا للوقت، ويسجّلها، ويسلّم النقل إلى وكيلك، ثم يُجمّعه ويقارنه ويمرّره على `gate`، ولا يفعّله إلا عندما يتطابق كل شيء (TS/JS وPython وPowerShell؛ و`disable` يوقفه من جديد).
+
+**كم يستغرق التشغيل.** تشغيل واحد لـ `go` ينقل وحدة واحدة، بحدّ أقصى `--rounds` من أدوار الوكيل (3 افتراضيًا): دور للنقل، ثم دور لكل diff أو gate يفشل. التطبيق كله تشغيل واحد لكل وحدة، فيمكنك التوقف بعد أيٍّ منها.
+
+**نموذج رخيص للخطة، ونموذج قوي للنقل.** الخطة لا تحتاج إلى نموذج. للنقل، مرّر أي أمر وكيل: `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**الوكلاء.** يضيفه `rust-anything setup` إلى Claude Code وCodex وCursor وGemini CLI وOpenCode. ويمكن لأي عميل MCP آخر تشغيل `rust-anything mcp`، وتُثبَّت المهارة أيضًا وحدها عبر `npx skills add erkamyaman/rust-anything` (انظر [التثبيت](install.md)).
 
 ## الرخصة
 

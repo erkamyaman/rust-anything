@@ -654,6 +654,7 @@ mod tests {
             allocator: Default::default(),
             float_tolerance: None,
             ignore_key_order: false,
+            end_state: None,
         };
         let rs = lib_rs(&m, &crate::codegen::PortApi::default()).unwrap();
         assert!(rs.contains("fn resolve_exception("), "{rs}");
@@ -679,6 +680,7 @@ mod tests {
             allocator: Default::default(),
             float_tolerance: None,
             ignore_key_order: false,
+            end_state: None,
         };
         let api = crate::codegen::parse_port(
             "pub fn pong() -> Result<String, String> { Ok(\"pong\".into()) }\n\

@@ -2,7 +2,7 @@ export const en = {
   meta: {
     title: 'Rewrite your whole app in Rust, piece by piece',
     description:
-      'Rewrite your app in Rust piece by piece, checked against the original at every step. CLIs, servers and libraries in TypeScript/JavaScript, Python, C, Go, Ruby, Java, Kotlin, PHP, PowerShell and C#.',
+      'Migrate your app to Rust piece by piece, checked against the original at every step. CLIs, servers and libraries in TypeScript/JavaScript, Python, C, Go, Ruby, Java, Kotlin, PHP, PowerShell and C#.',
   },
   ui: {
     docs: 'Docs',

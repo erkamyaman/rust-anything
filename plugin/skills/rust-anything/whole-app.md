@@ -124,7 +124,9 @@ app's documented examples, `--inputs` for the tests, workloads and error paths y
 traps, two runs, `--normalize` for named noise. A CLI's cases are trycmd files in
 `rust/app-cases/`. For a server add `--http`: the command starts it, taking its port from `PORT`
 or `{port}` (`--port` if it is fixed), and requests come from `curl` lines in its docs and
-`--inputs` (`{"method", "path", "headers", "body"}`), stored in `rust/app-cases/http/`. If the
+`--inputs` (`{"method", "path", "headers", "body"}`), stored in `rust/app-cases/http/`. A PHP
+server runs as `php -S 127.0.0.1:{port} router.php`; a C# app is recorded built
+(`dotnet out/app.dll`, a server with `--urls http://127.0.0.1:{port}`). If the
 app sends email, calls webhooks or APIs, or writes a database, record those too: `--effects
 http,smtp` (and `--effect-env VAR=KIND` for its own URL or mail settings), `--db-reset` and
 `--db-dump` for the database. Ask the user for the reset and dump commands when the database is
@@ -160,7 +162,7 @@ tangled core in one large piece rather than writing glue around it. Claim the un
 and run `rust-anything rules <repo>` first: `rust/RULES.md` holds every behavior the user has
 corrected so far, and the port keeps each one. When the user corrects behavior, add it with
 `rust-anything rules <repo> --add "<rule>"` before going on. Each unit goes through steps 1 to 5
-of SKILL.md, then:
+of SKILL.md with `--end-state scaffold` (the lift deletes its bindings), then:
 
 1. Wire the unit into the front door, and stop falling back for what it covers:
    `rust-anything app wire <repo> <unit> --command <name>` (the app's own name as the command

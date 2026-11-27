@@ -1,0 +1,14 @@
+{"fn":"slugify","args":["Hello, World!"]}
+{"fn":"slugify","args":["  Crème brûlée  "]}
+{"fn":"slugify","args":["!!!"]}
+{"fn":"truncate","args":["The quick brown fox",10]}
+{"fn":"truncate","args":["short",10]}
+{"fn":"truncate","args":["abc",0]}
+{"fn":"formatBytes","args":[512]}
+{"fn":"formatBytes","args":[1536]}
+{"fn":"formatBytes","args":[1073741824,2]}
+{"fn":"formatBytes","args":[-1]}
+{"fn":"parseDuration","args":["1h30m"]}
+{"fn":"parseDuration","args":["45s"]}
+{"fn":"parseDuration","args":["1h75m"]}
+{"fn":"parseDuration","args":["soon"]}

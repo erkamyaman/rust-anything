@@ -40,13 +40,63 @@ PowerShell and verify that `where.exe link` finds the MSVC linker. Tests use tem
 including a path with spaces and Unicode characters, and remove generated artifacts after a
 successful run.
 
-For agents, `rust-anything setup` registers everything (see Quick start). To try it without
-installing, `npx rust-anything@latest setup` sets each agent to start
-`npx -y rust-anything@<version> mcp`, because npm may clear the copy npx ran. The same MCP server and
-skill also ship as a Codex plugin from `.agents/plugins/marketplace.json`
+## Agents
+
+An agent needs two things: the MCP server (`rust-anything mcp`, every step as a tool) and the
+skill in [`skills/rust-anything/`](../skills/rust-anything) (the workflow, with `whole-app.md` and
+one file per language in `languages/`). Every route below still needs the `rust-anything` CLI
+installed.
+
+### `rust-anything setup`
+
+`rust-anything setup` registers the MCP server with Claude Code, Codex, Cursor, Gemini CLI and
+OpenCode, and copies the skill to `~/.claude/skills/`, `~/.codex/skills/` and
+`~/.config/opencode/skills/`. To try it without installing, `npx rust-anything@latest setup` sets
+each agent to start `npx -y rust-anything@<version> mcp`, because npm may clear the copy npx ran.
+
+### Plugins
+
+The repository is a Claude Code plugin marketplace (`.claude-plugin/marketplace.json`); the plugin
+carries the skill and the MCP server:
+
+```sh
+claude plugin marketplace add erkamyaman/rust-anything
+claude plugin install rust-anything@rust-anything
+```
+
+The same MCP server and skill ship as a Codex plugin from `.agents/plugins/marketplace.json`
 (`codex plugin marketplace add erkamyaman/rust-anything`, then
-`codex plugin add rust-anything@rust-anything`). To add the MCP server to one project by hand
-instead (`.mcp.json`):
+`codex plugin add rust-anything@rust-anything`).
+
+### The skill alone
+
+The [skills CLI](https://github.com/vercel-labs/skills) finds the skill in this repository's
+`skills/` folder and copies the whole folder, `languages/` included:
+
+```sh
+npx skills add erkamyaman/rust-anything                    # into this project, for the agents it detects
+npx skills add erkamyaman/rust-anything -g -a claude-code   # into ~/.claude/skills/, for one agent
+```
+
+Or copy [`skills/rust-anything/`](../skills/rust-anything) yourself, as a whole folder named
+`rust-anything`, into a folder the agent reads. One copy in `~/.agents/skills/` reaches Codex,
+Cursor, GitHub Copilot, Gemini CLI and OpenCode.
+
+| Agent | Your home folder | A project |
+| --- | --- | --- |
+| Claude Code | `~/.claude/skills/` | `.claude/skills/` |
+| Codex | `~/.agents/skills/` | `.agents/skills/` |
+| Cursor | `~/.cursor/skills/`, `~/.agents/skills/` (also reads `~/.claude/skills/`, `~/.codex/skills/`) | `.cursor/skills/`, `.agents/skills/` |
+| GitHub Copilot | `~/.copilot/skills/`, `~/.agents/skills/` | `.github/skills/`, `.claude/skills/`, `.agents/skills/` |
+| Gemini CLI | `~/.gemini/skills/`, `~/.agents/skills/` | `.gemini/skills/`, `.agents/skills/` |
+| OpenCode | `~/.config/opencode/skills/`, `~/.claude/skills/`, `~/.agents/skills/` | `.opencode/skills/`, `.claude/skills/`, `.agents/skills/` |
+
+The folders come from each agent's skills documentation (checked 2026-11-27); the skills CLI
+route from its documentation and source (version 1.3.7), not from a run.
+
+### The MCP server by hand
+
+To add the MCP server to one project (`.mcp.json`):
 
 ```json
 { "mcpServers": { "rust-anything": { "command": "rust-anything", "args": ["mcp"] } } }
@@ -66,11 +116,14 @@ that shape):
 }
 ```
 
-Its skill goes in `~/.config/opencode/skills/rust-anything/` (`SKILL.md` and `whole-app.md` from
-[`skills/rust-anything/`](../skills/rust-anything)).
-
 Every tool, its parameters and what it may touch: [docs/tools.md](tools.md). The server also
 offers two prompts, `port_unit` and `port_whole_app`, built from the skill.
+
+The server also serves the skill itself through MCP's skills extension
+(`io.modelcontextprotocol/skills`): `skills/list` and `skills/get` describe it at
+`skill://rust-anything/SKILL.md`, and `resources/read` returns `SKILL.md`, `whole-app.md` and
+each `languages/` file. A client that supports the extension (VS Code shows server skills as
+slash commands) gets the skill from the MCP server alone, with no plugin and no copied files.
 
 ## In CI
 

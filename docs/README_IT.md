@@ -68,6 +68,10 @@ Rust Anything è gratuito e open source. Se ti aiuta nel lavoro, la tua sponsori
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">Sponsorizzazione come azienda, o qualcos'altro? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">Stai portando una codebase in Rust? Offro consulenza per le migrazioni a Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## Avvio rapido
 
 Incolla questo nel tuo agente di programmazione:
@@ -85,6 +89,18 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 
 > [!TIP]
 > **Agenti:** leggete [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) per i passi di installazione, tutti i comandi e il flusso di porting.
+
+## Come funziona
+
+**Cosa conta come finito.** Il comportamento, non i tuoi test. `record` esegue l'originale su input generati e forniti e salva ciò che ogni chiamata restituisce, lancia e stampa. Un port è finito quando `gate` passa: ogni caso registrato corrisponde, e fmt, clippy, `cargo test`, il controllo `unsafe`, il controllo degli stub e quello sulle risposte registrate incollate nel port passano tutti. Girano anche i tuoi test.
+
+**Report o migrazione, scegli tu.** `analyze` e `profile` si limitano a riferire: un piano ordinato di cosa portare e di cosa è caldo sotto un carico reale. Sono comandi normali, quindi il report non costa token. `go` migra un'unità: crea il ponte verso la funzione più calda, la registra, passa il port al tuo agente, poi lo compila, lo confronta e lo fa passare da `gate`, e lo attiva solo quando tutto corrisponde (TS/JS, Python e PowerShell; `disable` lo disattiva di nuovo).
+
+**Quanto dura un'esecuzione.** Un'esecuzione di `go` porta un'unità, con al massimo `--rounds` turni dell'agente (3 di default): uno per il port, poi uno per ogni diff o gate fallito. Un'intera applicazione è un'esecuzione per unità, quindi puoi fermarti dopo una qualsiasi.
+
+**Modello economico per il piano, modello potente per il port.** Il piano non richiede alcun modello. Per il port, passa un qualsiasi comando di agente: `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**Agenti.** `rust-anything setup` lo aggiunge a Claude Code, Codex, Cursor, Gemini CLI e OpenCode. Qualsiasi altro client MCP può eseguire `rust-anything mcp`, e la skill si installa anche da sola con `npx skills add erkamyaman/rust-anything` (vedi [installazione](install.md)).
 
 ## Licenza
 

@@ -164,7 +164,12 @@ pub fn handle(request: &Value) -> Option<Value> {
     let result = match method {
         "initialize" => json!({
             "protocolVersion": request["params"]["protocolVersion"].as_str().unwrap_or(PROTOCOL_VERSION),
-            "capabilities": { "tools": {}, "prompts": {} },
+            "capabilities": {
+                "tools": {},
+                "prompts": {},
+                "resources": {},
+                "extensions": { "io.modelcontextprotocol/skills": {} },
+            },
             "serverInfo": { "name": "rust-anything", "version": env!("CARGO_PKG_VERSION") },
             "instructions": "Incremental TS/JS to Rust migration. Loop per unit: analyze -> bridge -> \
                 record -> (port src/port.rs) -> build -> diff -> shadow -> gate. Never mark a port done \
@@ -203,9 +208,77 @@ pub fn handle(request: &Value) -> Option<Value> {
                 Err(message) => return Some(error(id, -32602, &message)),
             }
         }
+        "skills/list" => fresh(json!({ "skills": [skill_entry()] })),
+        "skills/get" => {
+            let uri = request["params"]["uri"].as_str().unwrap_or_default();
+            if uri != format!("{SKILL_ROOT}SKILL.md") {
+                return Some(error(id, -32602, &format!("no skill at `{uri}`")));
+            }
+            fresh(json!({ "skill": skill_entry() }))
+        }
+        "resources/list" => {
+            json!({ "resources": crate::setup::SKILL_FILES.iter().map(|(file, _)| json!({
+            "uri": format!("{SKILL_ROOT}{file}"),
+            "name": format!("rust-anything/{file}"),
+            "mimeType": "text/markdown",
+        })).collect::<Vec<_>>() })
+        }
+        "resources/read" => {
+            let uri = request["params"]["uri"].as_str().unwrap_or_default();
+            let Some((_, text)) = uri
+                .strip_prefix(SKILL_ROOT)
+                .and_then(|file| crate::setup::SKILL_FILES.iter().find(|(f, _)| *f == file))
+            else {
+                return Some(error(id, -32002, &format!("resource not found: `{uri}`")));
+            };
+            fresh(
+                json!({ "contents": [{ "uri": uri, "mimeType": "text/markdown", "text": text }] }),
+            )
+        }
         _ => return Some(error(id, -32601, &format!("unknown method `{method}`"))),
     };
     Some(json!({ "jsonrpc": "2.0", "id": id, "result": result }))
+}
+
+/// Where the workflow skill's files live for the MCP skills extension.
+const SKILL_ROOT: &str = "skill://rust-anything/";
+
+/// A skills-extension result with the cache fields it requires.
+fn fresh(mut result: Value) -> Value {
+    result["resultType"] = json!("complete");
+    result["ttlMs"] = json!(300_000);
+    result["cacheScope"] = json!("public");
+    result
+}
+
+fn skill_digest(text: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let hash = Sha256::digest(text.as_bytes());
+    let hex: String = hash.iter().map(|b| format!("{b:02x}")).collect();
+    format!("sha256:{hex}")
+}
+
+/// The skill's `skills/list` entry: its frontmatter and every file with digest and size.
+fn skill_entry() -> Value {
+    let mut frontmatter = serde_json::Map::new();
+    let header = crate::setup::SKILL
+        .strip_prefix("---\n")
+        .and_then(|rest| rest.split_once("\n---").map(|(h, _)| h))
+        .unwrap_or_default();
+    for line in header.lines() {
+        if let Some((key, value)) = line.split_once(':') {
+            frontmatter.insert(key.trim().into(), json!(value.trim()));
+        }
+    }
+    json!({
+        "uri": format!("{SKILL_ROOT}SKILL.md"),
+        "frontmatter": frontmatter,
+        "resources": crate::setup::SKILL_FILES.iter().map(|(file, text)| json!({
+            "uri": format!("{SKILL_ROOT}{file}"),
+            "digest": skill_digest(text),
+            "size": text.len(),
+        })).collect::<Vec<_>>(),
+    })
 }
 
 fn error(id: Value, code: i64, message: &str) -> Value {
@@ -449,6 +522,7 @@ fn tool_schemas() -> Value {
                 "batch": { "type": "array", "items": { "type": "string" }, "description": "Batch classes, `function:param`: the function runs over many `param` values kept in Rust, on all cores, in one call. A `<Function>Index` struct in port.rs replaces the default per-item loop." },
                 "as_json": { "type": "array", "items": { "type": "string" }, "description": "Type parameters the app only fills with data (`T` in `paginate<T>(items: T[])`): bridged as JSON values instead of keeping the export in TS." },
                 "allocator": { "type": "string", "enum": ["mimalloc", "rusty_alloc"], "description": "Global allocator for crates with batches. mimalloc (default) is C and leaves wasm alone; rusty_alloc is pure Rust (no C compiler) and also serves wasm." },
+                "end_state": { "type": "string", "enum": ["replace", "bindings", "scaffold"], "description": "What the bindings are for once the port is done; ask the user before bridging. replace: the original is deleted after cut-over. bindings: callers keep importing it for good, so the bindings are public API. scaffold: the bindings are deleted at cut-over." },
             }, "required": ["root", "unit"] },
         },
         {
@@ -744,6 +818,20 @@ fn allocator_arg(args: &Value) -> Result<bridge::Allocator> {
     })
 }
 
+/// `bridge`'s `end_state`: none when omitted (or null), an error for any other value than the
+/// three names.
+fn end_state_arg(args: &Value) -> Result<Option<bridge::EndState>> {
+    Ok(match args.get("end_state") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(s)) if s == "replace" => Some(bridge::EndState::Replace),
+        Some(Value::String(s)) if s == "bindings" => Some(bridge::EndState::Bindings),
+        Some(Value::String(s)) if s == "scaffold" => Some(bridge::EndState::Scaffold),
+        Some(other) => {
+            anyhow::bail!("`end_state` is \"replace\", \"bindings\" or \"scaffold\", not {other}")
+        }
+    })
+}
+
 fn opt_string_list(args: &Value, key: &str) -> Result<Option<Vec<String>>> {
     match args.get(key) {
         None | Some(Value::Null) => Ok(None),
@@ -876,8 +964,9 @@ fn call(name: &str, args: &Value) -> Result<Value> {
             let kind = kind_arg(args)?;
             let root = path("root")?;
             let allocator = allocator_arg(args)?;
+            let end_state = end_state_arg(args)?;
             let force = opt_bool(args, "force")?.unwrap_or(false);
-            serde_json::to_value(bridge::bridge(&bridge::Options {
+            let outcome = bridge::bridge(&bridge::Options {
                 root: &root,
                 unit: &req_string(args, "unit")?,
                 kind,
@@ -889,7 +978,11 @@ fn call(name: &str, args: &Value) -> Result<Value> {
                 batch: strings("batch"),
                 as_json: strings("as_json"),
                 allocator,
-            })?)?
+            })?;
+            if let Some(end_state) = end_state {
+                bridge::set_end_state(&outcome.crate_dir, end_state)?;
+            }
+            serde_json::to_value(outcome)?
         }
         "record" => {
             let crate_dir = path("crate")?;
@@ -1491,6 +1584,26 @@ mod tests {
     }
 
     #[test]
+    fn end_state_is_one_of_three_names_or_none() {
+        let pick = |v: Value| end_state_arg(&v);
+        assert_eq!(pick(json!({})).unwrap(), None);
+        assert_eq!(pick(json!({ "end_state": null })).unwrap(), None);
+        assert_eq!(
+            pick(json!({ "end_state": "replace" })).unwrap(),
+            Some(bridge::EndState::Replace)
+        );
+        assert_eq!(
+            pick(json!({ "end_state": "bindings" })).unwrap(),
+            Some(bridge::EndState::Bindings)
+        );
+        assert_eq!(
+            pick(json!({ "end_state": "scaffold" })).unwrap(),
+            Some(bridge::EndState::Scaffold)
+        );
+        assert!(pick(json!({ "end_state": "delete" })).is_err());
+    }
+
+    #[test]
     fn allocator_defaults_only_when_omitted() {
         let pick = |v: Value| allocator_arg(&v);
         assert_eq!(pick(json!({})).unwrap(), bridge::Allocator::Mimalloc);
@@ -1793,6 +1906,87 @@ mod tests {
             }
         }
         assert!(failure("something else broke", &args)["next"].is_null());
+    }
+
+    #[test]
+    fn serves_the_skill_over_the_skills_extension() {
+        let init =
+            handle(&json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {} }))
+                .unwrap();
+        let caps = &init["result"]["capabilities"];
+        assert!(caps["resources"].is_object(), "{caps}");
+        assert!(
+            caps["extensions"]["io.modelcontextprotocol/skills"].is_object(),
+            "{caps}"
+        );
+
+        let list =
+            handle(&json!({ "jsonrpc": "2.0", "id": 2, "method": "skills/list", "params": {} }))
+                .unwrap();
+        let result = &list["result"];
+        assert_eq!(result["resultType"], "complete");
+        assert!(
+            result["ttlMs"].is_u64() && result["cacheScope"].is_string(),
+            "{result}"
+        );
+        let skill = &result["skills"][0];
+        assert_eq!(skill["uri"], "skill://rust-anything/SKILL.md");
+        assert_eq!(skill["frontmatter"]["name"], "rust-anything");
+        assert!(
+            skill["frontmatter"]["description"]
+                .as_str()
+                .unwrap()
+                .starts_with("Port or migrate")
+        );
+        let files = skill["resources"].as_array().unwrap();
+        let python = files
+            .iter()
+            .find(|f| f["uri"] == "skill://rust-anything/languages/python.md")
+            .expect("languages/python.md in the manifest");
+        let text = include_str!("../skills/rust-anything/languages/python.md");
+        assert_eq!(python["size"], text.len());
+        let digest = python["digest"].as_str().unwrap();
+        assert!(
+            digest.starts_with("sha256:") && digest.len() == 7 + 64,
+            "{digest}"
+        );
+
+        let get = handle(&json!({ "jsonrpc": "2.0", "id": 3, "method": "skills/get",
+            "params": { "uri": "skill://rust-anything/SKILL.md" } }))
+        .unwrap();
+        assert_eq!(
+            get["result"]["skill"]["uri"],
+            "skill://rust-anything/SKILL.md"
+        );
+        assert_eq!(get["result"]["resultType"], "complete");
+
+        let read = handle(
+            &json!({ "jsonrpc": "2.0", "id": 4, "method": "resources/read",
+            "params": { "uri": "skill://rust-anything/languages/python.md" } }),
+        )
+        .unwrap();
+        let content = &read["result"]["contents"][0];
+        assert_eq!(content["text"], text);
+        assert_eq!(content["mimeType"], "text/markdown");
+
+        let missing = handle(
+            &json!({ "jsonrpc": "2.0", "id": 5, "method": "resources/read",
+            "params": { "uri": "skill://rust-anything/nope.md" } }),
+        )
+        .unwrap();
+        assert_eq!(missing["error"]["code"], -32002);
+    }
+
+    #[test]
+    fn skill_digests_are_sha256() {
+        assert_eq!(
+            skill_digest(""),
+            "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            skill_digest("abc"),
+            "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
     }
 
     #[test]
