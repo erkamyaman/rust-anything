@@ -966,9 +966,11 @@ fn run() -> Result<ExitCode> {
                 .transpose()?;
             let inputs = if from_tests {
                 let c = rust_anything::from_tests::capture(&crate_dir, &test_command)?;
+                let total_calls = c.per_function.values().sum::<usize>();
+                let call_noun = if total_calls == 1 { "call" } else { "calls" };
                 say!(
-                    "Captured {} call(s) from the tests{}:",
-                    c.per_function.values().sum::<usize>(),
+                    "Captured {} {call_noun} from the tests{}:",
+                    total_calls,
                     if c.tests_passed {
                         ""
                     } else {
@@ -1044,8 +1046,13 @@ fn run() -> Result<ExitCode> {
                 );
             }
             if !outcome.timed_out.is_empty() {
+                let noun = if outcome.timed_out.len() == 1 {
+                    "input"
+                } else {
+                    "inputs"
+                };
                 say!(
-                    "Left out {} input(s) the original ran too long on (over the per-case limit, \
+                    "Left out {} {noun} the original ran too long on (over the per-case limit, \
                      RUST_ANYTHING_CASE_TIMEOUT seconds, 10 by default). The original does this \
                      itself, so the port need not match it there:",
                     outcome.timed_out.len()
@@ -1299,8 +1306,9 @@ fn run() -> Result<ExitCode> {
                     );
                 }
                 if f.kept > 0 {
+                    let case_noun = if f.kept == 1 { "case" } else { "cases" };
                     say!(
-                        "Kept {} case(s) in {}: the next diff and gate check them",
+                        "Kept {} {case_noun} in {}: the next diff and gate check them",
                         f.kept,
                         f.recording.display()
                     );

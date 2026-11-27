@@ -360,10 +360,7 @@ pub fn go(opts: &Options) -> Result<Outcome> {
             Lang::Ts | Lang::Python => {
                 let c = crate::from_tests::capture(&crate_dir, opts.command)?;
                 let n: usize = c.per_function.values().sum();
-                say(
-                    &mut steps,
-                    format!("captured {n} real call(s) from the workload"),
-                );
+                say(&mut steps, captured_line(n));
                 (n > 0).then_some(c.inputs)
             }
             _ => None,
@@ -376,13 +373,7 @@ pub fn go(opts: &Options) -> Result<Outcome> {
             resolve_from: None,
             node_args: &[],
         })?;
-        say(
-            &mut steps,
-            format!(
-                "recorded {} case(s) ({} throw in the original)",
-                recorded.cases, recorded.errors
-            ),
-        );
+        say(&mut steps, recorded_line(recorded.cases, recorded.errors));
     } else {
         say(&mut steps, "kept the recorded cases".into());
     }
@@ -623,15 +614,30 @@ fn check(crate_dir: &Path, steps: &mut Vec<String>) -> Result<(usize, usize, Vec
         .filter(|c| !c.passed)
         .map(|c| format!("gate check `{}` fails: {}", c.name, c.detail))
         .collect();
-    say(
-        steps,
-        if failed.is_empty() {
-            "gate passed".into()
-        } else {
-            format!("gate: {} check(s) fail", failed.len())
-        },
-    );
+    say(steps, gate_line(failed.len()));
     Ok((diff.total, diff.passed, failed))
+}
+
+fn captured_line(calls: usize) -> String {
+    format!(
+        "captured {} from the workload",
+        crate::report::count(calls, "real call")
+    )
+}
+
+fn recorded_line(cases: usize, errors: usize) -> String {
+    format!(
+        "recorded {} ({errors} threw in the original)",
+        crate::report::count(cases, "case")
+    )
+}
+
+fn gate_line(failed: usize) -> String {
+    match failed {
+        0 => "gate passed".into(),
+        1 => "gate: 1 check fails".into(),
+        n => format!("gate: {n} checks fail"),
+    }
 }
 
 /// What still differs, for the agent's next attempt: each distinct difference with one example
@@ -656,20 +662,18 @@ fn differences(diff: &crate::harness::DiffOutcome) -> String {
             .collect();
         return format!("{head} First mismatches:\n{}", shown.join("\n"));
     }
-    let mut out = format!(
-        "{head} {} distinct difference(s), most cases first:",
-        diff.groups.len()
-    );
+    let diff_count = crate::report::count(diff.groups.len(), "distinct difference");
+    let mut out = format!("{head} {diff_count}, most cases first:");
     for g in diff.groups.iter().take(5) {
         let mut example = g.example.clone();
         let at = example
             .as_object_mut()
             .and_then(|m| m.remove("at"))
             .and_then(|at| serde_json::from_value::<crate::mismatch::At>(at).ok());
+        let cases_count = crate::report::count(g.cases, "case");
         out += &format!(
-            "\n- {} ({} case(s), id {})\n  example: {}",
+            "\n- {} ({cases_count}, id {})\n  example: {}",
             g.label(),
-            g.cases,
             g.id,
             serde_json::to_string(&example).unwrap_or_default()
         );
@@ -700,11 +704,11 @@ mod tests {
         diff.groups = crate::mismatch::group_mismatches(&diff.mismatches);
         let text = differences(&diff);
         assert!(
-            text.starts_with("4 of 10 recorded cases differ. 1 distinct difference(s)"),
+            text.starts_with("4 of 10 recorded cases differ. 1 distinct difference,"),
             "{text}"
         );
         assert!(
-            text.contains("- count: return $ (value) (4 case(s), id "),
+            text.contains("- count: return $ (value) (4 cases, id "),
             "{text}"
         );
         assert_eq!(text.matches("example:").count(), 1, "{text}");
@@ -1021,5 +1025,25 @@ mod tests {
             err_no_agent,
             "`--rounds` needs `--agent`: rounds are agent turns"
         );
+    }
+
+    #[test]
+    fn go_progress_formatting_uses_singular_and_plural_counts() {
+        assert_eq!(captured_line(1), "captured 1 real call from the workload");
+        assert_eq!(
+            captured_line(1000),
+            "captured 1000 real calls from the workload"
+        );
+        assert_eq!(
+            recorded_line(1, 0),
+            "recorded 1 case (0 threw in the original)"
+        );
+        assert_eq!(
+            recorded_line(1013, 2),
+            "recorded 1013 cases (2 threw in the original)"
+        );
+        assert_eq!(gate_line(0), "gate passed");
+        assert_eq!(gate_line(1), "gate: 1 check fails");
+        assert_eq!(gate_line(2), "gate: 2 checks fail");
     }
 }

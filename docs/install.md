@@ -40,7 +40,9 @@ PowerShell and verify that `where.exe link` finds the MSVC linker. Tests use tem
 including a path with spaces and Unicode characters, and remove generated artifacts after a
 successful run.
 
-For agents, `rust-anything setup` registers everything (see Quick start). The same MCP server and
+For agents, `rust-anything setup` registers everything (see Quick start). To try it without
+installing, `npx rust-anything@latest setup` sets each agent to start
+`npx -y rust-anything@<version> mcp`, because npm may clear the copy npx ran. The same MCP server and
 skill also ship as a Codex plugin from `.agents/plugins/marketplace.json`
 (`codex plugin marketplace add erkamyaman/rust-anything`, then
 `codex plugin add rust-anything@rust-anything`). To add the MCP server to one project by hand
@@ -69,6 +71,23 @@ Its skill goes in `~/.config/opencode/skills/rust-anything/` (`SKILL.md` and `wh
 
 Every tool, its parameters and what it may touch: [docs/tools.md](tools.md). The server also
 offers two prompts, `port_unit` and `port_whole_app`, built from the skill.
+
+## In CI
+
+The repository is also a GitHub Action that runs `rust-anything gate` on each crate and fails the
+job when any of them fails, so a port cannot drift from the original unnoticed. The runner needs
+Rust, plus the runtime of the original (Node is already on GitHub's images):
+
+```yaml
+- uses: actions/checkout@v4
+- uses: erkamyaman/rust-anything@main
+  with:
+    crates: |
+      rust/parse-rs
+      rust/format-rs
+```
+
+`version` picks the npm version to install (default `latest`).
 
 ## Development
 

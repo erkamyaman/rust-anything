@@ -1,0 +1,37 @@
+name: Rust Anything gate
+description: Check on every push that your Rust port still behaves like the original it replaces.
+author: Erkam Yaman
+branding:
+  icon: check-circle
+  color: gray-dark
+
+inputs:
+  crates:
+    description: Crate folders made by `rust-anything bridge`, one per line or separated by spaces.
+    required: false
+    default: .
+  version:
+    description: The rust-anything version to install from npm.
+    required: false
+    default: latest
+
+runs:
+  using: composite
+  steps:
+    - name: Install rust-anything
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: npm install --global "rust-anything@$VERSION"
+    - name: Gate every crate
+      shell: bash
+      env:
+        CRATES: ${{ inputs.crates }}
+      run: |
+        status=0
+        for crate in $CRATES; do
+          echo "::group::rust-anything gate $crate"
+          rust-anything gate "$crate" || status=1
+          echo "::endgroup::"
+        done
+        exit $status

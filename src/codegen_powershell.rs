@@ -486,3 +486,136 @@ switch ($Mode) {
     }
 }
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::Lang;
+    use crate::ts::exports::{ExportedFn, Param};
+
+    fn manifest(crate_name: &str, exports: Vec<ExportedFn>) -> Manifest {
+        Manifest {
+            schema: String::new(),
+            root: std::path::PathBuf::new(),
+            root_written: None,
+            unit: "TextTools.psm1".into(),
+            language: Lang::Powershell,
+            kind: crate::bridge::Kind::Ffi,
+            crate_name: crate_name.into(),
+            exports,
+            classes: Vec::new(),
+            js_only: Vec::new(),
+            batches: Vec::new(),
+            allocator: Default::default(),
+            float_tolerance: None,
+            ignore_key_order: false,
+        }
+    }
+
+    fn param(name: &str) -> Param {
+        Param {
+            name: name.into(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_wrapper_path() {
+        let m1 = manifest("my-text-tools", Vec::new());
+        assert_eq!(wrapper_path(&m1), "ps/my_text_tools.ps1");
+
+        let m2 = manifest("text_kit", Vec::new());
+        assert_eq!(wrapper_path(&m2), "ps/text_kit.ps1");
+    }
+
+    #[test]
+    fn test_targets() {
+        let m = manifest(
+            "my-tools",
+            vec![
+                ExportedFn {
+                    name: "add".into(),
+                    params: vec![param("first"), param("second")],
+                    ..Default::default()
+                },
+                ExportedFn {
+                    name: "greet".into(),
+                    params: vec![param("name")],
+                    ..Default::default()
+                },
+            ],
+        );
+
+        let t = targets(&m);
+        assert_eq!(
+            t,
+            serde_json::json!({
+                "add": {
+                    "params": ["first", "second"]
+                },
+                "greet": {
+                    "params": ["name"]
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_wrapper() {
+        let m = manifest(
+            "calc-tools",
+            vec![
+                ExportedFn {
+                    name: "add".into(),
+                    prototype: Some("param([int]$a, [int]$b)".into()),
+                    params: vec![param("a"), param("b")],
+                    ..Default::default()
+                },
+                ExportedFn {
+                    name: "version".into(),
+                    prototype: None,
+                    params: Vec::new(),
+                    ..Default::default()
+                },
+            ],
+        );
+
+        let ps = wrapper(&m);
+
+        // Header and loader
+        assert!(
+            ps.contains("if ($null -eq $script:RustAnything_calc_tools)"),
+            "{ps}"
+        );
+
+        // Two-parameter export
+        assert!(ps.contains("function add {"), "{ps}");
+        assert!(ps.contains("    param([int]$a, [int]$b)"), "{ps}");
+        assert!(
+            ps.contains("    $rustAnythingArgs = [object[]]::new(2)"),
+            "{ps}"
+        );
+        assert!(ps.contains("    $rustAnythingArgs[0] = ${a}"), "{ps}");
+        assert!(ps.contains("    $rustAnythingArgs[1] = ${b}"), "{ps}");
+        assert!(
+            ps.contains(
+                "    & $script:RustAnythingCodec.Call $script:RustAnything_calc_tools 'add' $rustAnythingArgs"
+            ),
+            "{ps}"
+        );
+
+        // No-parameter export (prototype falls back to param())
+        assert!(ps.contains("function version {"), "{ps}");
+        assert!(ps.contains("    param()"), "{ps}");
+        assert!(
+            ps.contains("    $rustAnythingArgs = [object[]]::new(0)"),
+            "{ps}"
+        );
+        assert!(
+            ps.contains(
+                "    & $script:RustAnythingCodec.Call $script:RustAnything_calc_tools 'version' $rustAnythingArgs"
+            ),
+            "{ps}"
+        );
+    }
+}
