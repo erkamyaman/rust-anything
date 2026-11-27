@@ -5,7 +5,10 @@
 - `profile` on a Java workload keeps JFR's "Started recording" banner off stdout
   (`-Xlog:jfr+startup=error`). Every JVM the workload starts inherits the JFR options, so a build
   tool that runs `java` to read a JDK's version, as Gradle does for its toolchains, failed on the
-  banner with `Unable to determine version for JDK` before the build began (#742).
+  banner with `Unable to determine version for JDK` before the build began
+  (#742, #759 by @Layfate).
+- `profile` on a Java workload reads all of `jfr print`'s output. It kept only the last MiB, so a
+  recording of more than a second or two failed with `jfr output: expected value` (#759).
 - `go` says "captured 1 real call" / "N real calls", "recorded N cases (N threw in the original)",
   and "gate: 1 check fails" / "N checks fail" instead of "(s)" and "throw"
   (#732, #757 by @Papito084).

@@ -1298,7 +1298,9 @@ fn java(root: &Path, command: &[String], work: &Path) -> Result<(HashMap<Key, Ac
     if !status.success() {
         bail!("the workload failed ({status})");
     }
-    let out = crate::process::output(
+    let printed = work.join("profile.json");
+    let errors = work.join("jfr-print.err");
+    let status = crate::process::status(
         Command::new("jfr")
             .args([
                 "print",
@@ -1308,14 +1310,19 @@ fn java(root: &Path, command: &[String], work: &Path) -> Result<(HashMap<Key, Ac
                 "--events",
                 "jdk.ExecutionSample",
             ])
-            .arg(&recording),
+            .arg(&recording)
+            .stdout(std::fs::File::create(&printed)?)
+            .stderr(std::fs::File::create(&errors)?),
         crate::process::TESTS,
     )
     .context("running jfr (it comes with the JDK)")?;
-    if !out.status.success() {
-        bail!("jfr print failed: {}", String::from_utf8_lossy(&out.stderr));
+    if !status.success() {
+        bail!(
+            "jfr print failed: {}",
+            std::fs::read_to_string(&errors).unwrap_or_default()
+        );
     }
-    let json: Value = serde_json::from_slice(&out.stdout).context("jfr output")?;
+    let json: Value = serde_json::from_slice(&std::fs::read(&printed)?).context("jfr output")?;
     // Sources by class: `com/example/text/Strings` -> its file in the repository.
     let mut sources: HashMap<String, String> = HashMap::new();
     for entry in crate::walk::builder(root).build() {
