@@ -297,6 +297,12 @@ does this in the pre-commit hook).
 Українська first, then the other existing languages in their order, then new ones at the end (see
 CONTRIBUTING.md).
 
+**The debug CLI overflowed its stack on Windows.** Unoptimized, `run`'s one `match` over every
+command needs between 1.5 and 2 MB of stack, and Windows gives the main thread 1 MB, so every
+`cargo run` and every CLI test crashed with `thread 'main' has overflowed its stack` before parsing
+its arguments, while the release build and Linux (8 MB) were fine. `main` runs `run` on a thread
+with an 8 MB stack, and the Windows CI job runs a few CLI tests to keep it that way.
+
 **Two sessions edited one checkout.** When another agent is working in the repository, work in
 a separate worktree and bring the change over when its files do not overlap.
 

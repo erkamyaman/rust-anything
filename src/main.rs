@@ -833,13 +833,23 @@ fn counted(n: usize, word: &str) -> String {
     }
 }
 
+/// The stack `run` gets: Linux's main-thread default. Windows gives the main thread 1 MB, which
+/// an unoptimized `run` overflows before it parses the arguments.
+const STACK_SIZE: usize = 8 << 20;
+
 fn main() -> ExitCode {
-    match run() {
-        Ok(code) => code,
-        Err(e) => {
+    let worker = std::thread::Builder::new()
+        .name("main".into())
+        .stack_size(STACK_SIZE)
+        .spawn(run)
+        .expect("starting the main thread");
+    match worker.join() {
+        Ok(Ok(code)) => code,
+        Ok(Err(e)) => {
             eprintln!("error: {e:#}");
             ExitCode::from(2)
         }
+        Err(panic) => std::panic::resume_unwind(panic),
     }
 }
 

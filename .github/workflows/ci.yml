@@ -109,6 +109,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Test Windows command parsing
         run: cargo test --locked --lib app::tests::shell_words
+      - name: Run the debug CLI (1 MB main-thread stack)
+        run: cargo test --locked --test analyze --test diff_missing_folder --test doctor
       - name: Run native bridge integration tests
         run: cargo test --locked --test native -- --nocapture
 
