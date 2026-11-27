@@ -289,7 +289,9 @@ mod tests {
         let wrapper = crate_dir.join(crate::codegen_powershell::wrapper_path(&m));
         std::fs::create_dir_all(wrapper.parent().unwrap()).unwrap();
         std::fs::write(&wrapper, "# wrapper").unwrap();
-        let got = files(crate_dir, &m, true);
+        // A path through `child/..` is never canonical, so the result must have been canonicalized.
+        std::fs::create_dir(crate_dir.join("child")).unwrap();
+        let got = files(&crate_dir.join("child").join(".."), &m, true);
         let expected = wrapper.canonical().unwrap();
         assert_eq!(got.unwrap(), vec![expected]);
     }
