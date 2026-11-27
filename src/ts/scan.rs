@@ -14,7 +14,7 @@ use oxc_ast::ast::{
 use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
 use oxc_span::{SourceType, Span};
-use oxc_syntax::scope::ScopeFlags;
+use oxc_syntax::{operator::UnaryOperator, scope::ScopeFlags};
 use serde::Serialize;
 
 use crate::risks::{Risk, regex_folds_differently, regex_needs_fancy};
@@ -222,6 +222,17 @@ fn string_arg(arg: Option<&Argument>) -> Option<String> {
     }
 }
 
+fn is_number_literal(arg: Option<&Argument>) -> bool {
+    match arg {
+        Some(Argument::NumericLiteral(_)) => true,
+        Some(Argument::UnaryExpression(u)) => {
+            u.operator == UnaryOperator::UnaryNegation
+                && matches!(u.argument, Expression::NumericLiteral(_))
+        }
+        _ => false,
+    }
+}
+
 impl<'a> Visit<'a> for Collector {
     fn visit_import_declaration(&mut self, it: &ImportDeclaration<'a>) {
         self.import(
@@ -332,10 +343,7 @@ impl<'a> Visit<'a> for Collector {
             Some("Map" | "Set") => self.add(Risk::OrderedCollections, it.span),
             Some("Date") if it.arguments.is_empty() => self.add(Risk::ClockAndRandom, it.span),
             // One argument that is not a number literal: a string the engine parses.
-            Some("Date")
-                if it.arguments.len() == 1
-                    && !matches!(it.arguments.first(), Some(Argument::NumericLiteral(_))) =>
-            {
+            Some("Date") if it.arguments.len() == 1 && !is_number_literal(it.arguments.first()) => {
                 self.add(Risk::DateParsing, it.span);
             }
             Some("URL" | "URLSearchParams" | "TextEncoder" | "TextDecoder") => {
@@ -536,6 +544,7 @@ mod tests {
              export const ms = (s: string) => Date.parse(s)\n\
              export const d = (s: string) => new Date(s)\n\
              export const epoch = () => new Date(0)\n\
+             export const before = () => new Date(-1)\n\
              export const host = (u: string) => new URL(u).host\n\
              export const b = (s: string) => atob(s)\n\
              export const t = (b: Uint8Array) => new TextDecoder().decode(b)\n\
@@ -543,9 +552,9 @@ mod tests {
              export const day = (d: Date) => d.toLocaleDateString('en-US')\n\
              export const hour = (d: Date) => d.toLocaleTimeString()\n",
         );
-        assert_eq!(facts.risks[&Risk::Intl], [1, 2, 3, 12, 13, 14]);
+        assert_eq!(facts.risks[&Risk::Intl], [1, 2, 3, 13, 14, 15]);
         assert_eq!(facts.risks[&Risk::DateParsing], [6, 7]);
-        assert_eq!(facts.risks[&Risk::WebApis], [9, 10, 11]);
+        assert_eq!(facts.risks[&Risk::WebApis], [10, 11, 12]);
     }
 
     #[test]
