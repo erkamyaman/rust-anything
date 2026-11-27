@@ -186,6 +186,34 @@ pub fn package(opts: &Options) -> Result<Outcome> {
         return cli::package(&crate_dir, opts);
     }
     let manifest = Manifest::load(&crate_dir)?;
+    let kind_label = match manifest.kind {
+        Kind::Napi => "napi",
+        Kind::Wasm => "wasm",
+        Kind::Pyo3 => "PyO3",
+        Kind::CAbi | Kind::Ffi => {
+            let label = manifest
+                .kind
+                .label()
+                .trim_start_matches("a ")
+                .trim_start_matches("the ");
+            bail!(
+                "package covers napi-rs, wasm-bindgen and PyO3 crates; this one is a {} crate ({label})",
+                manifest.language.name()
+            );
+        }
+    };
+    if !opts.bin.is_empty() && opts.original.is_some() {
+        bail!(
+            "--bin and --original are for CLI front doors (`rust/app`); this is a {kind_label} crate"
+        );
+    } else if !opts.bin.is_empty() {
+        bail!("--bin is for CLI front doors (`rust/app`); this is a {kind_label} crate");
+    } else if opts.original.is_some() {
+        bail!("--original is for CLI front doors (`rust/app`); this is a {kind_label} crate");
+    }
+    if opts.fallback.is_some() && manifest.kind != Kind::Napi {
+        bail!("--fallback is for napi crates; this is a {kind_label} crate");
+    }
     let out = match &opts.out {
         Some(out) => std::path::absolute(out)?,
         None => crate_dir.join("package"),
@@ -237,17 +265,7 @@ pub fn package(opts: &Options) -> Result<Outcome> {
                 out.display()
             ));
         }
-        Kind::CAbi | Kind::Ffi => {
-            let label = manifest
-                .kind
-                .label()
-                .trim_start_matches("a ")
-                .trim_start_matches("the ");
-            bail!(
-                "package covers napi-rs, wasm-bindgen and PyO3 crates; this one is a {} crate ({label})",
-                manifest.language.name()
-            );
-        }
+        Kind::CAbi | Kind::Ffi => unreachable!(),
     }
     if matches!(manifest.kind, Kind::Pyo3 | Kind::Napi) {
         let (workflow, note) = workflow_file(&manifest, &name, &version, &crate_dir, &out)?;

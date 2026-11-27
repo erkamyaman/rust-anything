@@ -21,6 +21,8 @@ rust-anything setup
 | Gemini CLI | MCP server in `~/.gemini/settings.json` |
 | Any other MCP client | add `rust-anything mcp` as a stdio server by hand (below) |
 
+**Community integrations** (not maintained by Rust Anything): [dsh-rust-anything](https://github.com/lonyness/dsh-rust-anything) by [@lonyness](https://github.com/lonyness) runs Rust Anything inside DeepSeek Harness. It ships its own pinned copy of the engine (currently 3.3.0).
+
 Before changing a file that exists, `setup` saves a copy beside it (`<file>.rust-anything.bak`). `setup --remove` takes out only rust-anything's entries; the copies it saved stay until you delete them.
 
 ## The MCP server

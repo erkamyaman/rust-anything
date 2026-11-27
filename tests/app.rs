@@ -1199,7 +1199,9 @@ fn drift_finds_upstream_changes_and_new_examples() {
         "{report}"
     );
 
-    let readme = std::fs::read_to_string(repo.join("README.md")).unwrap();
+    let readme = std::fs::read_to_string(repo.join("README.md"))
+        .unwrap()
+        .replace("\r\n", "\n");
     std::fs::write(
         repo.join("README.md"),
         readme.replace("$ tcli nope\n", "$ tcli nope\n$ tcli upper again\n"),
@@ -1212,8 +1214,60 @@ fn drift_finds_upstream_changes_and_new_examples() {
         .unwrap();
     assert_eq!(out.status.code(), Some(1), "{out:?}");
     let printed = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        printed.contains("8 cases; build: node tcli_copy.js"),
+        "{printed}"
+    );
     assert!(printed.contains("tcli upper again"), "{printed}");
     let fresh = run();
     assert_eq!(fresh.new, ["tcli upper again"], "{fresh:?}");
+    std::fs::remove_dir_all(&repo).unwrap();
+}
+
+#[test]
+fn drift_prints_singular_case_for_one_case_recording() {
+    if !common::have("node") {
+        return;
+    }
+    let repo = fixture("ts");
+    std::fs::copy(repo.join("tcli.js"), repo.join("tcli_copy.js")).unwrap();
+    std::fs::write(repo.join("README.md"), "").unwrap();
+    std::fs::write(
+        repo.join("inputs.jsonl"),
+        "{\"args\": [\"div\", \"1\", \"0\"]}\n",
+    )
+    .unwrap();
+    let inputs = repo.join("inputs.jsonl");
+    app::record(&RecordOptions {
+        repo: &repo,
+        run: &words("node tcli.js"),
+        inputs: Some(&inputs),
+        normalize: &[],
+        name: None,
+        traps: false,
+        timeout_secs: None,
+        http: None,
+        server_args: None,
+        fresh: None,
+        pace_ms: None,
+        port: None,
+        float_tolerance: None,
+        float_files: &[],
+        effects: None,
+        ready_secs: None,
+        ready_request: None,
+    })
+    .unwrap();
+
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-anything"))
+        .args(["app", "drift", ".", "--build", "node tcli_copy.js"])
+        .current_dir(&repo)
+        .output()
+        .unwrap();
+    let printed = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        printed.contains("1 case; build: node tcli_copy.js"),
+        "{printed}"
+    );
     std::fs::remove_dir_all(&repo).unwrap();
 }

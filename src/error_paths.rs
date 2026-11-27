@@ -232,10 +232,14 @@ pub fn checks(crate_dir: &Path, manifest: &Manifest) -> Vec<Check> {
         detail: if raised.is_empty() {
             "the original fails on purpose nowhere".into()
         } else if unreached.is_empty() {
-            format!(
-                "each of the {} functions that fail in the original has a recorded failing case",
-                raised.len()
-            )
+            if raised.len() == 1 {
+                "the 1 function that fails in the original has a recorded failing case".into()
+            } else {
+                format!(
+                    "each of the {} functions that fail in the original has a recorded failing case",
+                    raised.len()
+                )
+            }
         } else {
             format!(
                 "no recorded case reaches these error paths: add inputs that fail (record --inputs)\n{}",
@@ -373,5 +377,79 @@ mod tests {
             ),
             BTreeSet::from(["b".to_string()])
         );
+    }
+
+    #[test]
+    fn error_cases_detail_singular_and_plural() {
+        let dir =
+            std::env::temp_dir().join(format!("rust-anything-error-detail-{}", std::process::id()));
+        let root = dir.join("root");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(
+            root.join("test.ts"),
+            "export function parse(s: string) {\n  if (!s) throw new Error('err');\n  return s;\n}\nexport function second(s: string) {\n  if (!s) throw new Error('err2');\n  return s;\n}\n",
+        )
+        .unwrap();
+
+        let mut manifest = Manifest {
+            schema: String::new(),
+            root: root.clone(),
+            root_written: None,
+            unit: "test.ts".into(),
+            language: Lang::Ts,
+            kind: crate::bridge::Kind::Napi,
+            crate_name: "test-rs".into(),
+            exports: vec![crate::ts::exports::ExportedFn {
+                name: "parse".into(),
+                file: "test.ts".into(),
+                line: 1,
+                ..Default::default()
+            }],
+            classes: Vec::new(),
+            js_only: Vec::new(),
+            batches: Vec::new(),
+            allocator: Default::default(),
+            float_tolerance: None,
+            ignore_key_order: false,
+        };
+
+        // 1 function that fails: recorded
+        std::fs::write(
+            dir.join("cases.jsonl"),
+            "{\"fn\":\"parse\",\"args\":[\"\"],\"error\":{\"name\":\"Error\"}}\n",
+        )
+        .unwrap();
+
+        let checks_one = checks(&dir, &manifest);
+        assert_eq!(checks_one[0].name, "error cases");
+        assert!(checks_one[0].passed);
+        assert_eq!(
+            checks_one[0].detail,
+            "the 1 function that fails in the original has a recorded failing case"
+        );
+
+        // 2 functions that fail: recorded
+        manifest.exports.push(crate::ts::exports::ExportedFn {
+            name: "second".into(),
+            file: "test.ts".into(),
+            line: 5,
+            ..Default::default()
+        });
+        std::fs::write(
+            dir.join("cases.jsonl"),
+            "{\"fn\":\"parse\",\"args\":[\"\"],\"error\":{\"name\":\"Error\"}}\n{\"fn\":\"second\",\"args\":[\"\"],\"error\":{\"name\":\"Error\"}}\n",
+        )
+        .unwrap();
+
+        let checks_two = checks(&dir, &manifest);
+        assert_eq!(checks_two[0].name, "error cases");
+        assert!(checks_two[0].passed);
+        assert_eq!(
+            checks_two[0].detail,
+            "each of the 2 functions that fail in the original has a recorded failing case"
+        );
+
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

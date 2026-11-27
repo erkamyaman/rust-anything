@@ -769,6 +769,42 @@ pub struct GateOutcome {
     pub checks: Vec<Check>,
 }
 
+/// Format the text output for a `GateOutcome`. Every check's detail begins in the same
+/// column by padding check names to the longest check name.
+pub fn text(outcome: &GateOutcome) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::new();
+    let width = outcome
+        .checks
+        .iter()
+        .map(|c| c.name.len())
+        .max()
+        .unwrap_or(0);
+    for check in &outcome.checks {
+        let mark = if check.passed { "pass" } else { "FAIL" };
+        let first = check.detail.lines().next().unwrap_or_default();
+        let _ = writeln!(out, "{mark}  {:<width$} {first}", check.name);
+        if !check.passed {
+            for line in check.detail.lines().skip(1) {
+                let _ = writeln!(out, "            {line}");
+            }
+            if let Some(fix) = &check.fix {
+                let _ = writeln!(out, "            fix: {fix}");
+            }
+        }
+    }
+    let _ = writeln!(
+        out,
+        "{}",
+        if outcome.passed {
+            "Gate passed."
+        } else {
+            "Gate failed."
+        }
+    );
+    out
+}
+
 pub fn gate(crate_dir: &Path, node_args: &[String]) -> Result<GateOutcome> {
     let manifest = Manifest::load(crate_dir)?;
     let lockfile = lockfile_check(crate_dir);
@@ -1281,7 +1317,7 @@ fn strip_code(line: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{CASES, Check, fix_for, spawn_fix, stubs, unsafe_blocks};
+    use super::{CASES, Check, GateOutcome, fix_for, spawn_fix, stubs, unsafe_blocks};
 
     #[test]
     fn counts_every_kind_of_stub() {
@@ -1599,5 +1635,58 @@ mod tests {
             "{}",
             check.detail
         );
+    }
+
+    #[test]
+    fn text_aligns_all_check_details_including_error_cases_and_known_diffs() {
+        let outcome = GateOutcome {
+            passed: true,
+            checks: vec![
+                Check {
+                    name: "tests",
+                    passed: true,
+                    detail: "0 tests, 0 assertions; saved as the baseline once gate passes".into(),
+                    fix: None,
+                },
+                Check {
+                    name: "error cases",
+                    passed: true,
+                    detail: "the 1 function that fails in the original has a recorded failing case"
+                        .into(),
+                    fix: None,
+                },
+                Check {
+                    name: "panics",
+                    passed: true,
+                    detail: "no unwrap, expect or panic where the original returns an error".into(),
+                    fix: None,
+                },
+                Check {
+                    name: "known diffs",
+                    passed: true,
+                    detail: "all recorded diffs match".into(),
+                    fix: None,
+                },
+            ],
+        };
+        let text = super::text(&outcome);
+        let lines: Vec<&str> = text.lines().take(4).collect();
+        // Column where the detail starts (after "pass  " (6 chars) + 11-char name + " " (1 char) = 18 chars)
+        let col = "pass  error cases ".len();
+        assert_eq!(col, 18);
+        for line in &lines {
+            assert!(line.len() > col, "line too short: {line}");
+            assert_eq!(
+                &line[col..col + 2],
+                match line.split_whitespace().nth(1).unwrap() {
+                    "tests" => "0 ",
+                    "error" => "th",
+                    "panics" => "no",
+                    "known" => "al",
+                    other => panic!("unexpected check: {other}"),
+                }
+            );
+        }
+        assert!(text.contains("Gate passed."));
     }
 }

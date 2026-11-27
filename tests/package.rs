@@ -479,3 +479,105 @@ fn package_refuses_non_packaged_crate_kinds_with_language_and_dispatcher() {
     );
     let _ = std::fs::remove_dir_all(&root);
 }
+
+#[test]
+fn package_refuses_cli_flags_on_unit_crates() {
+    let root = project(
+        "wasm-cli-flags",
+        &[
+            ("package.json", r#"{"name":"calc","version":"1.0.0"}"#),
+            ("src/calc.js", "export function calc() { return 1; }\n"),
+        ],
+    );
+    let port = bridged(&root, "src/calc.js", Kind::Wasm);
+    // Both --bin and --original
+    let err = package::package(&Options {
+        crate_dir: &port,
+        dry_run: true,
+        bin: vec!["calc".into()],
+        original: Some("calc@1.0.0".into()),
+        ..options(&port)
+    })
+    .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "--bin and --original are for CLI front doors (`rust/app`); this is a wasm crate"
+    );
+
+    // Only --bin
+    let err_bin = package::package(&Options {
+        crate_dir: &port,
+        dry_run: true,
+        bin: vec!["calc".into()],
+        ..options(&port)
+    })
+    .unwrap_err();
+    assert_eq!(
+        err_bin.to_string(),
+        "--bin is for CLI front doors (`rust/app`); this is a wasm crate"
+    );
+
+    // Only --original
+    let err_orig = package::package(&Options {
+        crate_dir: &port,
+        dry_run: true,
+        original: Some("calc@1.0.0".into()),
+        ..options(&port)
+    })
+    .unwrap_err();
+    assert_eq!(
+        err_orig.to_string(),
+        "--original is for CLI front doors (`rust/app`); this is a wasm crate"
+    );
+
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn package_refuses_fallback_on_wasm_and_pyo3_crates() {
+    let root = project(
+        "fallback-refusal",
+        &[
+            ("package.json", r#"{"name":"calc","version":"1.0.0"}"#),
+            ("src/calc.js", "export function calc() { return 1; }\n"),
+        ],
+    );
+    let wasm_port = bridged(&root, "src/calc.js", Kind::Wasm);
+    let err_wasm = package::package(&Options {
+        crate_dir: &wasm_port,
+        dry_run: true,
+        fallback: Some("./nowhere.js".into()),
+        ..options(&wasm_port)
+    })
+    .unwrap_err();
+    assert_eq!(
+        err_wasm.to_string(),
+        "--fallback is for napi crates; this is a wasm crate"
+    );
+
+    let py_root = project(
+        "py-fallback",
+        &[
+            ("src/textkit/__init__.py", ""),
+            (
+                "src/textkit/words.py",
+                "def count(s):\n    return len(s.split())\n",
+            ),
+        ],
+    );
+    let py_port = bridged(&py_root, "src/textkit/", Kind::Pyo3);
+    let err_py = package::package(&Options {
+        crate_dir: &py_port,
+        dry_run: true,
+        fallback: Some("./nowhere.js".into()),
+        ..options(&py_port)
+    })
+    .unwrap_err();
+    assert_eq!(
+        err_py.to_string(),
+        "--fallback is for napi crates; this is a PyO3 crate"
+    );
+
+    let _ = std::fs::remove_dir_all(&root);
+    let _ = std::fs::remove_dir_all(&py_root);
+}

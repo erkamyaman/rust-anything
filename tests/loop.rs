@@ -1011,7 +1011,8 @@ fn error_checks(dir: &Path, fails: &str) -> Vec<rust_anything::gate::Check> {
     assert_eq!(errors.name, "error cases");
     assert!(errors.passed, "{errors:?}");
     assert!(
-        errors.detail.starts_with("each of the"),
+        errors.detail.starts_with("the 1 function that fails")
+            || errors.detail.starts_with("each of the"),
         "{fails} fails in the original: {errors:?}"
     );
     checks
