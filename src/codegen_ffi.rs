@@ -252,3 +252,114 @@ pub fn cargo_toml(m: &Manifest) -> String {
         m.crate_name, m.unit
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn manifest(crate_name: &str) -> Manifest {
+        Manifest {
+            schema: String::new(),
+            root: std::path::PathBuf::new(),
+            root_written: None,
+            unit: "unit".into(),
+            language: Lang::Java,
+            kind: crate::bridge::Kind::Ffi,
+            crate_name: crate_name.into(),
+            exports: Vec::new(),
+            classes: Vec::new(),
+            js_only: Vec::new(),
+            batches: Vec::new(),
+            allocator: Default::default(),
+            float_tolerance: None,
+            ignore_key_order: false,
+        }
+    }
+
+    fn port_fn(params: Vec<(&str, &str)>, ret: &str) -> PortFn {
+        PortFn {
+            js_name: "test".into(),
+            rust_name: "test".into(),
+            params: params
+                .into_iter()
+                .map(|(n, t)| (n.into(), t.into()))
+                .collect(),
+            ret: ret.into(),
+            fallible: false,
+            is_async: false,
+        }
+    }
+
+    #[test]
+    fn test_java_native_class() {
+        // Multi-part name (hyphenated and underscored)
+        let m1 = manifest("text-kit-rs");
+        assert_eq!(java_native_class(&m1), "TextKitRsNative");
+
+        let m2 = manifest("my_awesome_tool");
+        assert_eq!(java_native_class(&m2), "MyAwesomeToolNative");
+
+        // Doubled underscore (or doubled hyphen)
+        let m3 = manifest("foo__bar");
+        assert_eq!(java_native_class(&m3), "FooBarNative");
+
+        let m4 = manifest("double--hyphen__lib");
+        assert_eq!(java_native_class(&m4), "DoubleHyphenLibNative");
+
+        // Single part
+        let m5 = manifest("simple");
+        assert_eq!(java_native_class(&m5), "SimpleNative");
+    }
+
+    #[test]
+    fn test_arg_expr() {
+        let f = port_fn(
+            vec![
+                ("a", "f64"),
+                ("b", "Option<f64>"),
+                ("c", "Vec<f64>"),
+                ("d", "Option<Vec<f64>>"),
+                ("e", "String"),
+                ("f", "i32"),
+            ],
+            "()",
+        );
+
+        assert_eq!(arg_expr(&f, 0), "num(args, 0)?");
+        assert_eq!(arg_expr(&f, 1), "opt_num(args, 1)?");
+        assert_eq!(arg_expr(&f, 2), "num_vec(args, 2)?");
+        assert_eq!(arg_expr(&f, 3), "opt_num_vec(args, 3)?");
+        assert_eq!(arg_expr(&f, 4), "arg(args, 4)?");
+        assert_eq!(arg_expr(&f, 5), "arg(args, 5)?");
+    }
+
+    #[test]
+    fn test_out_expr() {
+        let f_f64 = port_fn(vec![], "f64");
+        assert_eq!(out_expr(&f_f64), "out_num(out)");
+
+        let f_opt_f64 = port_fn(vec![], "Option<f64>");
+        assert_eq!(out_expr(&f_opt_f64), "out.map_or(Value::Null, out_num)");
+
+        let f_vec_f64 = port_fn(vec![], "Vec<f64>");
+        assert_eq!(
+            out_expr(&f_vec_f64),
+            "Value::Array(out.into_iter().map(out_num).collect())"
+        );
+
+        let f_unit = port_fn(vec![], "()");
+        assert_eq!(out_expr(&f_unit), "Value::Null");
+
+        let f_string = port_fn(vec![], "String");
+        assert_eq!(
+            out_expr(&f_string),
+            "serde_json::to_value(out).map_err(|e| e.to_string())?"
+        );
+
+        let f_custom = port_fn(vec![], "MyStruct");
+        assert_eq!(
+            out_expr(&f_custom),
+            "serde_json::to_value(out).map_err(|e| e.to_string())?"
+        );
+    }
+}

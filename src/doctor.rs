@@ -141,7 +141,30 @@ pub fn entry_state(entry: Option<&Entry>, exe: &Path) -> Install {
     let Some(command) = entry.command.as_deref() else {
         return Install::Foreign;
     };
-    if entry.url || entry.args != ["mcp"] {
+    if entry.url {
+        return Install::Foreign;
+    }
+    let npx = match entry.args.as_slice() {
+        [y, package, mcp] if y == "-y" && mcp == "mcp" && command == "npx" => Some(package),
+        [c, n, y, package, mcp]
+            if c == "/c" && n == "npx" && y == "-y" && mcp == "mcp" && command == "cmd" =>
+        {
+            Some(package)
+        }
+        _ => None,
+    };
+    if let Some(package) = npx {
+        if package != NAME && !package.starts_with(&format!("{NAME}@")) {
+            return Install::Foreign;
+        }
+        let wanted = crate::setup::launcher(exe);
+        return if !entry.disabled && wanted.command == command && wanted.args == entry.args {
+            Install::Current
+        } else {
+            Install::Outdated
+        };
+    }
+    if entry.args != ["mcp"] {
         return Install::Foreign;
     }
     if entry.disabled {
@@ -1162,6 +1185,40 @@ mod tests {
         let mut disabled = entry("/opt/bin/rust-anything", &["mcp"], false);
         disabled.disabled = true;
         assert_eq!(entry_state(Some(&disabled), exe), Install::Outdated);
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn an_npx_entry_is_current_for_a_copy_run_by_npx() {
+        let exe = Path::new(
+            "/home/u/.npm/_npx/0a1b2c/node_modules/rust-anything/binaries/linux-x64/rust-anything",
+        );
+        let entry = |args: &[&str]| Entry {
+            command: Some("npx".into()),
+            args: args.iter().map(|a| a.to_string()).collect(),
+            url: false,
+            disabled: false,
+        };
+        let package = format!("{NAME}@{}", env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            entry_state(Some(&entry(&["-y", &package, "mcp"])), exe),
+            Install::Current
+        );
+        assert_eq!(
+            entry_state(Some(&entry(&["-y", "rust-anything@0.0.1", "mcp"])), exe),
+            Install::Outdated
+        );
+        assert_eq!(
+            entry_state(
+                Some(&entry(&["-y", &package, "mcp"])),
+                Path::new("/opt/bin/rust-anything")
+            ),
+            Install::Outdated
+        );
+        assert_eq!(
+            entry_state(Some(&entry(&["-y", "other-package", "mcp"])), exe),
+            Install::Foreign
+        );
     }
 
     #[test]

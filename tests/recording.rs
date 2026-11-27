@@ -123,7 +123,7 @@ fn records_the_calls_a_python_test_suite_makes() {
     );
     let (printed, inputs) = from_tests(&root, "twice.py", &["python3", "-m", "unittest"]);
     std::fs::remove_dir_all(&root).unwrap();
-    assert!(printed.contains("Captured 3 call(s)"), "{printed}");
+    assert!(printed.contains("Captured 3 calls"), "{printed}");
     assert!(
         inputs.contains(r#"{"fn": "twice", "args": [21]}"#),
         "{inputs}"
@@ -171,7 +171,7 @@ fn records_python_test_calls_that_pass_arguments_by_keyword() {
         "{cases}"
     );
     // A keyword-only argument, and one passed by name after a skipped default.
-    assert!(printed.contains("Captured 3 call(s)"), "{printed}");
+    assert!(printed.contains("Captured 3 calls"), "{printed}");
     assert!(
         inputs.contains(r#"{"fn": "scale", "args": [3], "kwargs": {"by": 10}}"#),
         "{inputs}"
@@ -209,7 +209,7 @@ fn diff_replays_python_keyword_arguments_by_their_binding_names() {
         ],
     );
     let (printed, _) = from_tests(&root, "shape.py", &["python3", "-m", "unittest"]);
-    assert!(printed.contains("Captured 3 call(s)"), "{printed}");
+    assert!(printed.contains("Captured 3 calls"), "{printed}");
     let crate_dir = root.join("port");
     let lib = std::fs::read_to_string(crate_dir.join("src/lib.rs")).unwrap();
     // The bindings name the parameter in snake_case.
@@ -285,7 +285,7 @@ fn records_the_calls_a_js_test_suite_makes_and_restores_the_source() {
     assert_eq!(after, source);
     assert_eq!(backups, 1);
     assert!(
-        printed.contains("Captured 2 call(s) from the tests:"),
+        printed.contains("Captured 2 calls from the tests:"),
         "{printed}"
     );
     assert!(printed.contains("not captured: unwrapped"), "{printed}");
@@ -346,10 +346,7 @@ fn js_test_calls_are_captured_with_the_codec_record_uses() {
     // boxed string, or anything with `toJSON`, also nested) leave their call out; functions of
     // the unit named like the codec's `enc` and `looksLikeMarker` are still wrapped, and one
     // named `Buffer` does not stop the codec from telling a `Buffer`.
-    assert!(
-        printed.contains("Captured 10 call(s)"),
-        "{printed}\n{inputs}"
-    );
+    assert!(printed.contains("Captured 10 calls"), "{printed}\n{inputs}");
     assert_eq!(inputs.matches(r#"{"fn":"kind""#).count(), 1, "{inputs}");
     // Replayed through `dec`, each captured input gives the original what the test passed.
     for line in [
@@ -724,4 +721,34 @@ fn record_inputs_rejects_unknown_export_and_lists_known() {
     );
 
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn from_tests_singular_one_call() {
+    if !common::have("python3") {
+        return;
+    }
+    let root = project(
+        "single",
+        &[
+            (
+                "pyproject.toml",
+                "[project]\nname = \"twice\"\nversion = \"0.1.0\"\n",
+            ),
+            (
+                "twice.py",
+                "def twice(n: float) -> float:\n    return n * 2\n",
+            ),
+            (
+                "test_twice.py",
+                "import unittest\nfrom twice import twice\n\nclass T(unittest.TestCase):\n    def test_one(self):\n        self.assertEqual(twice(21), 42)\n",
+            ),
+        ],
+    );
+    let (printed, _) = from_tests(&root, "twice.py", &["python3", "-m", "unittest"]);
+    std::fs::remove_dir_all(&root).unwrap();
+    assert!(
+        printed.contains("Captured 1 call from the tests:"),
+        "{printed}"
+    );
 }
