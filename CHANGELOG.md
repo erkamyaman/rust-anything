@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `record` on Windows reports how much of a TS/JS original the cases ran, as it does elsewhere.
+  V8 names files `file:///C:/...` and the unit's files were compared as `\\?\C:\...`, so no file
+  matched and the coverage line was missing.
 - `analyze` also counts `Number.parseInt` and `Number.parseFloat` calls as `Number semantics`,
   alongside global `parseInt` and `parseFloat` (#730 by @brixtonpham).
 - `--db-dump` output is recorded with `\n` line endings: on Windows, Python's `print` and `sqlite3`
