@@ -200,7 +200,7 @@ bad it usually is and gives one example. The severities are the ones `analyze` s
 | Reflection and prototypes | medium | TS/JS `Proxy`, `Reflect`, `Symbol`; Python `globals`/`vars`; Ruby `send`, `is_a?`; PHP variable variables; Java `java.lang.reflect`, `getClass()`; Kotlin `::class`; C# `System.Reflection`; Go `reflect`; C function-like macros |
 | Callback-shaped APIs | medium | TS/JS, Ruby, PHP, Java, Kotlin, C#, Go, PowerShell script blocks: function-typed parameters make a chatty bridge |
 | Exceptions | low | all ten: `throw`, `raise`, `try`, Go `panic`/`recover`/`defer`, C `setjmp`/`longjmp`/`abort`/`exit`/`signal`, PowerShell `trap`/`Write-Error` |
-| Number semantics | low | TS/JS `number`, bitwise operators, `parseInt`; Python bitwise operators; PHP `/`; C# `decimal` |
+| Number semantics | low | TS/JS `number`, bitwise operators, `Math.round`, `toFixed`, `parseInt`/`parseFloat` (and `Number.parseInt`/`Number.parseFloat`); Python bitwise operators; PHP `/`; C# `decimal` |
 | JSON round-trips | low | TS/JS `JSON`, Ruby, PHP, Go `encoding/json`, PowerShell `ConvertTo-Json`: key order, `undefined`, `NaN` |
 | Integer width and overflow | medium | Python, Ruby and PHP `**` and `<<`; Java, Kotlin, C# shifts, `*` and hash codes; Go and C shifts and conversions: wrap vs panic |
 | Division and modulo | medium | Python, Ruby, PHP, Java, Kotlin, C#, Go, C: `/` and `%` on negatives, Python `//` |
