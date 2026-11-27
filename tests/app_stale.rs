@@ -115,6 +115,42 @@ fn a_cli_case_dropped_from_the_inputs_is_removed_on_rerecord() {
     assert_eq!((again.passed, again.total), (2, 2), "{:?}", again.failures);
 }
 
+#[test]
+fn a_kept_case_based_on_the_case_folder_does_not_keep_a_removed_case() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let repo = repo("dot-base");
+    std::fs::write(repo.join("cli.py"), "import sys\nprint(sys.argv[1:])\n").unwrap();
+    std::fs::write(
+        repo.join("in.jsonl"),
+        "{\"name\":\"one\",\"args\":[\"a\"]}\n{\"name\":\"two\",\"args\":[\"b\"]}\n",
+    )
+    .unwrap();
+    let run = [python.to_string(), "cli.py".to_string()];
+    record(&repo, &run, false);
+    let dir = app::cases_dir(&repo);
+    let one = std::fs::read_to_string(dir.join("one.toml")).unwrap();
+    let mine = one.replace("fs.sandbox = true", "fs.sandbox = true\nfs.base = \".\"");
+    assert_ne!(mine, one, "{one}");
+    std::fs::write(dir.join("mine.toml"), mine).unwrap();
+
+    std::fs::write(
+        repo.join("in.jsonl"),
+        "{\"name\":\"one\",\"args\":[\"a\"]}\n",
+    )
+    .unwrap();
+    let second = record(&repo, &run, false);
+    let left = files(&dir);
+    std::fs::remove_dir_all(&repo).unwrap();
+
+    assert_eq!(second.stale, ["two"], "{second:?}");
+    assert!(
+        !left.iter().any(|f| f.starts_with("two.")),
+        "two's files are left: {left:?}"
+    );
+}
+
 const SERVER: &str = r#"import http.server, os
 class H(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
