@@ -29,6 +29,8 @@
 
 <p align="center"><a href="translations.md">🌐 Башка телләр</a></p>
 
+<p align="center">Код базагызны Rust'ка күчерәсезме? Rust'ка күчү буенча консультация бирәм: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>Бу тәрҗемәне җәмәгатьчелек алып бара, шуңа күрә ул <a href="../README.md">инглизчә README</a> файлыннан калышырга мөмкин.</sub></p>
 
 ## Спонсорлар
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **Агентларга:** урнаштыру адымнары, барлык боерыклар һәм портлау тәртибе өчен [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) укыгыз.
 
 ## Бу ничек эшли
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/tt-dark.svg">
+    <img src="assets/how-it-works/tt-light.svg" width="880" alt="analyze нәрсәне портларга кирәклекне планлаштыра; rust-anything go күпер кора, яза, портны агентыгызга тапшыра һәм gate аша үткәрә, язылган һәр очрак туры килгәнче кабатлый; аннары enable чакыруларны Rust'ка күчерә">
+  </picture>
+</p>
 
 **Нәрсә әзер дип санала.** Тестларыгыз түгел, программаның үз-үзен тотышы. `record` оригиналны ясалган һәм бирелгән кертү мәгълүматлары белән эшләтә һәм һәр чакыру нәрсә кайтарганын, нәрсә ыргытканын һәм нәрсә чыгарганын саклый. Порт `gate` үткәч әзер: язылган һәр очрак туры килә, шулай ук fmt, clippy, `cargo test`, `unsafe` тикшерүе, stub тикшерүе һәм портка куелган язылган җавапларны тикшерү дә үтә. Үз тестларыгыз да эшли.
 

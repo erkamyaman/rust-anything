@@ -29,6 +29,8 @@
 
 <p align="center"><a href="translations.md">🌐 Другие языки</a></p>
 
+<p align="center">Переводите кодовую базу на Rust? Я консультирую по миграции на Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>Этот перевод поддерживается сообществом и может отставать от <a href="../README.md">английского README</a>.</sub></p>
 
 ## Спонсоры
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **Агентам:** прочитайте [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt), там шаги установки, все команды и порядок портирования.
 
 ## Как это работает
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/ru-dark.svg">
+    <img src="assets/how-it-works/ru-light.svg" width="880" alt="analyze планирует, что портировать; rust-anything go строит мост, записывает, отдаёт порт вашему агенту и прогоняет через gate, повторяя, пока каждый записанный случай не совпадёт; затем enable переключает вызовы на Rust">
+  </picture>
+</p>
 
 **Что считается готовым.** Поведение, а не ваши тесты. `record` запускает оригинал на сгенерированных и заданных входных данных и сохраняет, что каждый вызов возвращает, выбрасывает и печатает. Порт готов, когда проходит `gate`: каждый записанный случай совпадает, а fmt, clippy, `cargo test`, проверка `unsafe`, проверка заглушек и проверка на записанные ответы, вставленные в порт, тоже проходят. Ваши собственные тесты тоже запускаются.
 

@@ -29,6 +29,8 @@ Riscrivi la tua applicazione in Rust e dimostra che si comporta ancora allo stes
 
 <p align="center"><a href="translations.md">🌐 Altre lingue</a></p>
 
+<p align="center">Stai portando una codebase in Rust? Offro consulenza per le migrazioni a Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>Questa traduzione è mantenuta dalla community e può restare indietro rispetto al <a href="../README.md">README in inglese</a>.</sub></p>
 
 ## Sponsor
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **Agenti:** leggete [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) per i passi di installazione, tutti i comandi e il flusso di porting.
 
 ## Come funziona
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/it-dark.svg">
+    <img src="assets/how-it-works/it-light.svg" width="880" alt="analyze pianifica cosa portare; rust-anything go crea il ponte, registra, fa portare il codice al tuo agente e lo fa passare da gate, ripetendo finché ogni caso registrato corrisponde; poi enable passa le chiamate a Rust">
+  </picture>
+</p>
 
 **Cosa conta come finito.** Il comportamento, non i tuoi test. `record` esegue l'originale su input generati e forniti e salva ciò che ogni chiamata restituisce, lancia e stampa. Un port è finito quando `gate` passa: ogni caso registrato corrisponde, e fmt, clippy, `cargo test`, il controllo `unsafe`, il controllo degli stub e quello sulle risposte registrate incollate nel port passano tutti. Girano anche i tuoi test.
 

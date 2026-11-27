@@ -29,6 +29,8 @@
 
 <p align="center"><a href="translations.md">🌐 अन्य भाषाएँ</a></p>
 
+<p align="center">किसी कोडबेस को Rust में ले जा रहे हैं? मैं Rust माइग्रेशन के लिए कंसल्टिंग देता हूँ: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>इस अनुवाद का रखरखाव समुदाय करता है, इसलिए यह <a href="../README.md">अंग्रेज़ी README</a> से पीछे हो सकता है।</sub></p>
 
 ## प्रायोजक
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **एजेंट:** इंस्टॉल के चरण, सभी कमांड और पोर्टिंग का तरीका जानने के लिए [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) पढ़ें।
 
 ## यह कैसे काम करता है
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/hi-dark.svg">
+    <img src="assets/how-it-works/hi-light.svg" width="880" alt="analyze योजना बनाता है कि क्या पोर्ट करना है; rust-anything go ब्रिज बनाता है, रिकॉर्ड करता है, आपके एजेंट से पोर्ट करवाता है और gate से जाँचता है, तब तक दोहराता है जब तक रिकॉर्ड किया गया हर केस मेल न खाए; फिर enable कॉल को Rust पर स्विच करता है">
+  </picture>
+</p>
 
 **किसे पूरा माना जाता है।** व्यवहार, आपके टेस्ट नहीं। `record` मूल कोड को जनरेट किए गए और दिए गए इनपुट पर चलाता है, और हर कॉल जो लौटाती है, फेंकती है और प्रिंट करती है, उसे सहेजता है। पोर्ट तब पूरा होता है जब `gate` पास हो जाए: रिकॉर्ड किया गया हर केस मेल खाता है, और fmt, clippy, `cargo test`, `unsafe` जाँच, स्टब जाँच और पोर्ट में चिपकाए गए रिकॉर्ड किए गए जवाबों की जाँच, सब पास होते हैं। आपके अपने टेस्ट भी चलते हैं।
 

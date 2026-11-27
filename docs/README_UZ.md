@@ -29,6 +29,8 @@ Ilovangizni Rust'da qayta yozing va u hamon xuddi shunday ishlashini isbotlang.
 
 <p align="center"><a href="translations.md">🌐 Boshqa tillar</a></p>
 
+<p align="center">Kod bazangizni Rust'ga ko'chiryapsizmi? Rust'ga migratsiya bo'yicha konsalting xizmatini taklif qilaman: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>Bu tarjima hamjamiyat tomonidan yuritiladi va <a href="../README.md">inglizcha README</a>dan ortda qolishi mumkin.</sub></p>
 
 ## Homiylar
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **Agentlar:** o'rnatish qadamlari, barcha buyruqlar va portlash jarayoni uchun [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) ni o'qing.
 
 ## Qanday ishlaydi
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/uz-dark.svg">
+    <img src="assets/how-it-works/uz-light.svg" width="880" alt="analyze nimani portlashni rejalaydi; rust-anything go ko'prik quradi, yozib oladi, portni agentingizga beradi va gate orqali o'tkazadi, yozib olingan har bir holat mos kelguncha takrorlaydi; so'ng enable chaqiruvlarni Rust'ga o'tkazadi">
+  </picture>
+</p>
 
 **Nima tayyor hisoblanadi.** Sizning testlaringiz emas, xatti-harakat. `record` asl dasturni generatsiya qilingan va berilgan kirish ma'lumotlarida ishga tushiradi va har bir chaqiruv nima qaytarishi, nima tashlashi va nima chop etishini saqlaydi. Port `gate` o'tganda tayyor bo'ladi: yozib olingan har bir holat mos keladi, shuningdek fmt, clippy, `cargo test`, `unsafe` tekshiruvi, stub tekshiruvi va portga qo'yilgan yozib olingan javoblarni tekshirish ham o'tadi. O'z testlaringiz ham ishga tushadi.
 

@@ -29,6 +29,8 @@
 
 <p align="center"><a href="translations.md">🌐 其他語言</a></p>
 
+<p align="center">要把程式碼庫遷移到 Rust？我提供 Rust 遷移諮詢： <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>本譯文由社群維護，可能落後於<a href="../README.md">英文 README</a>。</sub></p>
 
 ## 贊助商
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **代理：**閱讀 [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt)，了解安裝步驟、所有指令和移植流程。
 
 ## 運作方式
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/zh-tw-dark.svg">
+    <img src="assets/how-it-works/zh-tw-light.svg" width="880" alt="analyze 規劃要移植什麼；rust-anything go 建立橋接、錄製、讓你的代理移植並用 gate 檢查，循環直到每個錄製的案例都相符；接著 enable 把呼叫切換到 Rust">
+  </picture>
+</p>
 
 **怎樣才算完成。** 看行為，而不是你的測試。`record` 用產生的和給定的輸入執行原始程式，儲存每次呼叫的回傳值、拋出的例外和印出的輸出。`gate` 通過時移植才算完成：每個錄製的案例都相符，而且 fmt、clippy、`cargo test`、`unsafe` 檢查、stub 檢查，以及檢查錄製的答案是否被直接貼進移植程式碼，全部通過。你自己的測試也會執行。
 

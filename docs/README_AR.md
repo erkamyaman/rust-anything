@@ -31,6 +31,8 @@
 
 <p align="center"><a href="translations.md">🌐 لغات أخرى</a></p>
 
+<p align="center">تنقل قاعدة شيفرة إلى Rust؟ أقدّم استشارات لعمليات الترحيل إلى Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>هذه الترجمة يحافظ عليها المجتمع، وقد تتأخر عن <a href="../README.md">README الإنجليزي</a>.</sub></p>
 
 ## الرعاة
@@ -92,6 +94,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **للوكلاء:** اقرأ [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) لخطوات التثبيت وكل الأوامر وسير عمل النقل.
 
 ## كيف يعمل
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/ar-dark.svg">
+    <img src="assets/how-it-works/ar-light.svg" width="880" alt="يخطط analyze لما يجب نقله؛ ثم يبني rust-anything go الجسر ويسجّل ويترك وكيلك ينقل ويمرّر النقل على gate، ويكرر ذلك حتى تتطابق كل حالة مسجّلة؛ ثم يحوّل enable الاستدعاءات إلى Rust">
+  </picture>
+</p>
 
 **ما الذي يُعدّ منجزًا.** السلوك، لا اختباراتك. يشغّل `record` الأصل على مدخلات مولّدة ومعطاة، ويحفظ ما يعيده كل استدعاء وما يرميه وما يطبعه. يكتمل النقل عندما ينجح `gate`: تتطابق كل حالة مسجّلة، وتنجح جميعها: fmt وclippy و`cargo test` وفحص `unsafe` وفحص البدائل الفارغة (stub) وفحص الإجابات المسجّلة الملصوقة في النقل. وتُشغَّل اختباراتك أيضًا.
 

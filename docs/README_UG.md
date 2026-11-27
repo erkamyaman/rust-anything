@@ -31,6 +31,8 @@
 
 <p align="center"><a href="translations.md">🌐 باشقا تىللار</a></p>
 
+<p align="center">كود ئامبىرىڭىزنى Rust قا كۆچۈرمەكچىمۇ؟ Rust قا كۆچۈش توغرىسىدا مەسلىھەت مۇلازىمىتى بېرىمەن: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>بۇ تەرجىمىنى جامائەت ئاسرايدۇ، شۇڭا ئۇ <a href="../README.md">ئىنگلىزچە README</a> دىن ئارقىدا قېلىشى مۇمكىن.</sub></p>
 
 ## ھامىيلار
@@ -92,6 +94,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **ۋاكالەتچىلەرگە:** ئورنىتىش قەدەملىرى، بارلىق بۇيرۇقلار ۋە كۆچۈرۈش جەريانى ئۈچۈن [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) نى ئوقۇڭ.
 
 ## قانداق ئىشلەيدۇ
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/ug-dark.svg">
+    <img src="assets/how-it-works/ug-light.svg" width="880" alt="analyze نېمىنى كۆچۈرۈشنى پىلانلايدۇ؛ rust-anything go كۆۋرۈك قۇرىدۇ، خاتىرىلەيدۇ، كۆچۈرۈشنى ۋاكالەتچىڭىزگە تاپشۇرىدۇ ۋە gate دىن ئۆتكۈزىدۇ، خاتىرىلەنگەن ھەر بىر ئەھۋال ماس كەلگۈچە تەكرارلايدۇ؛ ئاندىن enable چاقىرىقلارنى Rust قا ئالماشتۇرىدۇ">
+  </picture>
+</p>
 
 **نېمە تامام دەپ ھېسابلىنىدۇ.** سىزنىڭ سىناقلىرىڭىز ئەمەس، ھەرىكەت. `record` ئەسلىي پروگراممىنى ھاسىل قىلىنغان ۋە بېرىلگەن كىرگۈزمىلەر بىلەن ئىجرا قىلىپ، ھەر بىر چاقىرىقنىڭ قايتۇرغىنى، تاشلىغىنى ۋە بېسىپ چىقارغىنىنى ساقلايدۇ. `gate` ئۆتسە كۆچۈرۈش تامام بولىدۇ: خاتىرىلەنگەن ھەر بىر ئەھۋال ماس كېلىدۇ، ھەمدە fmt، clippy، `cargo test`، `unsafe` تەكشۈرۈشى، stub تەكشۈرۈشى ۋە كۆچۈرمىگە چاپلانغان خاتىرىلەنگەن جاۋابلارنى تەكشۈرۈش ھەممىسى ئۆتىدۇ. ئۆزىڭىزنىڭ سىناقلىرىمۇ ئىجرا قىلىنىدۇ.
 

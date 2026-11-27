@@ -29,6 +29,8 @@ Viết lại ứng dụng bằng Rust, và chứng minh nó vẫn hoạt động
 
 <p align="center"><a href="translations.md">🌐 Ngôn ngữ khác</a></p>
 
+<p align="center">Đang chuyển một codebase sang Rust? Tôi cung cấp dịch vụ tư vấn chuyển đổi sang Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>Bản dịch này do cộng đồng duy trì và có thể chậm hơn <a href="../README.md">README tiếng Anh</a>.</sub></p>
 
 ## Nhà tài trợ
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **Agent:** đọc [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) để xem các bước cài đặt, mọi lệnh và quy trình chuyển đổi.
 
 ## Cách hoạt động
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/vi-dark.svg">
+    <img src="assets/how-it-works/vi-light.svg" width="880" alt="analyze lên kế hoạch port gì; rust-anything go tạo cầu nối, ghi lại, để agent của bạn port và chạy gate, lặp lại đến khi mọi case đã ghi đều khớp; sau đó enable chuyển các lời gọi sang Rust">
+  </picture>
+</p>
 
 **Thế nào là xong.** Hành vi, không phải test của bạn. `record` chạy bản gốc trên các input được sinh ra và được cung cấp, rồi lưu lại những gì mỗi lời gọi trả về, ném ra và in ra. Một bản port xong khi `gate` qua: mọi case đã ghi đều khớp, và fmt, clippy, `cargo test`, kiểm tra `unsafe`, kiểm tra stub và kiểm tra câu trả lời đã ghi bị dán vào bản port đều qua. Test của chính bạn cũng được chạy.
 
