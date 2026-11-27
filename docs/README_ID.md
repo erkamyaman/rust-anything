@@ -29,6 +29,8 @@ Tulis ulang aplikasi Anda dalam Rust, dan buktikan perilakunya tetap sama.
 
 <p align="center"><a href="translations.md">🌐 Bahasa lain</a></p>
 
+<p align="center">Memindahkan codebase ke Rust? Saya menawarkan konsultasi untuk migrasi ke Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>Terjemahan ini dikelola oleh komunitas dan bisa tertinggal dari <a href="../README.md">README berbahasa Inggris</a>.</sub></p>
 
 ## Sponsor
@@ -70,6 +72,10 @@ Rust Anything gratis dan open source. Jika membantu pekerjaan Anda, sponsor Anda
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">Sponsor sebagai perusahaan, atau hal lain? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">Memindahkan codebase ke Rust? Saya menawarkan konsultasi untuk migrasi ke Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## Mulai cepat
 
 Tempel ini ke agen coding Anda:
@@ -87,6 +93,25 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 
 > [!TIP]
 > **Agen:** baca [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) untuk langkah instalasi, semua perintah, dan alur porting.
+
+## Cara kerjanya
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/id-dark.svg">
+    <img src="assets/how-it-works/id-light.svg" width="880" alt="analyze merencanakan apa yang di-port; rust-anything go membuat jembatan, merekam, membiarkan agen Anda mem-port dan menjalankan gate, berulang sampai setiap kasus yang direkam cocok; lalu enable mengalihkan pemanggil ke Rust">
+  </picture>
+</p>
+
+**Apa yang dianggap selesai.** Perilaku, bukan tes Anda. `record` menjalankan versi asli dengan input yang dihasilkan dan yang diberikan, lalu menyimpan apa yang dikembalikan, dilempar, dan dicetak setiap panggilan. Port selesai saat `gate` lolos: setiap kasus yang direkam cocok, dan fmt, clippy, `cargo test`, pemeriksaan `unsafe`, pemeriksaan stub, serta pemeriksaan jawaban rekaman yang ditempel ke port semuanya lolos. Tes Anda sendiri juga dijalankan.
+
+**Laporan atau migrasi, Anda yang pilih.** `analyze` dan `profile` hanya melapor: rencana berperingkat tentang apa yang perlu di-port, dan bagian mana yang panas di bawah beban kerja nyata. Keduanya perintah biasa, jadi laporannya tidak memakan token. `go` memigrasikan satu unit: membuat jembatan untuk fungsi terpanas, merekamnya, menyerahkan port ke agen Anda, lalu mem-build, membandingkan, dan menjalankan `gate` padanya, dan baru mengaktifkannya saat semuanya cocok (TS/JS, Python, dan PowerShell; `disable` mematikannya kembali).
+
+**Berapa lama satu run.** Satu run `go` mem-port satu unit, dengan paling banyak `--rounds` giliran agen (default 3): satu untuk port, lalu satu per diff atau gate yang gagal. Seluruh aplikasi berarti satu run per unit, jadi Anda bisa berhenti setelah yang mana pun.
+
+**Model murah untuk rencana, model kuat untuk port.** Rencana tidak butuh model. Untuk port, berikan perintah agen apa pun: `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**Agen.** `rust-anything setup` menambahkannya ke Claude Code, Codex, Cursor, Gemini CLI, dan OpenCode. Klien MCP lain bisa menjalankan `rust-anything mcp`, dan skill-nya juga bisa dipasang sendiri dengan `npx skills add erkamyaman/rust-anything` (lihat [instalasi](install.md)).
 
 ## Lisensi
 

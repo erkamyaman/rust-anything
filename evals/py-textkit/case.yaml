@@ -1,0 +1,12 @@
+schema_version: "1.0"
+name: py-textkit
+description: Move a small Python text utility module's functions to Rust while its caller, a JSON-lines driver, keeps working unchanged with the same behavior.
+tags: [port, python]
+plugins: [../../plugin]
+runs: 3
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 150
+  timeout_seconds: 2700
+  allowed_tools: [Read, Glob, Grep, Write, Edit, Bash, Skill]

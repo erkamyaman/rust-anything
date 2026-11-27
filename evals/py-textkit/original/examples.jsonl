@@ -1,0 +1,12 @@
+{"fn":"title_case","args":["the lord of the rings"]}
+{"fn":"title_case","args":["HELLO world"]}
+{"fn":"format_number","args":[1234567.891]}
+{"fn":"format_number","args":[1234567,0]}
+{"fn":"format_number","args":[-1234.5,1]}
+{"fn":"format_number","args":[1000,2," "]}
+{"fn":"format_number","args":["12"]}
+{"fn":"parse_kv","args":["a=1\nb = 'two'\n# c=3"]}
+{"fn":"parse_kv","args":["novalue"]}
+{"fn":"wrap","args":["the quick brown fox",10]}
+{"fn":"wrap","args":["abcdefghij",4]}
+{"fn":"wrap","args":["x",0]}
