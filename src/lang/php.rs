@@ -1128,6 +1128,7 @@ use Other\Three;
             "INT",
             "string | null",
             "int|string",
+            "int&string",
             "(int|string)",
             "?array",
             "mixed",
