@@ -226,3 +226,166 @@ fn report(
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::{DriftOutcome, Drifted, report};
+    use crate::app::{Failure, Problem, ReplayOutcome};
+
+    fn replay(build: &[&str], passed: usize, failures: Vec<Failure>) -> ReplayOutcome {
+        ReplayOutcome {
+            build: build.iter().map(|w| w.to_string()).collect(),
+            passed,
+            total: 3,
+            skipped: 0,
+            failures,
+            fallback: None,
+            report: PathBuf::new(),
+            groups: Vec::new(),
+        }
+    }
+
+    fn outcome(changed: Vec<Drifted>, failing: Vec<Drifted>, new: Vec<&str>) -> DriftOutcome {
+        DriftOutcome {
+            build: None,
+            cases: 3,
+            drifted: !changed.is_empty() || !failing.is_empty() || !new.is_empty(),
+            changed,
+            failing,
+            new: new.into_iter().map(String::from).collect(),
+            report: PathBuf::new(),
+        }
+    }
+
+    fn drifted(case: &str) -> Drifted {
+        Drifted {
+            case: case.into(),
+            args: vec!["--name".into(), "a b".into()],
+            fields: vec!["stdout".into()],
+            verdict: "changed".into(),
+        }
+    }
+
+    fn failure(case: &str, detail: &str) -> Failure {
+        Failure {
+            case: case.into(),
+            args: Vec::new(),
+            problems: vec![Problem::new("stdout", detail)],
+        }
+    }
+
+    #[test]
+    fn no_drift_and_no_build() {
+        let text = report(
+            &outcome(vec![], vec![], vec![]),
+            &replay(&["node", "cli.js"], 3, vec![]),
+            None,
+        );
+        assert!(
+            text.starts_with("# App drift\n\nOriginal: 3/3 cases match\n\n"),
+            "{text}"
+        );
+        assert!(
+            text.contains("Build: none (pass --build, or create rust/app with `app front-door`)\n"),
+            "{text}"
+        );
+        assert!(
+            text.contains("No drift: the recording still describes the original"),
+            "{text}"
+        );
+        assert!(!text.contains("## "), "{text}");
+    }
+
+    #[test]
+    fn a_build_reports_its_command_and_matches() {
+        let port = replay(&["target/app", "--flag"], 2, vec![]);
+        let text = report(
+            &outcome(vec![], vec![], vec![]),
+            &replay(&["node", "cli.js"], 3, vec![]),
+            Some(&port),
+        );
+        assert!(
+            text.contains("Build: `target/app --flag`: 2/3 cases match\n"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn a_changed_case_lists_its_arguments_and_diff() {
+        let original = replay(
+            &["node", "cli.js"],
+            2,
+            vec![failure("greet", "-hello\n+hi\n")],
+        );
+        let text = report(
+            &outcome(vec![drifted("greet")], vec![], vec![]),
+            &original,
+            None,
+        );
+        assert!(text.contains("## Changed upstream\n"), "{text}");
+        assert!(
+            text.contains("\n### greet (changed)\n\nArguments: `--name 'a b'`\n"),
+            "{text}"
+        );
+        assert!(
+            text.contains("\nstdout:\n\n```diff\n-hello\n+hi\n```\n"),
+            "{text}"
+        );
+        assert!(!text.contains("No drift"), "{text}");
+        assert!(!text.contains("## Port failures"), "{text}");
+        assert!(!text.contains("## New examples"), "{text}");
+    }
+
+    #[test]
+    fn port_failures_use_the_builds_replay() {
+        let original = replay(&["node", "cli.js"], 3, vec![]);
+        let port = replay(
+            &["target/app"],
+            2,
+            vec![failure("greet", "-hello\n+hullo\n")],
+        );
+        let text = report(
+            &outcome(vec![], vec![drifted("greet")], vec![]),
+            &original,
+            Some(&port),
+        );
+        assert!(!text.contains("## Changed upstream"), "{text}");
+        assert!(text.contains("\n## Port failures\n"), "{text}");
+        assert!(text.contains("+hullo\n```\n"), "{text}");
+    }
+
+    #[test]
+    fn new_examples_get_one_line_each() {
+        let text = report(
+            &outcome(vec![], vec![], vec!["cli --help", "cli greet x"]),
+            &replay(&["node", "cli.js"], 3, vec![]),
+            None,
+        );
+        assert!(text.contains("\n## New examples\n"), "{text}");
+        assert!(
+            text.contains("\n- `cli --help`\n- `cli greet x`\n"),
+            "{text}"
+        );
+        assert!(!text.contains("No drift"), "{text}");
+    }
+
+    #[test]
+    fn triple_backticks_in_a_diff_cannot_close_the_fence() {
+        let original = replay(
+            &["node", "cli.js"],
+            2,
+            vec![failure("md", "-```js\n+```ts\n")],
+        );
+        let text = report(
+            &outcome(vec![drifted("md")], vec![], vec![]),
+            &original,
+            None,
+        );
+        let body = text.split("```diff\n").nth(1).unwrap();
+        let (inside, _) = body.split_once("```\n").unwrap();
+        assert_eq!(inside, "-`\u{200b}``js\n+`\u{200b}``ts\n");
+        assert_eq!(text.matches("```").count(), 2, "{text}");
+    }
+}
