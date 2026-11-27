@@ -1145,7 +1145,8 @@ pub fn ported_check(crate_dir: &Path) -> Check {
             "nothing in port.rs is `unimplemented!`, `todo!` or only a `panic!`".into()
         } else {
             format!(
-                "{todo} place(s) in port.rs still `unimplemented!`, `todo!` or a function that only panics"
+                "{} in port.rs still `unimplemented!`, `todo!` or a function that only panics",
+                crate::report::count(todo, "place")
             )
         },
     }
@@ -1450,6 +1451,23 @@ mod tests {
     }
 
     #[test]
+    fn ported_check_counts_one_place_and_several_places() {
+        let detail = |port: &str| {
+            let dir = crate::app::temp_dir("gate-ported").unwrap();
+            std::fs::create_dir_all(dir.join("src")).unwrap();
+            std::fs::write(dir.join("src/port.rs"), port).unwrap();
+            let check = super::ported_check(&dir);
+            std::fs::remove_dir_all(dir).unwrap();
+            assert!(!check.passed);
+            check.detail
+        };
+        let one = detail("pub fn a() -> i32 { todo!() }\n");
+        assert!(one.starts_with("1 place in port.rs "), "{one}");
+        let two = detail("pub fn a() -> i32 { todo!() }\npub fn b() -> i32 { unimplemented!() }\n");
+        assert!(two.starts_with("2 places in port.rs "), "{two}");
+    }
+
+    #[test]
     fn scan_finds_literals_outside_comments_and_tests() {
         let port = "// \"a comment string\" 123456\n\
                     /* 987654 /* nested */ \"no\" */\n\
@@ -1701,9 +1719,7 @@ mod tests {
                 Check {
                     name: "ported",
                     passed: false,
-                    detail: "1 place in port.rs still `todo!`
-second line of the detail"
-                        .into(),
+                    detail: "1 place in port.rs still `todo!`\nsecond line of the detail".into(),
                     fix: Some("port the functions still stubbed in src/port.rs".into()),
                 },
                 Check {

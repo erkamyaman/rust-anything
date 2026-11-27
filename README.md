@@ -11,7 +11,9 @@
 <a href="https://www.npmjs.com/package/rust-anything"><img src="https://img.shields.io/npm/v/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=npm" alt="npm version"></a>
 <a href="https://github.com/erkamyaman/rust-anything/stargazers"><img src="https://img.shields.io/github/stars/erkamyaman/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=stars" alt="GitHub stars"></a>
 <a href="https://discord.gg/FXhUEA8eBR"><img src="https://img.shields.io/badge/discord-join-111111?style=flat&colorA=111111&colorB=b34a1a" alt="Discord"></a>
-<a href="#license"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-111111?style=flat&colorA=111111&colorB=b34a1a" alt="MIT or Apache-2.0 license"></a>
+<a href="#license"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-111111?style=flat&colorA=111111&colorB=b34a1a" alt="MIT or Apache-2.0 license"></a><br>
+<a href="https://crates.io/crates/rust-anything"><img src="https://img.shields.io/crates/d/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=crates.io%20downloads" alt="crates.io downloads"></a>
+<a href="https://www.npmjs.com/package/rust-anything"><img src="https://img.shields.io/npm/d18m/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=npm%20downloads" alt="npm downloads"></a>
 </p>
 
 <p align="center">
@@ -19,33 +21,15 @@ Rewrite your app in Rust, and prove it still behaves the same.
 </p>
 
 <p align="center">
-<b>Documentation:</b> <a href="https://rustanything.ai/">https://rustanything.ai/</a>
-</p>
-
-<p align="center"><a href="docs/translations.md">🌐 Other languages</a></p>
-
-<p align="center">
 <a href="https://trendshift.io/repositories/363468" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/363468/daily?language=Rust" alt="erkamyaman/rust-anything: #1 Rust repository of the day on Trendshift" width="250" height="55"/></a>
 <a href="https://trendshift.io/repositories/363468" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/363468/weekly?language=Rust" alt="erkamyaman/rust-anything: #1 Rust repository of the week on Trendshift" width="250" height="55"/></a>
 </p>
 
-## Quick start
+<p align="center">
+<b>Documentation:</b> <a href="https://rustanything.ai/">https://rustanything.ai/</a>
+</p>
 
-Paste this into your coding agent:
-
-```text
-Install Rust Anything with npm i -g rust-anything, then run rust-anything setup. Run rust-anything go -- <slow command of this app> and finish the port until rust-anything gate passes.
-```
-
-Or install it yourself:
-
-```sh
-cargo install rust-anything   # or: npm install -g rust-anything
-rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CLI and OpenCode
-```
-
-> [!TIP]
-> **Agents:** read [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) for the install steps, every command and the porting workflow.
+<p align="center"><a href="docs/translations.md">🌐 Other languages</a></p>
 
 ## Sponsors
 
@@ -89,6 +73,24 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 </p>
 
 <p align="center">Sponsoring as a company, or anything else? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+## Quick start
+
+Paste this into your coding agent:
+
+```text
+Install Rust Anything with npm i -g rust-anything, then run rust-anything setup. Run rust-anything go -- <slow command of this app> and finish the port until rust-anything gate passes.
+```
+
+Or install it yourself:
+
+```sh
+cargo install rust-anything   # or: npm install -g rust-anything
+rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CLI and OpenCode
+```
+
+> [!TIP]
+> **Agents:** read [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) for the install steps, every command and the porting workflow.
 
 ## License
 

@@ -3,7 +3,15 @@
 ## Unreleased
 
 - `gate` starts a failed check's extra detail lines and its `fix:` line in the same column as the
-  first line of its detail, instead of a fixed 12 spaces that no longer lined up after #707 (#713).
+  first line of its detail, instead of a fixed 12 spaces that no longer lined up after #707
+  (#713, #725 by @Layfate).
+- `gate`'s `ported` check says "1 place in port.rs" for one stub and "N places" for more,
+  instead of "1 place(s)" (#712, #724 by @Layfate).
+- `analyze` also counts `toLocaleString`, `toLocaleDateString` and `toLocaleTimeString` calls as
+  `Intl and locale-aware strings`: they format numbers and dates with the same ICU data as
+  `localeCompare` (#714, #722 by @chuenchen309).
+- `analyze` no longer flags `new Date(-1)` (a negative number literal) as `Date parsing`
+  (#715, #721 by @brixtonpham).
 - `app record` no longer keeps a separator that two runs' random values happen to share: request
   ids `k2Pq_x9Lm4` and `Zt7w_bR3nV` now record as `[..]` instead of `[..]_[..]`, so a replay whose id
   has no `_` passes. A separator next to a part both runs agree on stays, so `id=[..]` keeps its
