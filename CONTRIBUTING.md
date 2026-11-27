@@ -174,8 +174,11 @@ cargo test
 - Keep it to one change: two fixes are easier to review as two pull requests.
 
 CI runs on Ubuntu, macOS and Windows. The Ubuntu `check` job has Node and cargo
-(`RUST_ANYTHING_REQUIRE=node,cargo`); macOS adds Python, Go, Ruby, Java and the wasm-bindgen CLI, and
-Windows runs the native bridge integration tests. The `powershell` job runs the PowerShell tests on
+(`RUST_ANYTHING_REQUIRE=node,cargo`); macOS adds Python, Go, Ruby, Java and the wasm-bindgen CLI.
+Windows runs only `cargo test --lib app::tests::shell_words`, the `analyze`, `diff_missing_folder` and
+`doctor` suites (the debug CLI on Windows' 1 MB main-thread stack) and the `native` bridge suite; the
+rest of `cargo test` runs only on Ubuntu and macOS, so check a change to CLI code on Windows yourself
+if you can. The `powershell` job runs the PowerShell tests on
 Ubuntu and Windows, and the Ubuntu and macOS images have `pwsh` too. PHP, .NET and Kotlin are installed nowhere, so their
 tests skip there: run `cargo test` locally with those on `PATH` before a change that touches them
 (`docs/STATUS.md`, "Where the tests run", has the same split). For a first-time contributor, GitHub

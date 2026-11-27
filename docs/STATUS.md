@@ -106,4 +106,6 @@ CMake is read only as part of C project discovery. Requested in #200, where the 
 CI installs Node, Python, Go, Ruby and Java on macOS and Windows, and runs the PowerShell tests
 with `pwsh` on Linux, macOS and Windows (installed when the runner image lacks it). It does not
 install PHP, .NET, Kotlin, the Android NDK or an Android device, so the PHP, C#, Kotlin and Android
-tests skip there and run only on a machine that has them.
+tests skip there and run only on a machine that has them. The Windows job runs only the
+`app::tests::shell_words` unit tests and the `analyze`, `diff_missing_folder`, `doctor` and `native`
+suites; the rest of `cargo test` runs on Ubuntu and macOS.
