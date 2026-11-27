@@ -1878,6 +1878,21 @@ fn dotted() -> Table {
     t
 }
 
+/// The `.removed` file: one path per line, with `/` between components on every OS, so a
+/// recording made on Windows replays on Linux and macOS, where `\` is part of a file name.
+fn removed_list(paths: &[PathBuf]) -> String {
+    paths
+        .iter()
+        .map(|p| {
+            let parts: Vec<_> = p
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect();
+            format!("{}\n", parts.join("/"))
+        })
+        .collect()
+}
+
 fn write_case(dir: &Path, bin: &str, name: &str, case: &Case, rec: &Recorded) -> Result<()> {
     for ext in [
         "stdin",
@@ -1940,12 +1955,10 @@ fn write_case(dir: &Path, bin: &str, name: &str, case: &Case, rec: &Recorded) ->
     std::fs::write(dir.join(format!("{name}.stdout")), &rec.stdout)?;
     std::fs::write(dir.join(format!("{name}.stderr")), &rec.stderr)?;
     if !rec.removed.is_empty() {
-        let list: String = rec
-            .removed
-            .iter()
-            .map(|p| format!("{}\n", p.display()))
-            .collect();
-        std::fs::write(dir.join(format!("{name}.{REMOVED_EXT}")), list)?;
+        std::fs::write(
+            dir.join(format!("{name}.{REMOVED_EXT}")),
+            removed_list(&rec.removed),
+        )?;
     }
     if let Some(effects) = &rec.effects {
         std::fs::write(dir.join(format!("{name}.{}", crate::effects::EXT)), effects)?;
@@ -3058,6 +3071,15 @@ fn replay_cases(opts: &ReplayOptions) -> Result<ReplayOutcome> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn removed_paths_are_written_with_forward_slashes() {
+        let paths = vec![
+            PathBuf::from("top.txt"),
+            Path::new("stale").join("nested").join("old.txt"),
+        ];
+        assert_eq!(removed_list(&paths), "top.txt\nstale/nested/old.txt\n");
+    }
 
     #[test]
     fn shell_quote_leaves_plain_words_and_quotes_the_rest() {

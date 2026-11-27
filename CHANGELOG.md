@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `app record --fresh` writes the files a case removed (`<case>.removed`) with `/` between folders
+  on Windows too, so a recording made on Windows replays on Linux and macOS instead of failing on
+  `stale\old.txt`.
 - `app record` no longer keeps a separator that two runs' random values happen to share: request
   ids `k2Pq_x9Lm4` and `Zt7w_bR3nV` now record as `[..]` instead of `[..]_[..]`, so a replay whose id
   has no `_` passes. A separator next to a part both runs agree on stays, so `id=[..]` keeps its
