@@ -29,6 +29,8 @@
 
 <p align="center"><a href="translations.md">🌐 다른 언어</a></p>
 
+<p align="center">코드베이스를 Rust로 옮기시나요? Rust 마이그레이션 컨설팅을 제공합니다: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>이 번역은 커뮤니티에서 관리하며 <a href="../README.md">영어 README</a>보다 늦게 반영될 수 있습니다.</sub></p>
 
 ## 후원자
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **에이전트:** 설치 단계, 모든 명령, 포팅 흐름은 [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt)를 읽으세요.
 
 ## 작동 방식
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/ko-dark.svg">
+    <img src="assets/how-it-works/ko-light.svg" width="880" alt="analyze가 무엇을 포팅할지 계획하고, rust-anything go가 브리지, 기록, 에이전트의 포팅, gate를 기록된 모든 케이스가 일치할 때까지 반복한 뒤, enable이 호출을 Rust로 전환합니다">
+  </picture>
+</p>
 
 **무엇이 완료인가.** 여러분의 테스트가 아니라 동작입니다. `record`는 생성된 입력과 주어진 입력으로 원본을 실행하고, 각 호출이 반환하고 던지고 출력하는 것을 저장합니다. `gate`가 통과하면 포팅이 완료됩니다: 기록된 모든 케이스가 일치하고, fmt, clippy, `cargo test`, `unsafe` 검사, 스텁 검사, 기록된 답을 포팅 코드에 붙여 넣었는지 보는 검사가 모두 통과해야 합니다. 여러분의 테스트도 함께 실행됩니다.
 

@@ -29,6 +29,8 @@ Tətbiqinizi Rust-da yenidən yazın və onun hələ də eyni davrandığını s
 
 <p align="center"><a href="translations.md">🌐 Digər dillər</a></p>
 
+<p align="center">Kod bazanızı Rust-a köçürürsünüz? Rust miqrasiyaları üzrə məsləhət xidməti göstərirəm: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>Bu tərcümə icma tərəfindən dəstəklənir və <a href="../README.md">ingiliscə README</a>-dən geri qala bilər.</sub></p>
 
 ## Sponsorlar
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **Agentlər:** quraşdırma addımları, bütün əmrlər və portlama axını üçün [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) faylını oxuyun.
 
 ## Necə işləyir
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/az-dark.svg">
+    <img src="assets/how-it-works/az-light.svg" width="880" alt="analyze nəyin portlanacağını planlaşdırır; rust-anything go körpü qurur, qeydə alır, portu agentinizə yazdırır və gate-dən keçirir, qeydə alınmış hər hal uyğun gələnə qədər təkrarlayır; sonra enable çağıranları Rust-a keçirir">
+  </picture>
+</p>
 
 **Nə hazır sayılır.** Testləriniz yox, davranış. `record` orijinalı yaradılmış və verilmiş girişlərlə işə salır və hər çağırışın qaytardığını, atdığını və çap etdiyini saxlayır. Port `gate` keçəndə hazırdır: qeydə alınmış hər hal uyğun gəlir, fmt, clippy, `cargo test`, `unsafe` yoxlaması, stub yoxlaması və porta yapışdırılmış qeydə alınmış cavabların yoxlaması da keçir. Öz testləriniz də işləyir.
 

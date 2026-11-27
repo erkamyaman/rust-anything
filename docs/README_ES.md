@@ -29,6 +29,8 @@ Reescribe tu aplicación en Rust y demuestra que sigue comportándose igual.
 
 <p align="center"><a href="translations.md">🌐 Otros idiomas</a></p>
 
+<p align="center">¿Migrando una base de código a Rust? Ofrezco consultoría para migraciones a Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>Esta traducción la mantiene la comunidad y puede quedarse atrás respecto al <a href="../README.md">README en inglés</a>.</sub></p>
 
 ## Patrocinadores
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **Agentes:** lee [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) para los pasos de instalación, todos los comandos y el flujo de migración.
 
 ## Cómo funciona
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/es-dark.svg">
+    <img src="assets/how-it-works/es-light.svg" width="880" alt="analyze planifica qué portar; rust-anything go crea el puente, graba, deja que tu agente porte y lo pasa por gate, repitiendo hasta que todos los casos grabados coinciden; luego enable cambia las llamadas a Rust">
+  </picture>
+</p>
 
 **Qué cuenta como terminado.** El comportamiento, no tus tests. `record` ejecuta el original con entradas generadas y dadas, y guarda lo que cada llamada devuelve, lanza e imprime. Un porte está terminado cuando `gate` pasa: todos los casos grabados coinciden, y fmt, clippy, `cargo test`, la comprobación de `unsafe`, la de stubs y la de respuestas grabadas pegadas en el porte pasan todas. Tus propios tests también se ejecutan.
 

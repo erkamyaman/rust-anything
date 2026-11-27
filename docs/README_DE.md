@@ -29,6 +29,8 @@ Schreibe deine App in Rust neu und beweise, dass sie sich weiterhin genauso verh
 
 <p align="center"><a href="translations.md">🌐 Andere Sprachen</a></p>
 
+<p align="center">Du überträgst eine Codebasis nach Rust? Ich biete Beratung für Rust-Migrationen an: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 <p align="center"><sub>Diese Übersetzung wird von der Community gepflegt und kann hinter dem <a href="../README.md">englischen README</a> zurückliegen.</sub></p>
 
 ## Sponsoren
@@ -91,6 +93,13 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 > **Agenten:** Lies [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) für die Installationsschritte, alle Befehle und den Portierungsablauf.
 
 ## So funktioniert es
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/de-dark.svg">
+    <img src="assets/how-it-works/de-light.svg" width="880" alt="analyze plant, was portiert wird; rust-anything go baut die Brücke, zeichnet auf, lässt deinen Agenten portieren und prüft mit gate, in Runden, bis jeder aufgezeichnete Fall übereinstimmt; enable schaltet die Aufrufer dann auf Rust um">
+  </picture>
+</p>
 
 **Was als fertig gilt.** Das Verhalten, nicht deine Tests. `record` führt das Original mit generierten und vorgegebenen Eingaben aus und speichert, was jeder Aufruf zurückgibt, wirft und ausgibt. Eine Portierung ist fertig, wenn `gate` besteht: Jeder aufgezeichnete Fall stimmt überein, und fmt, clippy, `cargo test`, die `unsafe`-Prüfung, die Stub-Prüfung und die Prüfung auf aufgezeichnete Antworten, die in die Portierung kopiert wurden, bestehen alle. Deine eigenen Tests laufen ebenfalls.
 

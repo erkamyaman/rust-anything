@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `profile` on Java keeps the samples of every JVM the workload starts. Each one now writes its own
+  recording (`profile-<pid>.jfr`) and `profile` reads them all, where they used to share one
+  `profile.jfr` and the last JVM to exit replaced the others, so work done in a child JVM (a Gradle
+  test worker, say) was lost (#743).
 - `bridge --end-state replace|bindings|scaffold` records what the unit's bindings are for once the
   port is done: `replace` (the original is deleted after cut-over), `bindings` (callers keep
   importing it, so the bindings are public API) or `scaffold` (the bindings are deleted at
