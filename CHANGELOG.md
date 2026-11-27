@@ -5,7 +5,7 @@
 - The repository checks text files out with `\n` line endings on every OS (`.gitattributes`).
   Git for Windows turns on `core.autocrlf` by default, which gave `docs/tools.md` and
   `skills/rust-anything/SKILL.md` `\r\n` endings, so `tests/tools.rs` and `tests/skill.rs` failed
-  on a fresh Windows clone.
+  on a fresh Windows clone (#761 by @Layfate).
 - `map` names a crate folder whose `rust-anything.json` does not parse with `/` between folders
   on Windows too (`rust/util-rs`), as it names every readable port, instead of `rust\util-rs`
   (#760 by @Layfate).
