@@ -68,6 +68,10 @@ Rust Anything est gratuit et open source. S'il vous aide dans votre travail, vot
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">Parrainage en tant qu'entreprise, ou autre chose ? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">Vous migrez une base de code vers Rust ? Je propose du conseil pour les migrations vers Rust : <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## Démarrage rapide
 
 Collez ceci dans votre agent de code :
@@ -85,6 +89,18 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 
 > [!TIP]
 > **Agents :** lisez [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) pour les étapes d'installation, toutes les commandes et le flux de portage.
+
+## Comment ça marche
+
+**Ce qui compte comme terminé.** Le comportement, pas vos tests. `record` exécute l'original sur des entrées générées et fournies, et enregistre ce que chaque appel renvoie, lève et affiche. Un portage est terminé quand `gate` passe : chaque cas enregistré correspond, et fmt, clippy, `cargo test`, la vérification `unsafe`, la vérification des stubs et celle des réponses enregistrées collées dans le portage passent toutes. Vos propres tests tournent aussi.
+
+**Rapport ou migration, à vous de choisir.** `analyze` et `profile` ne font que rapporter : un plan classé de ce qu'il faut porter, et de ce qui est chaud sous une vraie charge. Ce sont de simples commandes, donc le rapport ne coûte aucun token. `go` migre une unité : il crée le pont vers la fonction la plus chaude, l'enregistre, confie le portage à votre agent, puis le compile, le compare et le passe à `gate`, et ne l'active que si tout correspond (TS/JS, Python et PowerShell ; `disable` le désactive à nouveau).
+
+**Durée d'une exécution.** Une exécution de `go` porte une unité, avec au plus `--rounds` tours d'agent (3 par défaut) : un pour le portage, puis un par diff ou gate en échec. Une application entière, c'est une exécution par unité, vous pouvez donc vous arrêter après n'importe laquelle.
+
+**Modèle bon marché pour le plan, modèle puissant pour le portage.** Le plan n'a besoin d'aucun modèle. Pour le portage, passez n'importe quelle commande d'agent : `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**Agents.** `rust-anything setup` l'ajoute à Claude Code, Codex, Cursor, Gemini CLI et OpenCode. Tout autre client MCP peut lancer `rust-anything mcp`, et le skill s'installe aussi seul avec `npx skills add erkamyaman/rust-anything` (voir [installation](install.md)).
 
 ## Licence
 

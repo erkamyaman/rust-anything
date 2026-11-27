@@ -1,0 +1,45 @@
+{"fn":"title_case","args":["a tale of two cities"]}
+{"fn":"title_case","args":["war and peace"]}
+{"fn":"title_case","args":["of"]}
+{"fn":"title_case","args":["the end of the"]}
+{"fn":"title_case","args":["ß"]}
+{"fn":"title_case","args":["ǆungla"]}
+{"fn":"title_case","args":["mcdonald's o'neil"]}
+{"fn":"title_case","args":["tab\tsep\u3000ideo"]}
+{"fn":"title_case","args":["   "]}
+{"fn":"title_case","args":["ﬁsh AND chips"]}
+{"fn":"format_number","args":[2.675,2]}
+{"fn":"format_number","args":[0.5,0]}
+{"fn":"format_number","args":[1.5,0]}
+{"fn":"format_number","args":[-0.0,2]}
+{"fn":"format_number","args":[-0.001,2]}
+{"fn":"format_number","args":[12345678901234567890123,0]}
+{"fn":"format_number","args":[12345678901234567890123,2]}
+{"fn":"format_number","args":[true,2]}
+{"fn":"format_number","args":[null]}
+{"fn":"format_number","args":[1e+21,0]}
+{"fn":"format_number","args":[1234.5,-1]}
+{"fn":"format_number","args":[1,21]}
+{"fn":"format_number","args":[999.995,2]}
+{"fn":"format_number","args":[7,3,"."]}
+{"fn":"format_number","args":[1234567,0,"_"]}
+{"fn":"format_number","args":[1234567.5,1,""]}
+{"fn":"parse_kv","args":["k=v\r\nk2=v2"]}
+{"fn":"parse_kv","args":["x = \"quoted\" "]}
+{"fn":"parse_kv","args":["a='mismatch\""]}
+{"fn":"parse_kv","args":["dup=1\ndup=2"]}
+{"fn":"parse_kv","args":["  \n# only comment\n"]}
+{"fn":"parse_kv","args":["ok=1\n1bad=3"]}
+{"fn":"parse_kv","args":["ключ=значение"]}
+{"fn":"parse_kv","args":["a=b=c"]}
+{"fn":"parse_kv","args":["a=1\u2028b=2"]}
+{"fn":"parse_kv","args":["z=1\ny=2\nx=3"]}
+{"fn":"parse_kv","args":["k='"]}
+{"fn":"parse_kv","args":["=v"]}
+{"fn":"wrap","args":["",5]}
+{"fn":"wrap","args":["supercalifragilistic",5]}
+{"fn":"wrap","args":["ab cd",5]}
+{"fn":"wrap","args":["abcd efgh",4]}
+{"fn":"wrap","args":["naïve café résumé",6]}
+{"fn":"wrap","args":["😀😀😀 ab",2]}
+{"fn":"wrap","args":["a  b\tc\nd",3]}

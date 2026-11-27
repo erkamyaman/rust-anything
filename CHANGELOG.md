@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+- `bridge --end-state replace|bindings|scaffold` records what the unit's bindings are for once the
+  port is done: `replace` (the original is deleted after cut-over), `bindings` (callers keep
+  importing it, so the bindings are public API) or `scaffold` (the bindings are deleted at
+  cut-over). It is kept as `end_state` in `rust-anything.json` (the MCP `bridge` tool takes it
+  too), and crates bridged before it keep working without one.
+- The skill reads a short guide for the unit's language before porting (`languages/` next to
+  `SKILL.md`, one file per language): how errors, null, numbers, strings, collections and classes
+  map to Rust, and the traps that made recorded cases differ in this repository. `setup` installs
+  them with the skill, the plugins ship them, and the MCP `port_unit` prompt takes a `language`
+  argument that adds the file. The skill now asks the end state before `bridge`, and says a port
+  keeps behavior, bugs included: a fix lands in its own change after `gate` passes.
+- `evals/` measures what the skill and tool add over an agent without them, with
+  `claude plugin eval` and a no-plugin baseline: a TypeScript, a Python and a Go module whose
+  callers must keep working while the functions run in Rust. `evals/score.py` checks the callers
+  are unchanged, replays held-out inputs the agent never saw, and proves each call enters Rust.
+  No results are published until a full run on stated hardware (`docs/evals.md`).
+- The MCP server serves the workflow skill over MCP's skills extension
+  (`io.modelcontextprotocol/skills`, SEP-2640): `skills/list`, `skills/get` and `resources/read`
+  at `skill://rust-anything/`, with each file's SHA-256 digest and size. A client that supports the
+  extension gets the skill from `rust-anything mcp` alone, without a plugin.
+- `gate` no longer panics on a Go unit whose source file got shorter after `bridge` (the manifest's
+  line pointed past the end of the file, as when the package is rewritten to call the Rust
+  binding).
+- The README says how the tool decides a port is done, what reports and what migrates, how long a
+  run takes, how to plan with no model and port with a strong one, and which agents it supports,
+  plus a line about consulting for Rust migrations.
+- `docs/install.md` lists every way to give an agent the skill: `setup`, the Claude Code and Codex
+  plugins, `npx skills add erkamyaman/rust-anything`, a copy by hand (with each agent's skills
+  folder), and the MCP server by hand.
+- `report` writes what a reviewer needs into `REPORT.md`: the end state, every `known-diffs.jsonl`
+  entry with its reason ("Intended differences"), and the exports kept in the original language
+  with theirs.
+- `gate`'s behavior line counts the `known-diffs.jsonl` entries added since the last passing gate,
+  so a behavior change that lands in the same change as the port is visible.
+
 - `analyze` also flags Python bitwise augmented assignments (`&=`, `|=`, `^=`, `>>=`) as
   `Number semantics`, alongside `&`, `|`, `^` and `>>` (and as `//=`, `%=`, `**=` and `<<=`
   already are for division and integer semantics) (#768 by @brixtonpham).

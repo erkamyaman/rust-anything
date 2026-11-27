@@ -162,6 +162,7 @@ fn php_error_resolution_matches_namespaced_throwables_and_falls_back() {
         allocator: Default::default(),
         float_tolerance: None,
         ignore_key_order: false,
+        end_state: None,
     };
     std::fs::write(root.join("wrapper.php"), codegen_php::wrapper(&manifest)).unwrap();
     std::fs::write(
