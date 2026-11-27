@@ -1142,7 +1142,8 @@ pub fn ported_check(crate_dir: &Path) -> Check {
             "nothing in port.rs is `unimplemented!`, `todo!` or only a `panic!`".into()
         } else {
             format!(
-                "{todo} place(s) in port.rs still `unimplemented!`, `todo!` or a function that only panics"
+                "{} in port.rs still `unimplemented!`, `todo!` or a function that only panics",
+                crate::report::count(todo, "place")
             )
         },
     }
@@ -1444,6 +1445,30 @@ mod tests {
         assert!(!check.passed);
         assert!(check.detail.contains("cannot read"));
         assert!(check.detail.contains("port.rs"));
+    }
+
+    #[test]
+    fn ported_check_counts_one_place_and_several_places() {
+        let detail = |port: &str| {
+            let dir = crate::app::temp_dir("gate-ported").unwrap();
+            std::fs::create_dir_all(dir.join("src")).unwrap();
+            std::fs::write(dir.join("src/port.rs"), port).unwrap();
+            let check = super::ported_check(&dir);
+            std::fs::remove_dir_all(dir).unwrap();
+            assert!(!check.passed);
+            check.detail
+        };
+        let one = detail(
+            "pub fn a() -> i32 { todo!() }
+",
+        );
+        assert!(one.starts_with("1 place in port.rs "), "{one}");
+        let two = detail(
+            "pub fn a() -> i32 { todo!() }
+pub fn b() -> i32 { unimplemented!() }
+",
+        );
+        assert!(two.starts_with("2 places in port.rs "), "{two}");
     }
 
     #[test]
