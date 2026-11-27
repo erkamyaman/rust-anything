@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The repository checks text files out with `\n` line endings on every OS (`.gitattributes`).
+  Git for Windows turns on `core.autocrlf` by default, which gave `docs/tools.md` and
+  `skills/rust-anything/SKILL.md` `\r\n` endings, so `tests/tools.rs` and `tests/skill.rs` failed
+  on a fresh Windows clone.
 - `analyze` also counts `Number.parseInt` and `Number.parseFloat` calls as `Number semantics`,
   alongside global `parseInt` and `parseFloat` (#730 by @brixtonpham).
 - `--db-dump` output is recorded with `\n` line endings: on Windows, Python's `print` and `sqlite3`
