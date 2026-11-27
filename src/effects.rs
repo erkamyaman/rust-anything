@@ -438,7 +438,7 @@ impl Sinks {
             text.push_str("db\n");
             match shell(cmd, cwd, repo, &self.env()) {
                 Ok(out) => {
-                    text.push_str(&String::from_utf8_lossy(&out.stdout));
+                    text.push_str(&dump_text(&out.stdout));
                     if !out.status.success() {
                         text.push_str(&format!("(db dump failed: {})\n", out.status));
                     }
@@ -1078,9 +1078,24 @@ fn serve_smtp_mode(stream: TcpStream, events: &Mutex<Vec<String>>, raw: bool) {
     }
 }
 
+/// A `--db-dump` command's output as it goes into the effects. Its line endings are the dump
+/// tool's, not the app's (Python's `print` and `sqlite3` end lines with `\r\n` on Windows), so
+/// they become `\n` like the rest of the effects, and a recording made on Windows replays on Linux
+/// and macOS.
+fn dump_text(stdout: &[u8]) -> String {
+    String::from_utf8_lossy(stdout).replace("\r\n", "\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn db_dump_lines_end_with_a_newline_on_every_os() {
+        assert_eq!(dump_text(b"1 dave\r\n2 erin\r\n"), "1 dave\n2 erin\n");
+        assert_eq!(dump_text(b"1 dave\n"), "1 dave\n");
+        assert_eq!(dump_text(b"a\rb\r\n"), "a\rb\n", "a lone \\r is data");
+    }
 
     #[test]
     fn base64_matches_the_rfc_4648_vectors() {

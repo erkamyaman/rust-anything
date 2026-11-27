@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `--db-dump` output is recorded with `\n` line endings: on Windows, Python's `print` and `sqlite3`
+  end lines with `\r\n`, so `.effects` mixed both and a recording made there failed replay on Linux
+  and macOS.
 - `app record` no longer keeps a separator that two runs' random values happen to share: request
   ids `k2Pq_x9Lm4` and `Zt7w_bR3nV` now record as `[..]` instead of `[..]_[..]`, so a replay whose id
   has no `_` passes. A separator next to a part both runs agree on stays, so `id=[..]` keeps its

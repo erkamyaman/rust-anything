@@ -60,7 +60,8 @@ rust-anything app record . --effects http,smtp --effect-env WEBHOOK_URL=http-url
   the cases, so replay gets the same replies. Giving the flag again replaces the saved rules.
 - **`--db-reset` and `--db-dump`** are shell commands: reset puts the database in a known state
   before each case (each start, for servers), and dump prints its state after each case (each
-  request, for servers). Cases then run one at a time. Both run in the folder the case runs in
+  request, for servers); the dump's `\r\n` line endings are recorded as `\n`, so a recording made
+  on Windows replays elsewhere. Cases then run one at a time. Both run in the folder the case runs in
   (the server's, with `--fresh`), so `app.db` is the one the app opened; a script they name by a
   relative path (`scripts/reset-db.sh`, `reset.py`, `< schema.sql`) is still the repository's. That
   holds for files with a script extension (`.py`, `.sh`, `.bash`, `.js`, `.mjs`, `.cjs`, `.ts`,
