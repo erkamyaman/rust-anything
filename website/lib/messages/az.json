@@ -117,7 +117,7 @@
       {
         "v": "32",
         "unit": "x",
-        "k": "50,000 string üzərində sorğu başına Fuse.js axtarışı, Apple M4"
+        "k": "50,000 string üzərində sorğu başına Fuse.js axtarışı, Apple M4, 10 nüvə"
       },
       {
         "v": "3.5",
@@ -207,14 +207,14 @@
         "href": "/docs/real-world/fuse-js",
         "kind": "Fuse.js · string siyahısında axtarış",
         "big": "32x",
-        "text": "50,000 string üzərində sorğu başına daha sürətli (91.2 ms → 2.8 ms, Apple M4). 3,414/3,414 qeydə alınmış hal uyğun gəlir; 360 axtarışda nəticələr Fuse ilə bayt-bayt eynidir.",
+        "text": "50,000 string üzərində sorğu başına daha sürətli (91.2 ms → 2.8 ms, Apple M4, 10 nüvə). 3,414/3,414 qeydə alınmış hal uyğun gəlir; 360 axtarışda nəticələr Fuse ilə bayt-bayt eynidir.",
         "rows": [
           {
-            "k": "10,000 string",
+            "k": "10,000 string, bütün nüvələr",
             "v": "27-30x"
           },
           {
-            "k": "1,000 string",
+            "k": "1,000 string, bütün nüvələr",
             "v": "18x"
           },
           {
@@ -236,11 +236,11 @@
             "slow": true
           },
           {
-            "k": "Batch, parse x100,000",
+            "k": "Batch, parse x100,000, bütün nüvələr",
             "v": "18x"
           },
           {
-            "k": "Batch, format x100,000",
+            "k": "Batch, format x100,000, bütün nüvələr",
             "v": "0.8x",
             "slow": true
           }

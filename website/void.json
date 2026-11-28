@@ -11,6 +11,7 @@
     },
     "rewrites": {
       "/": "/en",
+      "/about": "/en/about",
       "/docs/*": "/en/docs/:splat"
     },
     "headers": {

@@ -66,6 +66,44 @@ impl Allocator {
     }
 }
 
+/// What a unit's bindings are for once the port is done (`bridge --end-state`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+pub enum EndState {
+    /// The Rust replaces the original, which is deleted after cut-over.
+    Replace,
+    /// Callers keep importing the unit through the bindings for good: they are public API.
+    Bindings,
+    /// The bindings are temporary and are deleted at cut-over.
+    Scaffold,
+}
+
+impl EndState {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Replace => "replace",
+            Self::Bindings => "bindings",
+            Self::Scaffold => "scaffold",
+        }
+    }
+
+    /// What is left to do once the port matches, for people reading a report.
+    pub fn after_cut_over(self) -> &'static str {
+        match self {
+            Self::Replace => "delete the original once callers use the Rust",
+            Self::Bindings => "the bindings stay as public API: version and document them",
+            Self::Scaffold => "delete the bindings at cut-over",
+        }
+    }
+}
+
+/// Records the unit's end state in its manifest.
+pub fn set_end_state(crate_dir: &Path, end_state: EndState) -> Result<()> {
+    let mut manifest = Manifest::load(crate_dir)?;
+    manifest.end_state = Some(end_state);
+    manifest.save(crate_dir)
+}
+
 /// What `bridge` generated; every later step starts from it.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Manifest {
@@ -103,6 +141,9 @@ pub struct Manifest {
     /// Objects match regardless of key order (`record --ignore-key-order`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub ignore_key_order: bool,
+    /// What the bindings are for once the port is done (`bridge --end-state`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_state: Option<EndState>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -1455,6 +1496,7 @@ pub fn bridge(opts: &Options) -> Result<Outcome> {
         allocator: opts.allocator,
         float_tolerance: None,
         ignore_key_order: false,
+        end_state: None,
     };
     if kind == Kind::CAbi {
         return bridge_c(&manifest, &crate_dir, &js_only);
@@ -1931,6 +1973,44 @@ mod tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn manifest_json(extra: &str) -> String {
+        format!(
+            r#"{{"schema":"{SCHEMA}","root":".","unit":"u","kind":"napi","crate_name":"u-rs","exports":[]{extra}}}"#
+        )
+    }
+
+    #[test]
+    fn a_manifest_written_before_end_states_has_none() {
+        let dir = std::env::temp_dir().join(format!("ra-end-none-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(MANIFEST), manifest_json("")).unwrap();
+        let m = Manifest::load(&dir).unwrap();
+        assert_eq!(m.end_state, None);
+        m.save(&dir).unwrap();
+        let saved = std::fs::read_to_string(dir.join(MANIFEST)).unwrap();
+        assert!(!saved.contains("end_state"), "{saved}");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn set_end_state_keeps_the_rest_of_the_manifest() {
+        let dir = std::env::temp_dir().join(format!("ra-end-set-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(MANIFEST),
+            manifest_json(r#","float_tolerance":0.001"#),
+        )
+        .unwrap();
+        set_end_state(&dir, EndState::Scaffold).unwrap();
+        let saved = std::fs::read_to_string(dir.join(MANIFEST)).unwrap();
+        assert!(saved.contains(r#""end_state": "scaffold""#), "{saved}");
+        assert!(saved.contains(r#""root": ".""#), "{saved}");
+        let m = Manifest::load(&dir).unwrap();
+        assert_eq!(m.end_state, Some(EndState::Scaffold));
+        assert_eq!(m.float_tolerance, Some(0.001));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn kind_labels_match_documentation() {

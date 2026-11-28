@@ -12,6 +12,7 @@
 <a href="https://github.com/erkamyaman/rust-anything/stargazers"><img src="https://img.shields.io/github/stars/erkamyaman/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=stars" alt="GitHub stars"></a>
 <a href="https://discord.gg/FXhUEA8eBR"><img src="https://img.shields.io/badge/discord-join-111111?style=flat&colorA=111111&colorB=b34a1a" alt="Discord"></a>
 <a href="https://github.com/erkamyaman/rust-anything#license"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-111111?style=flat&colorA=111111&colorB=b34a1a" alt="MIT or Apache-2.0 license"></a><br>
+<a href="https://rustanything.ai/"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Frustanything.ai%2Fbadge-downloads.json&style=flat" alt="Total downloads, crates.io and npm"></a>
 <a href="https://crates.io/crates/rust-anything"><img src="https://img.shields.io/crates/d/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=crates.io%20downloads" alt="crates.io downloads"></a>
 <a href="https://www.npmjs.com/package/rust-anything"><img src="https://img.shields.io/npm/d18m/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=npm%20downloads" alt="npm downloads"></a>
 </p>
@@ -28,6 +29,8 @@
 <p align="center"><b>Құжаттама:</b> <a href="https://rustanything.ai/kk">https://rustanything.ai/kk</a></p>
 
 <p align="center"><a href="translations.md">🌐 Басқа тілдер</a></p>
+
+<p align="center">Код базаңызды Rust-қа көшіріп жатырсыз ба? Rust-қа көшу бойынша кеңес беремін: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
 
 <p align="center"><sub>Бұл аударманы қауымдастық жүргізеді, сондықтан ол <a href="../README.md">ағылшынша README</a> нұсқасынан артта қалуы мүмкін.</sub></p>
 
@@ -68,6 +71,10 @@ Rust Anything тегін әрі ашық бастапқы кодты. Жұмыс
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">Компания ретінде демеушілік пе, әлде басқа нәрсе ме? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">Код базаңызды Rust-қа көшіріп жатырсыз ба? Rust-қа көшу бойынша кеңес беремін: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## Жылдам бастау
 
 Мұны код жазатын агентіңізге қойыңыз:
@@ -85,6 +92,25 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 
 > [!TIP]
 > **Агенттерге:** орнату қадамдары, барлық командалар және порттау тәртібі үшін [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) оқыңыз.
+
+## Бұл қалай жұмыс істейді
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/kk-dark.svg">
+    <img src="assets/how-it-works/kk-light.svg" width="880" alt="analyze нені порттауды жоспарлайды; rust-anything go көпір жасайды, жазады, портты агентіңізге береді және gate арқылы өткізеді, жазылған әр жағдай сәйкес келгенше қайталайды; содан кейін enable шақыруларды Rust-қа ауыстырады">
+  </picture>
+</p>
+
+**Не дайын деп саналады.** Сіздің тесттеріңіз емес, мінез-құлық. `record` түпнұсқаны генерацияланған және берілген кіріс деректерімен іске қосып, әр шақырудың нені қайтаратынын, лақтыратынын және шығаратынын сақтайды. Порт `gate` өткенде дайын: жазылған әр жағдай сәйкес келеді, сондай-ақ fmt, clippy, `cargo test`, `unsafe` тексерісі, stub тексерісі және портқа қойылған жазылған жауаптарды тексеру де өтеді. Өз тесттеріңіз де іске қосылады.
+
+**Есеп пе, көшіру ме, өзіңіз таңдайсыз.** `analyze` және `profile` тек есеп береді: нені порттау керектігінің реттелген жоспары және нақты жүктеме кезінде не ең көп уақыт алатыны. Бұлар қарапайым командалар, сондықтан есеп ешқандай токен жұмсамайды. `go` бір бірлікті көшіреді: ең қызу функцияға көпір жасайды, оны жазады, портты агентіңізге береді, содан кейін құрастырады, салыстырады және `gate` арқылы өткізеді, бәрі сәйкес келгенде ғана қосады (TS/JS, Python және PowerShell; `disable` қайта өшіреді).
+
+**Бір іске қосу қанша уақыт алады.** Бір `go` іске қосуы бір бірлікті порттайды, ең көбі `--rounds` агент айналымымен (әдепкі бойынша 3): біреуі порт үшін, содан кейін әр сәтсіз diff немесе gate үшін біреуден. Бүкіл қолданба әр бірлікке бір іске қосудан тұрады, сондықтан кез келгенінен кейін тоқтай аласыз.
+
+**Жоспарға арзан модель, портқа күшті модель.** Жоспарға модель керек емес. Порт үшін кез келген агент командасын беріңіз: `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**Агенттер.** `rust-anything setup` оны Claude Code, Codex, Cursor, Gemini CLI және OpenCode-қа қосады. Кез келген басқа MCP клиенті `rust-anything mcp` іске қоса алады, ал skill `npx skills add erkamyaman/rust-anything` арқылы бөлек те орнатылады ([орнату](install.md) бөлімін қараңыз).
 
 ## Лицензия
 

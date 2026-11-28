@@ -12,6 +12,7 @@
 <a href="https://github.com/erkamyaman/rust-anything/stargazers"><img src="https://img.shields.io/github/stars/erkamyaman/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=stars" alt="GitHub stars"></a>
 <a href="https://discord.gg/FXhUEA8eBR"><img src="https://img.shields.io/badge/discord-join-111111?style=flat&colorA=111111&colorB=b34a1a" alt="Discord"></a>
 <a href="https://github.com/erkamyaman/rust-anything#license"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-111111?style=flat&colorA=111111&colorB=b34a1a" alt="MIT or Apache-2.0 license"></a><br>
+<a href="https://rustanything.ai/"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Frustanything.ai%2Fbadge-downloads.json&style=flat" alt="Total downloads, crates.io and npm"></a>
 <a href="https://crates.io/crates/rust-anything"><img src="https://img.shields.io/crates/d/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=crates.io%20downloads" alt="crates.io downloads"></a>
 <a href="https://www.npmjs.com/package/rust-anything"><img src="https://img.shields.io/npm/d18m/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=npm%20downloads" alt="npm downloads"></a>
 </p>
@@ -28,6 +29,8 @@ Reescribe tu aplicación en Rust y demuestra que sigue comportándose igual.
 <p align="center"><b>Documentación:</b> <a href="https://rustanything.ai/es">https://rustanything.ai/es</a></p>
 
 <p align="center"><a href="translations.md">🌐 Otros idiomas</a></p>
+
+<p align="center">¿Migrando una base de código a Rust? Ofrezco consultoría para migraciones a Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
 
 <p align="center"><sub>Esta traducción la mantiene la comunidad y puede quedarse atrás respecto al <a href="../README.md">README en inglés</a>.</sub></p>
 
@@ -68,6 +71,10 @@ Rust Anything es gratuito y de código abierto. Si te ayuda en tu trabajo, tu pa
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">¿Patrocinio como empresa, o cualquier otra cosa? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">¿Migrando una base de código a Rust? Ofrezco consultoría para migraciones a Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## Inicio rápido
 
 Pega esto en tu agente de código:
@@ -85,6 +92,25 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 
 > [!TIP]
 > **Agentes:** lee [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) para los pasos de instalación, todos los comandos y el flujo de migración.
+
+## Cómo funciona
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/es-dark.svg">
+    <img src="assets/how-it-works/es-light.svg" width="880" alt="analyze planifica qué portar; rust-anything go crea el puente, graba, deja que tu agente porte y lo pasa por gate, repitiendo hasta que todos los casos grabados coinciden; luego enable cambia las llamadas a Rust">
+  </picture>
+</p>
+
+**Qué cuenta como terminado.** El comportamiento, no tus tests. `record` ejecuta el original con entradas generadas y dadas, y guarda lo que cada llamada devuelve, lanza e imprime. Un porte está terminado cuando `gate` pasa: todos los casos grabados coinciden, y fmt, clippy, `cargo test`, la comprobación de `unsafe`, la de stubs y la de respuestas grabadas pegadas en el porte pasan todas. Tus propios tests también se ejecutan.
+
+**Informe o migración, tú eliges.** `analyze` y `profile` solo informan: un plan ordenado de qué portar y de qué está caliente bajo una carga real. Son comandos normales, así que el informe no cuesta tokens. `go` migra una unidad: crea el puente para la función más caliente, la graba, entrega el porte a tu agente, luego lo compila, lo compara y lo pasa por `gate`, y solo lo activa cuando todo coincide (TS/JS, Python y PowerShell; `disable` lo vuelve a desactivar).
+
+**Cuánto dura una ejecución.** Una ejecución de `go` porta una unidad, con como máximo `--rounds` turnos del agente (3 por defecto): uno para el porte y luego uno por cada diff o gate que falle. Una aplicación entera es una ejecución por unidad, así que puedes parar después de cualquiera.
+
+**Modelo barato para el plan, modelo potente para el porte.** El plan no necesita modelo. Para el porte, pasa cualquier comando de agente: `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**Agentes.** `rust-anything setup` lo añade a Claude Code, Codex, Cursor, Gemini CLI y OpenCode. Cualquier otro cliente MCP puede ejecutar `rust-anything mcp`, y la skill también se instala por sí sola con `npx skills add erkamyaman/rust-anything` (ver [instalación](install.md)).
 
 ## Licencia
 

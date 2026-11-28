@@ -12,6 +12,7 @@
 <a href="https://github.com/erkamyaman/rust-anything/stargazers"><img src="https://img.shields.io/github/stars/erkamyaman/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=stars" alt="GitHub stars"></a>
 <a href="https://discord.gg/FXhUEA8eBR"><img src="https://img.shields.io/badge/discord-join-111111?style=flat&colorA=111111&colorB=b34a1a" alt="Discord"></a>
 <a href="https://github.com/erkamyaman/rust-anything#license"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-111111?style=flat&colorA=111111&colorB=b34a1a" alt="MIT or Apache-2.0 license"></a><br>
+<a href="https://rustanything.ai/"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Frustanything.ai%2Fbadge-downloads.json&style=flat" alt="Total downloads, crates.io and npm"></a>
 <a href="https://crates.io/crates/rust-anything"><img src="https://img.shields.io/crates/d/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=crates.io%20downloads" alt="crates.io downloads"></a>
 <a href="https://www.npmjs.com/package/rust-anything"><img src="https://img.shields.io/npm/d18m/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=npm%20downloads" alt="npm downloads"></a>
 </p>
@@ -28,6 +29,8 @@
 <p align="center"><b>Документация:</b> <a href="https://rustanything.ai/tt">https://rustanything.ai/tt</a></p>
 
 <p align="center"><a href="translations.md">🌐 Башка телләр</a></p>
+
+<p align="center">Код базагызны Rust'ка күчерәсезме? Rust'ка күчү буенча консультация бирәм: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
 
 <p align="center"><sub>Бу тәрҗемәне җәмәгатьчелек алып бара, шуңа күрә ул <a href="../README.md">инглизчә README</a> файлыннан калышырга мөмкин.</sub></p>
 
@@ -68,6 +71,10 @@ Rust Anything бушлай һәм ачык чыганаклы. Эшегезгә 
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">Компания буларак спонсорлык яки башка берәр нәрсә? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">Код базагызны Rust'ка күчерәсезме? Rust'ка күчү буенча консультация бирәм: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## Тиз башлау
 
 Моны код язучы агентыгызга куегыз:
@@ -85,6 +92,25 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 
 > [!TIP]
 > **Агентларга:** урнаштыру адымнары, барлык боерыклар һәм портлау тәртибе өчен [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) укыгыз.
+
+## Бу ничек эшли
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/tt-dark.svg">
+    <img src="assets/how-it-works/tt-light.svg" width="880" alt="analyze нәрсәне портларга кирәклекне планлаштыра; rust-anything go күпер кора, яза, портны агентыгызга тапшыра һәм gate аша үткәрә, язылган һәр очрак туры килгәнче кабатлый; аннары enable чакыруларны Rust'ка күчерә">
+  </picture>
+</p>
+
+**Нәрсә әзер дип санала.** Тестларыгыз түгел, программаның үз-үзен тотышы. `record` оригиналны ясалган һәм бирелгән кертү мәгълүматлары белән эшләтә һәм һәр чакыру нәрсә кайтарганын, нәрсә ыргытканын һәм нәрсә чыгарганын саклый. Порт `gate` үткәч әзер: язылган һәр очрак туры килә, шулай ук fmt, clippy, `cargo test`, `unsafe` тикшерүе, stub тикшерүе һәм портка куелган язылган җавапларны тикшерү дә үтә. Үз тестларыгыз да эшли.
+
+**Хисап яки күчерү, үзегез сайлыйсыз.** `analyze` һәм `profile` хисап кына бирә: нәрсәне портларга кирәклекнең тәртипкә салынган планы һәм чын йөкләнештә нәрсә иң күп вакыт алуы. Болар гади боерыклар, шуңа күрә хисап бер токен да тотмый. `go` бер берәмлекне күчерә: иң кайнар функциягә күпер кора, аны яза, портны агентыгызга тапшыра, аннары җыя, чагыштыра һәм `gate` аша үткәрә, барысы да туры килгәндә генә кабыза (TS/JS, Python һәм PowerShell; `disable` кире сүндерә).
+
+**Бер эшләтү күпме вакыт ала.** Бер `go` эшләтүе бер берәмлекне портлый, иң күбе `--rounds` агент әйләнеше белән (килешү буенча 3): берсе порт өчен, аннары һәр уңышсыз diff яки gate өчен берәр. Бөтен кушымта һәр берәмлеккә бер эшләтүдән тора, шуңа күрә теләсә кайсысыннан соң туктый аласыз.
+
+**План өчен арзан модель, порт өчен көчле модель.** Планга модель кирәкми. Порт өчен теләсә нинди агент боерыгын бирегез: `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**Агентлар.** `rust-anything setup` аны Claude Code, Codex, Cursor, Gemini CLI һәм OpenCode'ка өсти. Теләсә кайсы башка MCP клиенты `rust-anything mcp` эшләтә ала, ә skill `npx skills add erkamyaman/rust-anything` ярдәмендә аерым да урнаштырыла ([урнаштыру](install.md) бүлеген карагыз).
 
 ## Лицензия
 

@@ -153,6 +153,9 @@ pub fn raises(lang: Lang, root: &Path, exports: &[(String, String, u32)]) -> Vec
         };
         let lines: Vec<&str> = text.lines().collect();
         let start = (*line as usize).saturating_sub(1);
+        if start >= lines.len() {
+            continue;
+        }
         if let Some(at) = raise_line(lang, &lines, body(lang, &lines, start)) {
             out.push(Raise {
                 export: name.clone(),
@@ -300,6 +303,14 @@ mod tests {
     }
 
     #[test]
+    fn a_line_past_the_end_of_an_edited_file_is_skipped() {
+        let source = "package textkit\n\nfunc Abbrev(s string) string {\n\treturn s\n}\n";
+        for lang in [Lang::Go, Lang::Ts, Lang::Python] {
+            assert!(check(lang, "short.go", source, &[("Humanize", 12)]).is_empty());
+        }
+    }
+
+    #[test]
     fn finds_where_the_original_fails_in_each_language() {
         assert_eq!(
             check(
@@ -412,6 +423,7 @@ mod tests {
             allocator: Default::default(),
             float_tolerance: None,
             ignore_key_order: false,
+            end_state: None,
         };
 
         // 1 function that fails: recorded

@@ -1838,6 +1838,7 @@ func Json(raw uint64) uint64 { return raw }"#,
             allocator: Default::default(),
             float_tolerance: None,
             ignore_key_order: false,
+            end_state: None,
         };
         let mut api = crate::codegen::parse_port(&crate::codegen::port_rs(&manifest));
         crate::bridge::match_export_names(&manifest, &mut api);
@@ -1914,6 +1915,7 @@ func Lookup(id int) (string, error) {
             allocator: Default::default(),
             float_tolerance: None,
             ignore_key_order: false,
+            end_state: None,
         };
         let mut api = crate::codegen::parse_port(&crate::codegen::port_rs(&manifest));
         crate::bridge::match_export_names(&manifest, &mut api);
@@ -2004,6 +2006,7 @@ func Lookup(id int) (string, error) {
             allocator: Default::default(),
             float_tolerance: None,
             ignore_key_order: false,
+            end_state: None,
         };
         let drv = driver(&manifest, "example.com/app/store");
         std::fs::write(dir.join("drv/main.go"), drv).unwrap();
@@ -2080,6 +2083,7 @@ func Echo(s string) (string, error) { return s, nil }
             allocator: Default::default(),
             float_tolerance: None,
             ignore_key_order: false,
+            end_state: None,
         };
         let mut api = crate::codegen::parse_port(
             "pub fn pong() -> Result<String, String> { Ok(\"pong\".into()) }\n\

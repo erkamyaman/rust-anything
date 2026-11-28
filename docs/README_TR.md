@@ -12,6 +12,7 @@
 <a href="https://github.com/erkamyaman/rust-anything/stargazers"><img src="https://img.shields.io/github/stars/erkamyaman/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=stars" alt="GitHub stars"></a>
 <a href="https://discord.gg/FXhUEA8eBR"><img src="https://img.shields.io/badge/discord-join-111111?style=flat&colorA=111111&colorB=b34a1a" alt="Discord"></a>
 <a href="https://github.com/erkamyaman/rust-anything#license"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-111111?style=flat&colorA=111111&colorB=b34a1a" alt="MIT or Apache-2.0 license"></a><br>
+<a href="https://rustanything.ai/"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Frustanything.ai%2Fbadge-downloads.json&style=flat" alt="Total downloads, crates.io and npm"></a>
 <a href="https://crates.io/crates/rust-anything"><img src="https://img.shields.io/crates/d/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=crates.io%20downloads" alt="crates.io downloads"></a>
 <a href="https://www.npmjs.com/package/rust-anything"><img src="https://img.shields.io/npm/d18m/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=npm%20downloads" alt="npm downloads"></a>
 </p>
@@ -28,6 +29,8 @@ Uygulamanızı Rust ile yeniden yazın ve hâlâ aynı davrandığını kanıtla
 <p align="center"><b>Dokümantasyon:</b> <a href="https://rustanything.ai/tr">https://rustanything.ai/tr</a></p>
 
 <p align="center"><a href="translations.md">🌐 Diğer diller</a></p>
+
+<p align="center">Bir kod tabanını Rust'a mı taşıyorsunuz? Rust geçişleri için danışmanlık veriyorum: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
 
 <p align="center"><sub>Bu çeviri topluluk tarafından sürdürülmektedir ve <a href="../README.md">İngilizce README</a>'nin gerisinde kalabilir.</sub></p>
 
@@ -68,6 +71,10 @@ Rust Anything ücretsiz ve açık kaynaktır. İşinize yarıyorsa, sponsor olma
   <a href="https://buymeacoffee.com/erkamyaman"><img src="https://img.shields.io/badge/Buy_me_a_coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
+<p align="center">Şirket olarak sponsorluk ya da başka bir konu mu? <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
+<p align="center">Bir kod tabanını Rust'a mı taşıyorsunuz? Rust geçişleri için danışmanlık veriyorum: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
+
 ## Hızlı başlangıç
 
 Bunu kodlama ajanınıza yapıştırın:
@@ -85,6 +92,25 @@ rust-anything setup           # adds it to Claude Code, Codex, Cursor, Gemini CL
 
 > [!TIP]
 > **Ajanlar:** kurulum adımları, tüm komutlar ve port etme akışı için [rustanything.ai/llms.txt](https://rustanything.ai/llms.txt) dosyasını okuyun.
+
+## Nasıl çalışır
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works/tr-dark.svg">
+    <img src="assets/how-it-works/tr-light.svg" width="880" alt="analyze neyin port edileceğini planlar; rust-anything go köprü kurar, kaydeder, portu ajanınıza yazdırır ve gate'ten geçirir, kaydedilen her vaka eşleşene kadar tekrarlar; ardından enable çağıranları Rust'a geçirir">
+  </picture>
+</p>
+
+**Ne zaman bitmiş sayılır.** Testleriniz değil, davranış. `record` orijinali üretilmiş ve verilmiş girdilerle çalıştırır ve her çağrının döndürdüğünü, fırlattığını ve yazdırdığını kaydeder. Bir port, `gate` geçtiğinde biter: kaydedilen her vaka eşleşir; fmt, clippy, `cargo test`, `unsafe` kontrolü, stub kontrolü ve porta yapıştırılmış kayıtlı cevap kontrolü de geçer. Kendi testleriniz de çalışır.
+
+**Rapor mu, taşıma mı, siz seçin.** `analyze` ve `profile` yalnızca rapor verir: neyin port edileceğine dair sıralı bir plan ve gerçek bir iş yükü altında neyin sıcak olduğu. Bunlar düz komutlardır, bu yüzden rapor hiç token harcamaz. `go` bir birimi taşır: en sıcak fonksiyon için köprü kurar, onu kaydeder, portu ajanınıza verir, sonra derler, karşılaştırır ve `gate`'ten geçirir; yalnızca her şey eşleşirse devreye alır (TS/JS, Python ve PowerShell; `disable` yeniden kapatır).
+
+**Bir çalıştırma ne kadar sürer.** Bir `go` çalıştırması bir birimi port eder ve en fazla `--rounds` ajan turu kullanır (varsayılan 3): biri port için, sonra başarısız her diff ya da gate için bir tane. Bütün bir uygulama birim başına bir çalıştırmadır, yani herhangi birinden sonra durabilirsiniz.
+
+**Plan için ucuz model, port için güçlü model.** Plan için model gerekmez. Port için herhangi bir ajan komutu verin: `rust-anything go --agent "claude --model <model>" -- <workload>`.
+
+**Ajanlar.** `rust-anything setup` onu Claude Code, Codex, Cursor, Gemini CLI ve OpenCode'a ekler. Diğer MCP istemcileri `rust-anything mcp` çalıştırabilir; skill ayrıca `npx skills add erkamyaman/rust-anything` ile tek başına da kurulur (bkz. [kurulum](install.md)).
 
 ## Lisans
 
