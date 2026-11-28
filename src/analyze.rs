@@ -1259,6 +1259,84 @@ fn topological(deps_of: &[Vec<usize>]) -> Vec<usize> {
 mod tests {
     use super::*;
 
+    fn package(dir: &str, src_root: &str) -> Package {
+        Package {
+            name: "pkg".into(),
+            dir: dir.into(),
+            src_root: src_root.into(),
+            deps: Vec::new(),
+            dev_deps: Vec::new(),
+            namespaces: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_unit_is_its_folder_under_the_source_root() {
+        // Issue #786: the id becomes the unit's name and its column in the plan, so a file one
+        // folder deeper has to keep its folder.
+        let pkg = package("packages/app", "packages/app/src");
+        assert_eq!(
+            unit_id(&pkg, "packages/app/src/text/a.ts"),
+            "packages/app/src/text/"
+        );
+        assert_eq!(
+            unit_id(&pkg, "packages/app/src/text/deep/a.ts"),
+            "packages/app/src/text/deep/"
+        );
+        // A file at the source root is its own unit, never an empty id.
+        assert_eq!(
+            unit_id(&pkg, "packages/app/src/a.ts"),
+            "packages/app/src/a.ts"
+        );
+    }
+
+    #[test]
+    fn a_unit_falls_back_to_the_package_folder() {
+        // No `src/`: the package folder is the base, so the first path component is the unit.
+        let pkg = package("packages/app", "packages/app");
+        assert_eq!(
+            unit_id(&pkg, "packages/app/text/a.ts"),
+            "packages/app/text/"
+        );
+        // A file at the repository root has no folder and stays itself.
+        let root = package("", "");
+        assert_eq!(unit_id(&root, "a.ts"), "a.ts");
+    }
+
+    #[test]
+    fn priority_keeps_the_size_bands_and_the_test_bonus() {
+        // Issue #786: with readiness, density and tests at 0 the score is half the size value, and
+        // the value is `loc / 4` below 80 lines, 20 from 80 to 599 and 10 from 600.
+        let size = |loc| priority(0.0, 0.0, loc, 0, 0);
+        assert_eq!(size(0), 0, "no lines, no value");
+        assert_eq!(size(40), 5, "40 lines: value 10, halved");
+        assert_eq!(size(60), 8, "60 lines: value 15, halved and rounded");
+        // 79 and 80 differ by a rounding step, not a jump: the band is continuous there on purpose,
+        // so a port that only just reaches 80 lines is not punished.
+        assert_eq!(size(79), 10, "79 lines: value 19.75, halved and rounded");
+        assert_eq!(size(80), 10, "the `20` band starts here");
+        assert_eq!(size(599), 10);
+        assert_eq!(size(600), 5, "600 lines is the `10` band, halved");
+    }
+
+    #[test]
+    fn priority_scores_tests_and_compute_density() {
+        // Compute density is capped at 50, so a dense unit cannot outweigh everything else.
+        assert_eq!(priority(0.0, 100.0, 0, 0, 0), 25);
+        assert_eq!(priority(0.0, 12.5, 0, 0, 0), 25, "12.5 * 4 = 50, the cap");
+        // Direct tests are worth twice a package's tests, and half of each lands in the score.
+        assert_eq!(priority(0.0, 0.0, 0, 1, 0), 15);
+        assert_eq!(priority(0.0, 0.0, 0, 0, 1), 8, "15 / 2 rounds to 8");
+        assert_eq!(priority(0.0, 0.0, 0, 1, 1), 15, "a direct test wins");
+        // Readiness is the other half, and the result stays in 0 to 100.
+        assert_eq!(priority(100.0, 0.0, 0, 0, 0), 50);
+        assert_eq!(
+            priority(100.0, 100.0, 79, 1, 1),
+            100,
+            "99.875 rounds to 100"
+        );
+    }
+
     #[test]
     fn status_labels_match_analyze() {
         assert_eq!(Status::Ready.label(), "ready");

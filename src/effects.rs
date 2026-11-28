@@ -1769,4 +1769,38 @@ mod merge_tests {
         assert_eq!(merged.db_dump.as_deref(), Some("echo y"));
         assert_eq!(EffectsConfig::merge(None, None), None);
     }
+
+    #[test]
+    fn strip_http_scheme_drops_http_or_https_in_any_case() {
+        assert_eq!(strip_http_scheme("http://host/a"), Some("host/a"));
+        assert_eq!(strip_http_scheme("https://host"), Some("host"));
+        assert_eq!(strip_http_scheme("HTTPS://Host/x"), Some("Host/x"));
+        assert_eq!(strip_http_scheme("Http://h"), Some("h"));
+        assert_eq!(strip_http_scheme("ftp://host"), None);
+        assert_eq!(strip_http_scheme("/a"), None);
+        assert_eq!(strip_http_scheme("http:/"), None);
+    }
+
+    #[test]
+    fn request_path_is_the_path_and_query_of_a_target() {
+        assert_eq!(request_path("http://host/a?b"), "/a?b");
+        assert_eq!(request_path("http://host?x"), "/?x");
+        assert_eq!(request_path("http://host"), "/");
+        assert_eq!(request_path("HTTPS://host/p"), "/p");
+        assert_eq!(request_path("?x"), "/?x");
+        assert_eq!(request_path("/a"), "/a");
+    }
+
+    #[test]
+    fn glob_match_star_matches_any_run_and_the_rest_matches_itself() {
+        assert!(glob_match("/api/*", "/api/users"));
+        assert!(glob_match("/api/*", "/api/")); // the run may be empty
+        assert!(glob_match("*", ""));
+        assert!(glob_match("/a/*/b/*", "/a/x/b/y/z"));
+        assert!(glob_match("*.json", "data.json"));
+        assert!(glob_match("/exact", "/exact"));
+        assert!(!glob_match("/exact", "/exact/more"));
+        assert!(!glob_match("/api/*/b", "/api/x/c"));
+        assert!(!glob_match("/a", ""));
+    }
 }
