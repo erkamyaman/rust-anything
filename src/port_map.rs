@@ -317,6 +317,10 @@ fn render(out: &mut String, map: &PortMap) -> std::fmt::Result {
     match map.changed() {
         _ if map.ports.is_empty() => writeln!(out, ".\n")?,
         0 => writeln!(out, "; no original changed since it was recorded.\n")?,
+        1 => writeln!(
+            out,
+            "; **1 changed upstream** since it was recorded: re-record it and run `diff`.\n"
+        )?,
         n => writeln!(
             out,
             "; **{n} changed upstream** since they were recorded: re-record them and run `diff`.\n"
