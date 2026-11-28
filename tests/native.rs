@@ -245,6 +245,315 @@ fn pyo3_bytes_bridge_accepts_bytes_bytearray_memoryview_and_returns_bytes() {
 }
 
 #[test]
+fn pyo3_path_bridge_takes_and_returns_pathlib_paths() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let root = project(
+        "pyo3-path",
+        &[
+            (
+                "pyproject.toml",
+                "[project]\nname = \"pathkit\"\nversion = \"0.1.0\"\n",
+            ),
+            (
+                "pathkit/__init__.py",
+                "from __future__ import annotations\n\nfrom pathlib import Path\n\n\n\
+                 def stem_of(file: Path) -> str:\n\
+                 \x20   return file.stem\n\n\n\
+                 def same(file: Path) -> Path:\n\
+                 \x20   return file\n\n\n\
+                 def maybe(file: Path | None) -> Path | None:\n\
+                 \x20   return file\n\n\n\
+                 def tagged(info: dict) -> dict:\n\
+                 \x20   return info\n",
+            ),
+        ],
+    );
+    let dir = root.join("port");
+    bridge::bridge(&bridge::Options {
+        root: &root,
+        unit: "pathkit/",
+        kind: Some(Kind::Pyo3),
+        out: Some(dir.clone()),
+        name: None,
+        force: false,
+        keep: Vec::new(),
+        lang: None,
+        batch: Vec::new(),
+        as_json: Vec::new(),
+        allocator: Default::default(),
+    })
+    .unwrap();
+
+    let port_path = dir.join("src/port.rs");
+    let mut port = std::fs::read_to_string(&port_path).unwrap();
+    for signature in [
+        "pub fn stem_of(file: std::path::PathBuf) -> Result<String, String>",
+        "pub fn same(file: std::path::PathBuf) -> Result<std::path::PathBuf, String>",
+        "pub fn maybe(file: Option<std::path::PathBuf>) -> Result<Option<std::path::PathBuf>, String>",
+    ] {
+        assert!(port.contains(signature), "{signature}\n{port}");
+    }
+
+    let recorded = harness::record(&RecordOptions {
+        crate_dir: &dir,
+        count: 20,
+        inputs: None,
+        module: None,
+        resolve_from: None,
+        node_args: &[],
+    })
+    .unwrap();
+    assert!(recorded.cases > 0, "{recorded:?}");
+    // Every case calls the original with a real path, and a returned path keeps its text. The
+    // path checked has no separator: Windows records `src\main.py` for `src/main.py`.
+    let cases = std::fs::read_to_string(dir.join("cases.jsonl")).unwrap();
+    assert!(!cases.contains("AttributeError"), "{cases}");
+    assert!(!cases.contains("$repr"), "{cases}");
+    assert!(
+        cases.contains(
+            r#"{"fn": "same", "args": [{"$path": "notes.txt"}], "ok": {"$path": "notes.txt"}}"#
+        ),
+        "{cases}"
+    );
+    assert!(
+        cases.contains(
+            r#"{"fn": "stem_of", "args": [{"$path": "/tmp/report.tar.gz"}], "ok": "report.tar"}"#
+        ),
+        "{cases}"
+    );
+
+    for (name, body) in [
+        (
+            "stem_of",
+            "Ok(file.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default())",
+        ),
+        ("same", "Ok(file)"),
+        ("maybe", "Ok(file)"),
+        ("tagged", "Ok(info)"),
+    ] {
+        let start = port.find(&format!("pub fn {name}(")).unwrap();
+        let open = start + port[start..].find('{').unwrap();
+        let close = open + port[open..].find("\n}").unwrap();
+        port = format!("{}{{\n    {body}{}", &port[..open], &port[close..]);
+    }
+    std::fs::write(&port_path, port).unwrap();
+
+    harness::build(&dir).unwrap();
+    let outcome = harness::diff(&DiffOptions {
+        crate_dir: &dir,
+        module: None,
+        ignore_key_order: false,
+        node_args: &[],
+        float_tolerance: None,
+    })
+    .unwrap();
+    assert_eq!(
+        (outcome.failed, outcome.passed),
+        (0, outcome.total),
+        "{:#?}",
+        outcome.mismatches
+    );
+
+    let check = Command::new(python)
+        .env("PYTHONPATH", dir.join("python"))
+        .args([
+            "-c",
+            "import pathkit_rs as m\n\
+             from pathlib import Path, PurePosixPath\n\
+             out = m.same(Path('a') / 'b.txt')\n\
+             assert isinstance(out, Path) and out == Path('a/b.txt'), out\n\
+             assert m.stem_of(PurePosixPath('x/y.tar.gz')) == 'y.tar'\n\
+             assert m.maybe(None) is None\n\
+             import os\n\
+             if os.name == 'posix':\n\
+             \x20   odd = Path(os.fsdecode(b'bad-\\xff.txt'))\n\
+             \x20   assert m.same(odd) == odd, m.same(odd)\n\
+             \x20   assert m.tagged({'file': odd}) == {'file': odd}\n\
+             assert m.tagged({'file': Path('a.txt')}) == {'file': Path('a.txt')}\n\
+             try:\n\
+             \x20   m.stem_of('a.txt')\n\
+             except TypeError as error:\n\
+             \x20   assert 'str' in str(error), error\n\
+             else:\n\
+             \x20   raise AssertionError('a str is not a path')\n",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        check.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&check.stdout),
+        String::from_utf8_lossy(&check.stderr)
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn pyo3_required_optional_parameter_is_passed_none_not_left_out() {
+    if common::python().is_none() {
+        return;
+    }
+    let root = project(
+        "pyo3-required-optional",
+        &[
+            (
+                "pyproject.toml",
+                "[project]\nname = \"pickkit\"\nversion = \"0.1.0\"\n",
+            ),
+            (
+                "pickkit/__init__.py",
+                "from __future__ import annotations\n\n\n\
+                 def pick(text: str, fallback: str | None) -> str:\n\
+                 \x20   return text if fallback is None else fallback\n\n\n\
+                 def tag(name: str, suffix: str | None = None) -> str:\n\
+                 \x20   return name + (\"\" if suffix is None else suffix)\n",
+            ),
+        ],
+    );
+    let dir = root.join("port");
+    bridge::bridge(&bridge::Options {
+        root: &root,
+        unit: "pickkit/",
+        kind: Some(Kind::Pyo3),
+        out: Some(dir.clone()),
+        name: None,
+        force: false,
+        keep: Vec::new(),
+        lang: None,
+        batch: Vec::new(),
+        as_json: Vec::new(),
+        allocator: Default::default(),
+    })
+    .unwrap();
+    harness::record(&RecordOptions {
+        crate_dir: &dir,
+        count: 20,
+        inputs: None,
+        module: None,
+        resolve_from: None,
+        node_args: &[],
+    })
+    .unwrap();
+    // `pick` has no default for `fallback`: the original is called with `None`, not without it.
+    let cases = std::fs::read_to_string(dir.join("cases.jsonl")).unwrap();
+    assert!(!cases.contains("missing 1 required positional"), "{cases}");
+    let none_passed = cases.lines().any(|line| {
+        line.contains(r#""fn": "pick""#) && line.contains(r#"{"$undefined": true}], "ok""#)
+    });
+    assert!(none_passed, "no `pick(text, None)` case:\n{cases}");
+
+    let port_path = dir.join("src/port.rs");
+    let mut port = std::fs::read_to_string(&port_path).unwrap();
+    for (name, body) in [
+        ("pick", "Ok(fallback.unwrap_or(text))"),
+        (
+            "tag",
+            "Ok(format!(\"{name}{}\", suffix.unwrap_or_default()))",
+        ),
+    ] {
+        let start = port.find(&format!("pub fn {name}(")).unwrap();
+        let open = start + port[start..].find('{').unwrap();
+        let close = open + port[open..].find("\n}").unwrap();
+        port = format!("{}{{\n    {body}{}", &port[..open], &port[close..]);
+    }
+    std::fs::write(&port_path, port).unwrap();
+    harness::build(&dir).unwrap();
+    let outcome = harness::diff(&DiffOptions {
+        crate_dir: &dir,
+        module: None,
+        ignore_key_order: false,
+        node_args: &[],
+        float_tolerance: None,
+    })
+    .unwrap();
+    assert_eq!(
+        (outcome.failed, outcome.passed),
+        (0, outcome.total),
+        "{:#?}",
+        outcome.mismatches
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn pyo3_dataclass_argument_crosses_as_its_fields() {
+    let Some(python) = common::python() else {
+        return;
+    };
+    let root = project(
+        "pyo3-dataclass",
+        &[
+            (
+                "pyproject.toml",
+                "[project]\nname = \"shop\"\nversion = \"0.1.0\"\n",
+            ),
+            (
+                "shop/__init__.py",
+                "from dataclasses import dataclass\n\n\n\
+                 @dataclass\nclass Item:\n    name: str\n    count: int\n\n\n\
+                 def label(item: Item) -> str:\n    return f\"{item.count} x {item.name}\"\n",
+            ),
+        ],
+    );
+    let dir = root.join("port");
+    bridge::bridge(&bridge::Options {
+        root: &root,
+        unit: "shop/",
+        kind: Some(Kind::Pyo3),
+        out: Some(dir.clone()),
+        name: None,
+        force: false,
+        keep: Vec::new(),
+        lang: None,
+        batch: Vec::new(),
+        as_json: Vec::new(),
+        allocator: Default::default(),
+    })
+    .unwrap();
+
+    let port_path = dir.join("src/port.rs");
+    let port = std::fs::read_to_string(&port_path).unwrap();
+    let start = port
+        .find("pub fn label(item: serde_json::Value) -> Result<String, String>")
+        .unwrap_or_else(|| panic!("{port}"));
+    let open = start + port[start..].find('{').unwrap();
+    let close = open + port[open..].find("\n}").unwrap();
+    // The recorder writes an instance as `{"$object": name, "attrs": {...}}`; the port reads that.
+    let ported = format!(
+        "{}{{\n    let attrs = &item[\"attrs\"];\n    Ok(format!(\"{{}} x {{}}\", attrs[\"count\"], attrs[\"name\"].as_str().unwrap_or_default())){}",
+        &port[..open],
+        &port[close..]
+    );
+    std::fs::write(&port_path, ported).unwrap();
+    harness::build(&dir).unwrap();
+
+    // What a caller of the shadow module passes is the instance itself.
+    let paths = std::env::join_paths([dir.join("python"), root.clone()]).unwrap();
+    let check = Command::new(python)
+        .env("PYTHONPATH", paths)
+        .args([
+            "-c",
+            "import shop_rs as m\nfrom shop import Item\n\
+             out = m.label(Item('nut', 3))\nassert out == '3 x nut', out\n\
+             loop = Item('nut', 3)\nloop.name = loop  # a field that refers back to its object\n\
+             out = m.label(loop)\nassert out == '3 x ', out\n\
+             shared = Item('nut', 3)\npair = Item(shared, 3)\npair.count = shared  # twice, no cycle\n\
+             assert m.label(pair).endswith(' x '), m.label(pair)\n",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        check.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&check.stdout),
+        String::from_utf8_lossy(&check.stderr)
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn pyo3_float_param_with_integer_default_builds_and_matches() {
     if common::python().is_none() {
         return;

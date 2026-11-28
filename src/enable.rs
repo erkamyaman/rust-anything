@@ -743,4 +743,59 @@ mod tests {
             "{err:#}"
         );
     }
+
+    fn tags(crate_name: &str, eof: bool) -> (String, String) {
+        let note = if eof { EOF_NOTE } else { "" };
+        (
+            format!(
+                "# {START} {crate_name} is on. `rust-anything disable x` removes this block.{note}"
+            ),
+            format!("# {END} {crate_name}"),
+        )
+    }
+
+    #[test]
+    fn line_starts_leaves_out_the_end_of_a_final_newline() {
+        assert_eq!(line_starts("").collect::<Vec<_>>(), Vec::<usize>::new());
+        assert_eq!(line_starts("a").collect::<Vec<_>>(), [0]);
+        assert_eq!(line_starts("a\nbc").collect::<Vec<_>>(), [0, 2]);
+        assert_eq!(line_starts("a\nbc\n").collect::<Vec<_>>(), [0, 2]);
+        assert_eq!(line_starts("\n\n").collect::<Vec<_>>(), [0, 1]);
+    }
+
+    #[test]
+    fn find_block_spans_the_start_line_to_the_end_of_the_end_line() {
+        let (start, end) = tags("fuzzy-rs", false);
+        let block = format!("{start}\nx = 1\n{end}\n");
+        let text = format!("a = 0\n{block}b = 2\n");
+        let at = "a = 0\n".len();
+        assert_eq!(
+            find_block(&text, "fuzzy-rs"),
+            Some((at, at + block.len(), false))
+        );
+        assert_eq!(&text[at..at + block.len()], block);
+        assert_eq!(remove(&text, "fuzzy-rs").unwrap(), "a = 0\nb = 2\n");
+    }
+
+    #[test]
+    fn find_block_at_the_end_without_a_final_newline_reports_the_note() {
+        let (start, end) = tags("fuzzy-rs", true);
+        let text = format!("a = 0\n{start}\nx = 1\n{end}");
+        assert_eq!(
+            find_block(&text, "fuzzy-rs"),
+            Some(("a = 0\n".len(), text.len(), true))
+        );
+    }
+
+    #[test]
+    fn find_block_needs_this_crate_and_both_ends() {
+        let (start, end) = tags("other-rs", false);
+        let text = format!("{start}\nx = 1\n{end}\n");
+        assert_eq!(find_block(&text, "fuzzy-rs"), None);
+        assert!(find_block(&text, "other-rs").is_some());
+
+        let (start, _) = tags("fuzzy-rs", false);
+        assert_eq!(find_block(&format!("{start}\nx = 1\n"), "fuzzy-rs"), None);
+        assert_eq!(find_block("x = 1\n", "fuzzy-rs"), None);
+    }
 }

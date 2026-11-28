@@ -347,6 +347,8 @@ pub enum RType {
     Bool,
     /// A byte buffer (`bytes` in the type dialect): `Vec<u8>` in the port.
     Bytes,
+    /// A `pathlib` path (`pypath` in the type dialect): `std::path::PathBuf` in the port.
+    Path,
     Unit,
     Vec(Box<RType>),
     Opt(Box<RType>),
@@ -410,6 +412,7 @@ impl RType {
             "int" => Self::Int,
             "boolean" => Self::Bool,
             "pybytes" => Self::Bytes,
+            "pypath" => Self::Path,
             "void" | "undefined" => Self::Unit,
             _ if is_string_literal(ts) => Self::Str,
             _ => Self::Json,
@@ -427,6 +430,7 @@ impl RType {
             Self::Int => "i64".into(),
             Self::Bool => "bool".into(),
             Self::Bytes => "Vec<u8>".into(),
+            Self::Path => "std::path::PathBuf".into(),
             Self::Unit => "()".into(),
             Self::Vec(t) => format!("Vec<{}>", t.rust()),
             Self::Opt(t) => format!("Option<{}>", t.rust()),
