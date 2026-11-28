@@ -498,6 +498,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn table_speed_names_a_slowdown_below_parity() {
+        assert_eq!(table_speed(2.0), "2.0x");
+        assert_eq!(table_speed(0.5), "2.0x slower");
+    }
+
+    #[test]
+    fn esc_encodes_svg_special_characters_once() {
+        assert_eq!(esc("&<>\""), "&amp;&lt;&gt;&quot;");
+        assert_eq!(esc("&lt;"), "&amp;lt;");
+    }
+
+    #[test]
     fn a_value_that_rounds_up_to_the_next_unit_prints_in_that_unit() {
         assert_eq!(ns(999.6), "1.0 µs");
         assert_eq!(ns(999_999.0), "1.0 ms");
@@ -542,6 +554,24 @@ mod tests {
             markdown: "REPORT.md".into(),
             svg: "card.svg".into(),
         }
+    }
+
+    #[test]
+    fn fallback_percent_distinguishes_rounded_limits_from_exact_limits() {
+        let mut c = card();
+        c.cases = 10_000;
+        for (fallback_cases, expected) in [
+            (0, "0.0%"),
+            (10_000, "100.0%"),
+            (1, "<0.1%"),
+            (9_999, ">99.9%"),
+        ] {
+            c.fallback_cases = fallback_cases;
+            assert_eq!(fallback_percent(&c), expected);
+        }
+        c.cases = 4;
+        c.fallback_cases = 1;
+        assert_eq!(fallback_percent(&c), "25.0%");
     }
 
     #[test]
