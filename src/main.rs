@@ -838,6 +838,30 @@ fn counted(n: usize, word: &str) -> String {
     }
 }
 
+/// What `app record` prints when it finishes: every count singular for one, so a one-trap
+/// recording does not say "1 traps".
+fn recorded_summary(
+    cases: usize,
+    dir: &std::path::Path,
+    examples: usize,
+    inputs: usize,
+    traps: usize,
+    dropped: Option<usize>,
+) -> String {
+    let head = format!(
+        "Recorded {} in {} ({} from examples, {} from inputs, {}",
+        counted(cases, "case"),
+        dir.display(),
+        examples,
+        inputs,
+        counted(traps, "trap")
+    );
+    match dropped {
+        Some(n) => format!("{head}, {} dropped)", counted(n, "trap")),
+        None => format!("{head})"),
+    }
+}
+
 /// The stack `run` gets: Linux's main-thread default. Windows gives the main thread 1 MB, which
 /// an unoptimized `run` overflows before it parses the arguments.
 const STACK_SIZE: usize = 8 << 20;
@@ -1844,22 +1868,27 @@ fn run_app(command: AppCmd) -> Result<ExitCode> {
             }
             if outcome.traps_dropped > 0 {
                 say!(
-                    "Recorded {} in {} ({} from examples, {} from inputs, {} traps, {} dropped)",
-                    counted(outcome.cases, "case"),
-                    outcome.dir.display(),
-                    outcome.examples,
-                    outcome.inputs,
-                    outcome.traps,
-                    counted(outcome.traps_dropped, "trap")
+                    "{}",
+                    recorded_summary(
+                        outcome.cases,
+                        &outcome.dir,
+                        outcome.examples,
+                        outcome.inputs,
+                        outcome.traps,
+                        Some(outcome.traps_dropped)
+                    )
                 );
             } else {
                 say!(
-                    "Recorded {} in {} ({} from examples, {} from inputs, {} traps)",
-                    counted(outcome.cases, "case"),
-                    outcome.dir.display(),
-                    outcome.examples,
-                    outcome.inputs,
-                    outcome.traps
+                    "{}",
+                    recorded_summary(
+                        outcome.cases,
+                        &outcome.dir,
+                        outcome.examples,
+                        outcome.inputs,
+                        outcome.traps,
+                        None
+                    )
                 );
             }
             for (kind, what) in [
@@ -2245,4 +2274,29 @@ fn run_app(command: AppCmd) -> Result<ExitCode> {
 /// a relative crate path points nowhere.
 fn absolute(arg: &str) -> Result<PathBuf, String> {
     std::path::absolute(arg).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::recorded_summary;
+    use std::path::Path;
+
+    #[test]
+    fn the_record_summary_counts_traps_like_every_other_count() {
+        // Issue #854: a recording with one trap said "1 traps" while the case count next to it was
+        // already singular.
+        let dir = Path::new("/tmp/app-cases");
+        assert_eq!(
+            recorded_summary(1, dir, 0, 0, 1, None),
+            "Recorded 1 case in /tmp/app-cases (0 from examples, 0 from inputs, 1 trap)"
+        );
+        assert_eq!(
+            recorded_summary(2, dir, 1, 1, 61, None),
+            "Recorded 2 cases in /tmp/app-cases (1 from examples, 1 from inputs, 61 traps)"
+        );
+        assert_eq!(
+            recorded_summary(1, dir, 0, 0, 0, Some(1)),
+            "Recorded 1 case in /tmp/app-cases (0 from examples, 0 from inputs, 0 traps, 1 trap dropped)"
+        );
+    }
 }
