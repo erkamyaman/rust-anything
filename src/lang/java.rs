@@ -864,8 +864,8 @@ public class Totals {
 
     #[test]
     fn a_stripped_keyword_needs_whitespace_after_it() {
-        // The keyword goes with the whitespace that follows it, so the caller gets the rest of the
-        // line; a tab counts as whitespace, and the split does not care where in the line it is.
+        // The keyword must start the text and be followed by whitespace (a tab counts); the
+        // caller gets the rest with that whitespace trimmed.
         for (s, kw, expected) in [
             ("static int x", "static", Some("int x")),
             ("static\tint x", "static", Some("int x")),
