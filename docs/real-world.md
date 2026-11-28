@@ -38,8 +38,8 @@ with rust-anything 1.5.1; the crate is in
 | `diff` | 784/784 matched on the first build; 975/975 with the captured calls |
 | `gate` | passes (fmt, clippy, tests, error paths, size, behavior) |
 | `bench`, per call | 0.56x over the recorded cases (0.39x at first): `parse` on a normal string takes 79 ns, level with JS, but edge cases and thrown errors still cost more through the bridge |
-| batch, `parse` x100,000 | JS 11.8 ms, Rust 0.65 ms: **18x**; 3.4x counting the one-time handover of the strings (2.1x before strings crossed joined) |
-| batch, `format` x100,000 | JS 2.1 ms, Rust 2.5 ms with the handover: **0.8x** (0.2x at first); `format(x, { long: true })` 1.2x |
+| batch, `parse` x100,000 | JS 11.8 ms on one thread, Rust 0.65 ms on all cores: **18x**; 3.4x counting the one-time handover of the strings (2.1x before strings crossed joined) |
+| batch, `format` x100,000 | JS 2.1 ms on one thread, Rust 2.5 ms on all cores with the handover: **0.8x** (0.2x at first); `format(x, { long: true })` 1.2x |
 
 What the port had to get right, all caught by recorded cases or traps:
 

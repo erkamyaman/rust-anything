@@ -117,7 +117,7 @@
       {
         "v": "32",
         "unit": "x",
-        "k": "50,000 string ustida har bir so'rovga Fuse.js qidiruvi, Apple M4"
+        "k": "50,000 string ustida har bir so'rovga Fuse.js qidiruvi, Apple M4, 10 yadro"
       },
       {
         "v": "3.5",
@@ -207,14 +207,14 @@
         "href": "/docs/real-world/fuse-js",
         "kind": "Fuse.js · string ro'yxati bo'yicha qidiruv",
         "big": "32x",
-        "text": "50,000 string ustida har bir so'rovga tezroq (91.2 ms → 2.8 ms, Apple M4). 3,414/3,414 yozib olingan holat mos keladi; 360 ta qidiruvda natijalar Fuse bilan bayt darajasida bir xil.",
+        "text": "50,000 string ustida har bir so'rovga tezroq (91.2 ms → 2.8 ms, Apple M4, 10 yadro). 3,414/3,414 yozib olingan holat mos keladi; 360 ta qidiruvda natijalar Fuse bilan bayt darajasida bir xil.",
         "rows": [
           {
-            "k": "10,000 string",
+            "k": "10,000 string, barcha yadrolar",
             "v": "27 dan 30x gacha"
           },
           {
-            "k": "1,000 string",
+            "k": "1,000 string, barcha yadrolar",
             "v": "18x"
           },
           {
@@ -236,11 +236,11 @@
             "slow": true
           },
           {
-            "k": "Batch, parse x100,000",
+            "k": "Batch, parse x100,000, barcha yadrolar",
             "v": "18x"
           },
           {
-            "k": "Batch, format x100,000",
+            "k": "Batch, format x100,000, barcha yadrolar",
             "v": "0.8x",
             "slow": true
           }

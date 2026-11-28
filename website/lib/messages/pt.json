@@ -117,7 +117,7 @@
       {
         "v": "32",
         "unit": "x",
-        "k": "Pesquisa do Fuse.js por consulta em 50,000 strings, Apple M4"
+        "k": "Pesquisa do Fuse.js por consulta em 50,000 strings, Apple M4, 10 núcleos"
       },
       {
         "v": "3.5",
@@ -207,14 +207,14 @@
         "href": "/docs/real-world/fuse-js",
         "kind": "Fuse.js · pesquisa em listas de strings",
         "big": "32x",
-        "text": "Mais rápido por consulta em 50,000 strings (91.2 ms → 2.8 ms, Apple M4). 3,414/3,414 casos registados coincidem; resultados idênticos byte a byte aos do Fuse em 360 pesquisas.",
+        "text": "Mais rápido por consulta em 50,000 strings (91.2 ms → 2.8 ms, Apple M4, 10 núcleos). 3,414/3,414 casos registados coincidem; resultados idênticos byte a byte aos do Fuse em 360 pesquisas.",
         "rows": [
           {
-            "k": "10,000 strings",
+            "k": "10,000 strings, todos os núcleos",
             "v": "27 a 30x"
           },
           {
-            "k": "1,000 strings",
+            "k": "1,000 strings, todos os núcleos",
             "v": "18x"
           },
           {
@@ -236,11 +236,11 @@
             "slow": true
           },
           {
-            "k": "Lote, parse x100,000",
+            "k": "Lote, parse x100,000, todos os núcleos",
             "v": "18x"
           },
           {
-            "k": "Lote, format x100,000",
+            "k": "Lote, format x100,000, todos os núcleos",
             "v": "0.8x",
             "slow": true
           }
