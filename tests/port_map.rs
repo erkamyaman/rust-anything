@@ -61,7 +61,10 @@ fn map_lists_ports_and_marks_upstream_changes() {
     let map = port_map::map(&repo, &[]).unwrap();
     assert_eq!(map.changed(), 1);
     let md = port_map::markdown(&map);
-    assert!(md.contains("**1 changed upstream**"), "{md}");
+    assert!(
+        md.contains("**1 changed upstream** since it was recorded: re-record it"),
+        "{md}"
+    );
     assert!(md.contains("`rust-anything record rust/util-rs`"), "{md}");
 
     let outside =
