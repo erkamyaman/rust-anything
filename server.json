@@ -7,14 +7,14 @@
     "url": "https://github.com/erkamyaman/rust-anything",
     "source": "github"
   },
-  "websiteUrl": "https://github.com/erkamyaman/rust-anything",
-  "version": "5.0.1",
+  "websiteUrl": "https://rustanything.ai",
+  "version": "5.0.2",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "rust-anything",
-      "version": "5.0.1",
+      "version": "5.0.2",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
