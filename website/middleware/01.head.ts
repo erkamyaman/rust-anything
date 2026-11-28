@@ -20,12 +20,38 @@ const LOCALE_LINKS = (rest: string) =>
   LOCALES.map((l) => `<link rel="alternate" hreflang="${l.lang}" href="${SITE_ORIGIN}${withLocale(rest, l.code)}">`).join('') +
   `<link rel="alternate" hreflang="x-default" href="${SITE_ORIGIN}${withLocale(rest, 'en')}">`
 
+const AUTHOR = { '@type': 'Person', name: 'Erkam Yaman', url: `${SITE_ORIGIN}/about` }
+
 const jsonLd = (data: unknown) =>
   `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`
 
 function structuredData(path: string, title: string, description: string): string {
   const rest = stripLocale(path)
   const url = `${SITE_ORIGIN}${path}`
+  if (rest === '/about') {
+    return jsonLd({
+      '@context': 'https://schema.org',
+      '@type': 'ProfilePage',
+      url,
+      name: title,
+      description,
+      mainEntity: {
+        ...AUTHOR,
+        alternateName: 'kæm',
+        jobTitle: 'Software Engineer',
+        image: 'https://github.com/erkamyaman.png?size=192',
+        email: 'mailto:hello@rustanything.ai',
+        homeLocation: { '@type': 'Place', name: 'Istanbul, Türkiye' },
+        sameAs: [
+          'https://erkamyaman.dev',
+          'https://github.com/erkamyaman',
+          'https://x.com/erkamyaman_ng',
+          'https://bsky.app/profile/erkamyaman.dev',
+          'https://www.linkedin.com/in/erkamyaman',
+        ],
+      },
+    })
+  }
   if (rest === '/' || rest === '') {
     return jsonLd({
       '@context': 'https://schema.org',
@@ -42,7 +68,7 @@ function structuredData(path: string, title: string, description: string): strin
           codeRepository: REPO_URL,
           license: 'https://opensource.org/licenses/MIT',
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-          author: { '@type': 'Person', name: 'Erkam Yaman', url: 'https://github.com/erkamyaman' },
+          author: AUTHOR,
         },
         { '@type': 'WebSite', name: 'Rust Anything', url: SITE_ORIGIN },
       ],
@@ -57,7 +83,7 @@ function structuredData(path: string, title: string, description: string): strin
           headline: title,
           description,
           url,
-          author: { '@type': 'Person', name: 'Erkam Yaman', url: 'https://github.com/erkamyaman' },
+          author: AUTHOR,
           publisher: { '@type': 'Organization', name: 'Rust Anything', url: SITE_ORIGIN },
         },
         {
@@ -142,6 +168,6 @@ export default defineMiddleware(async (c, next) => {
   ].join('')
   const info = localeInfo(localeOf(path))
   const htmlOpen = `<html lang="${info.lang}"${'rtl' in info && info.rtl ? ' dir="rtl"' : ''}`
-  const alternates = LOCALE_LINKS(stripLocale(path))
+  const alternates = stripLocale(path) === '/about' ? '' : LOCALE_LINKS(stripLocale(path))
   rebuild((html.slice(0, headEnd) + tags + alternates + html.slice(headEnd)).replace(/<html lang="en"/, htmlOpen))
 })
