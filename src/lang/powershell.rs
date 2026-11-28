@@ -1087,4 +1087,48 @@ mod tests {
         let text = "@{\n    ModuleVersion = '1.0'\n    RequiredModules = @('PSReadLine', @{ ModuleName = 'Pester'; ModuleVersion = '5.0' })\n}\n";
         assert_eq!(required_modules(text), ["PSReadLine", "Pester"]);
     }
+
+    fn local(spec: &str) -> Option<String> {
+        local_path(spec)
+    }
+
+    #[test]
+    fn local_path_reads_script_root_and_dot_forms() {
+        assert_eq!(local("$PSScriptRoot/x.ps1").as_deref(), Some("./x.ps1"));
+        assert_eq!(local("${PSScriptRoot}\\x.ps1").as_deref(), Some("./x.ps1"));
+        assert_eq!(local(".\\x.ps1").as_deref(), Some("./x.ps1"));
+        assert_eq!(local("./lib/x.ps1").as_deref(), Some("./lib/x.ps1"));
+        assert_eq!(
+            local("$PSScriptRoot\\lib\\x.ps1").as_deref(),
+            Some("./lib/x.ps1")
+        );
+    }
+
+    #[test]
+    fn local_path_ignores_case_quotes_and_spaces() {
+        assert_eq!(local("$psscriptroot/x.ps1").as_deref(), Some("./x.ps1"));
+        assert_eq!(local("$PSSCRIPTROOT\\x.ps1").as_deref(), Some("./x.ps1"));
+        assert_eq!(local("'.\\x.ps1'").as_deref(), Some("./x.ps1"));
+        assert_eq!(local("\"$PSScriptRoot/x.ps1\"").as_deref(), Some("./x.ps1"));
+        assert_eq!(local("  ./x.ps1  ").as_deref(), Some("./x.ps1"));
+    }
+
+    #[test]
+    fn local_path_keeps_parent_paths() {
+        assert_eq!(local("../x.ps1").as_deref(), Some("../x.ps1"));
+        assert_eq!(local("..\\x.ps1").as_deref(), Some("../x.ps1"));
+        assert_eq!(local("'../lib/x.ps1'").as_deref(), Some("../lib/x.ps1"));
+    }
+
+    #[test]
+    fn local_path_rejects_modules_absolute_and_built_paths() {
+        assert_eq!(local("Pester"), None);
+        assert_eq!(local("C:\\x.ps1"), None);
+        assert_eq!(local("/usr/x.ps1"), None);
+        assert_eq!(local("x.ps1"), None);
+        assert_eq!(local(""), None);
+        assert_eq!(local("$PSScriptRoot/$name.ps1"), None);
+        assert_eq!(local("$PSScriptRoot/$(Get-Name).ps1"), None);
+        assert_eq!(local("./(Join-Path a b)"), None);
+    }
 }
