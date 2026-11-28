@@ -62,7 +62,7 @@ fn gem_names(text: &str) -> (Vec<String>, Vec<String>) {
         if t.starts_with('#') {
             continue;
         }
-        if t.starts_with("group ") {
+        if t.starts_with("group ") || t.starts_with("group(") {
             group_at = Some(depth);
         }
         if opens_a_block(t) {
@@ -855,6 +855,56 @@ pub fn signature(f: &ExportedFn) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn grouped_gems_in_parenthesized_group_go_to_dev_deps() {
+        let gemfile = <<'RUBY'
+source "https://rubygems.org"
+gem "rake"
+group(:test) do
+  gem "rspec"
+end
+group(:development, :test) do
+  gem "factory_bot"
+end
+group :test do
+  gem "minitest"
+end
+RUBY
+;
+        let (deps, dev) = gem_names(gemfile);
+        assert!(
+            dev.contains(&"rspec".to_string()),
+            "rspec should be in dev deps but got {:?}",
+            dev
+        );
+        assert!(
+            dev.contains(&"factory_bot".to_string()),
+            "factory_bot should be in dev deps but got {:?}",
+            dev
+        );
+        assert!(
+            dev.contains(&"minitest".to_string()),
+            "minitest should be in dev deps but got {:?}",
+            dev
+        );
+        assert!(
+            !deps.contains(&"rspec".to_string()),
+            "rspec should NOT be in deps but got {:?}",
+            deps
+        );
+        assert!(
+            !deps.contains(&"factory_bot".to_string()),
+            "factory_bot should NOT be in deps but got {:?}",
+            deps
+        );
+        assert!(
+            !deps.contains(&"minitest".to_string()),
+            "minitest should NOT be in deps but got {:?}",
+            deps
+        );
+        assert!(deps.contains(&"rake".to_string()), "rake should be in deps but got {:?}", deps);
+    }
 
     #[test]
     fn yard_takes_the_name_and_the_type_in_either_order() {
