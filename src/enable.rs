@@ -774,6 +774,7 @@ mod tests {
             Some((at, at + block.len(), false))
         );
         assert_eq!(&text[at..at + block.len()], block);
+        assert_eq!(remove(&text, "fuzzy-rs").unwrap(), "a = 0\nb = 2\n");
     }
 
     #[test]
