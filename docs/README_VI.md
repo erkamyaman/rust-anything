@@ -12,6 +12,7 @@
 <a href="https://github.com/erkamyaman/rust-anything/stargazers"><img src="https://img.shields.io/github/stars/erkamyaman/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=stars" alt="GitHub stars"></a>
 <a href="https://discord.gg/FXhUEA8eBR"><img src="https://img.shields.io/badge/discord-join-111111?style=flat&colorA=111111&colorB=b34a1a" alt="Discord"></a>
 <a href="https://github.com/erkamyaman/rust-anything#license"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-111111?style=flat&colorA=111111&colorB=b34a1a" alt="MIT or Apache-2.0 license"></a><br>
+<a href="https://rustanything.ai/"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Frustanything.ai%2Fbadge-downloads.json&style=flat" alt="Total downloads, crates.io and npm"></a>
 <a href="https://crates.io/crates/rust-anything"><img src="https://img.shields.io/crates/d/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=crates.io%20downloads" alt="crates.io downloads"></a>
 <a href="https://www.npmjs.com/package/rust-anything"><img src="https://img.shields.io/npm/d18m/rust-anything?style=flat&colorA=111111&colorB=b34a1a&label=npm%20downloads" alt="npm downloads"></a>
 </p>
@@ -28,6 +29,8 @@ Viết lại ứng dụng bằng Rust, và chứng minh nó vẫn hoạt động
 <p align="center"><b>Tài liệu:</b> <a href="https://rustanything.ai/vi">https://rustanything.ai/vi</a></p>
 
 <p align="center"><a href="translations.md">🌐 Ngôn ngữ khác</a></p>
+
+<p align="center">Đang chuyển một codebase sang Rust? Tôi cung cấp dịch vụ tư vấn chuyển đổi sang Rust: <a href="mailto:hello@rustanything.ai">hello@rustanything.ai</a></p>
 
 <p align="center"><sub>Bản dịch này do cộng đồng duy trì và có thể chậm hơn <a href="../README.md">README tiếng Anh</a>.</sub></p>
 

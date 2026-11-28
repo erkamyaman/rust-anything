@@ -117,7 +117,7 @@
       {
         "v": "32",
         "unit": "x",
-        "k": "búsqueda de Fuse.js por solicitud sobre 50,000 cadenas, Apple M4"
+        "k": "búsqueda de Fuse.js por solicitud sobre 50,000 cadenas, Apple M4, 10 núcleos"
       },
       {
         "v": "3.5",
@@ -207,14 +207,14 @@
         "href": "/docs/real-world/fuse-js",
         "kind": "Fuse.js · búsqueda en listas de cadenas",
         "big": "32x",
-        "text": "Más rápido por solicitud sobre 50,000 cadenas (91.2 ms → 2.8 ms, Apple M4). 3,414/3,414 casos registrados coinciden; resultados idénticos byte a byte a los de Fuse en 360 búsquedas.",
+        "text": "Más rápido por solicitud sobre 50,000 cadenas (91.2 ms → 2.8 ms, Apple M4, 10 núcleos). 3,414/3,414 casos registrados coinciden; resultados idénticos byte a byte a los de Fuse en 360 búsquedas.",
         "rows": [
           {
-            "k": "10,000 cadenas",
+            "k": "10,000 cadenas, todos los núcleos",
             "v": "27 a 30x"
           },
           {
-            "k": "1,000 cadenas",
+            "k": "1,000 cadenas, todos los núcleos",
             "v": "18x"
           },
           {
@@ -236,11 +236,11 @@
             "slow": true
           },
           {
-            "k": "Lote, parse x100,000",
+            "k": "Lote, parse x100,000, todos los núcleos",
             "v": "18x"
           },
           {
-            "k": "Lote, format x100,000",
+            "k": "Lote, format x100,000, todos los núcleos",
             "v": "0.8x",
             "slow": true
           }

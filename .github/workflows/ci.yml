@@ -5,7 +5,31 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -z "$BASE" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BASE" HEAD | grep -qE '^(src/|tests/|demo/|Cargo\.(toml|lock)$|build\.rs$|\.github/workflows/ci\.yml$)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   actionlint:
     runs-on: ubuntu-latest
     steps:
@@ -44,6 +68,8 @@ jobs:
       - run: cargo test
 
   macos:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-latest
     env:
       RUST_ANYTHING_REQUIRE: node,python3,go,ruby,java,cc,cargo,pwsh
