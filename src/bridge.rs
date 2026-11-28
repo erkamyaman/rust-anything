@@ -467,13 +467,17 @@ fn balanced(ts: &str) -> bool {
     depth == 0
 }
 
-/// Splits on `sep` outside brackets.
+/// Splits on `sep` outside brackets. The `>` of an arrow (`=>`) closes nothing.
 fn split_top(ts: &str, sep: char) -> Vec<&str> {
     let mut out = Vec::new();
     let mut depth = 0i32;
     let mut start = 0;
+    let mut prev = None;
     for (i, c) in ts.char_indices() {
+        let arrow = c == '>' && prev == Some('=');
+        prev = Some(c);
         match c {
+            '>' if arrow => {}
             '<' | '(' | '[' | '{' => depth += 1,
             '>' | ')' | ']' | '}' => depth -= 1,
             c if c == sep && depth == 0 => {
@@ -2240,6 +2244,56 @@ mod tests {
             "Option<String>"
         );
         assert_eq!(RType::from_ts("(a) | (b)").rust(), "serde_json::Value");
+    }
+
+    #[test]
+    fn balanced_wants_parentheses_closed_in_order() {
+        assert!(balanced(""));
+        assert!(balanced("string | null"));
+        assert!(balanced("(a) | (b)"));
+        assert!(balanced("(() => void)"));
+        assert!(!balanced("(a))("));
+        assert!(!balanced("(a"));
+    }
+
+    #[test]
+    fn split_top_splits_outside_brackets_only() {
+        assert_eq!(split_top("string | null", '|'), ["string", "null"]);
+        assert_eq!(
+            split_top("Map<string, number> | null", '|'),
+            ["Map<string, number>", "null"]
+        );
+        assert_eq!(
+            split_top("Map<string, number>, [a, b], {c: d}", ','),
+            ["Map<string, number>", "[a, b]", "{c: d}"]
+        );
+        assert_eq!(split_top(" | a || ", '|'), ["a"]);
+    }
+
+    #[test]
+    fn split_top_does_not_close_a_bracket_at_an_arrow() {
+        assert_eq!(
+            split_top("(() => void) | null", '|'),
+            ["(() => void)", "null"]
+        );
+        assert_eq!(
+            split_top("Map<string, () => number> | undefined", '|'),
+            ["Map<string, () => number>", "undefined"]
+        );
+        assert_eq!(
+            RType::from_ts("(() => void) | null").rust(),
+            "Option<serde_json::Value>"
+        );
+    }
+
+    #[test]
+    fn rust_ident_escapes_keywords() {
+        for word in ["self", "Self", "super", "crate", "_"] {
+            assert_eq!(rust_ident(word), format!("{word}_"));
+        }
+        assert_eq!(rust_ident("type"), "r#type");
+        assert_eq!(rust_ident("async"), "r#async");
+        assert_eq!(rust_ident("name"), "name");
     }
 
     #[test]
