@@ -3771,4 +3771,65 @@ mod tests {
 
         std::fs::remove_dir_all(repo).unwrap();
     }
+
+    fn f64s(values: &[f64]) -> Vec<u8> {
+        values.iter().flat_map(|v| v.to_le_bytes()).collect()
+    }
+
+    #[test]
+    fn float_width_knows_f32le_and_f64le() {
+        assert_eq!(float_width("f32le").unwrap(), 4);
+        assert_eq!(float_width("f64le").unwrap(), 8);
+        let err = float_width("f16le").unwrap_err().to_string();
+        assert!(err.contains("`f16le`"), "{err}");
+        assert!(err.contains("f32le") && err.contains("f64le"), "{err}");
+    }
+
+    #[test]
+    fn compare_floats_matches_equal_values_and_nan() {
+        let same = f64s(&[1.0, -2.5, 1e300]);
+        assert_eq!(compare_floats(&same, &same, 8, None), None);
+        let nan = f64s(&[f64::NAN, 3.0]);
+        assert_eq!(compare_floats(&nan, &nan, 8, None), None);
+    }
+
+    #[test]
+    fn compare_floats_names_the_first_difference_unless_the_tolerance_covers_it() {
+        let expected = f64s(&[1.0, 2.0, 3.0]);
+        let actual = f64s(&[1.0, 2.5, 3.0]);
+        let line = compare_floats(&expected, &actual, 8, None).unwrap();
+        assert!(line.starts_with("1 of 3 values differ"), "{line}");
+        assert!(
+            line.contains("first at index 1: 2 expected, 2.5 got"),
+            "{line}"
+        );
+        assert!(line.contains("max abs diff 5e-1"), "{line}");
+        assert!(line.contains("max rel diff 2e-1"), "{line}");
+        assert_eq!(compare_floats(&expected, &actual, 8, Some(0.3)), None);
+        assert!(compare_floats(&expected, &actual, 8, Some(0.1)).is_some());
+    }
+
+    #[test]
+    fn compare_floats_reads_f32le() {
+        let f32s = |v: &[f32]| v.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>();
+        let expected = f32s(&[1.5, -0.25]);
+        assert_eq!(compare_floats(&expected, &expected, 4, None), None);
+        let line = compare_floats(&expected, &f32s(&[1.5, 0.25]), 4, None).unwrap();
+        assert!(line.starts_with("1 of 2 values differ"), "{line}");
+        assert!(
+            line.contains("first at index 1: -0.25 expected, 0.25 got"),
+            "{line}"
+        );
+    }
+
+    #[test]
+    fn compare_floats_reports_a_length_mismatch() {
+        let two = f64s(&[1.0, 2.0]);
+        assert_eq!(
+            compare_floats(&two, &two[..8], 8, None).as_deref(),
+            Some("2 values expected, 8 bytes got (8 bytes per value)\n")
+        );
+        // A partial value in the expected file is a mismatch too, even against itself.
+        assert!(compare_floats(&two[..12], &two[..12], 8, None).is_some());
+    }
 }
