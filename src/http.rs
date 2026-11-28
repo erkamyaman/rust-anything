@@ -3248,4 +3248,29 @@ mod tests {
         assert!(err.downcast_ref::<PortInUse>().is_none(), "{err:#}");
         assert!(format!("{err:#}").contains("empty command"), "{err:#}");
     }
+
+    #[test]
+    fn percent_encode_keeps_unreserved_bytes_and_escapes_the_rest() {
+        assert_eq!(percent_encode("aZ09-._~"), "aZ09-._~");
+        assert_eq!(percent_encode("a b/c"), "a%20b%2Fc");
+        // one escape per UTF-8 byte, upper-case hex
+        assert_eq!(percent_encode("é"), "%C3%A9");
+        assert_eq!(percent_encode(""), "");
+    }
+
+    #[test]
+    fn infer_mime_reads_the_extension_in_any_case() {
+        assert_eq!(infer_mime("a.JPG"), "image/jpeg");
+        assert_eq!(infer_mime("dir/photo.Png"), "image/png");
+        assert_eq!(infer_mime("notes.csv"), "text/plain");
+        assert_eq!(infer_mime("README"), "application/octet-stream");
+        assert_eq!(infer_mime("archive.xyz"), "application/octet-stream");
+    }
+
+    #[test]
+    fn escape_param_drops_line_breaks_and_escapes_quotes_and_backslashes() {
+        assert_eq!(escape_param(r#"a "b" c\d"#), r#"a \"b\" c\\d"#);
+        assert_eq!(escape_param("line1\r\nline2\n"), "line1line2");
+        assert_eq!(escape_param("plain.txt"), "plain.txt");
+    }
 }
