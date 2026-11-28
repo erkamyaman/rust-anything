@@ -1046,6 +1046,64 @@ fn app_record_prints_one_case_in_the_singular() {
 }
 
 #[test]
+fn a_written_file_named_by_a_normalized_value_replays() {
+    if !common::have("node") {
+        return;
+    }
+    // Every run names its file differently; `run=run-\d+` says that part of the name is noise.
+    let write = |text: &str| {
+        format!(
+            "require('fs').writeFileSync(`run-${{process.hrtime.bigint()}}.log`, '{text}\\n')\n"
+        )
+    };
+    let repo = one_off(
+        "named-by-time",
+        &[
+            ("save.cjs", &write("saved")),
+            ("other.cjs", &write("other")),
+            ("nothing.cjs", "\n"),
+            ("inputs.jsonl", "{\"name\": \"save\", \"args\": []}\n"),
+        ],
+    );
+    let bin = env!("CARGO_BIN_EXE_rust-anything");
+    let record = Command::new(bin)
+        .args([
+            "app",
+            "record",
+            ".",
+            "--no-traps",
+            "--inputs",
+            "inputs.jsonl",
+        ])
+        .args(["--normalize", r"run=run-\d+", "--", "node", "save.cjs"])
+        .current_dir(&repo)
+        .output()
+        .unwrap();
+    let printed = String::from_utf8_lossy(&record.stdout).into_owned();
+    let replay = |build: Option<&str>| {
+        let mut cmd = Command::new(bin);
+        cmd.args(["app", "replay", "."]).current_dir(&repo);
+        if let Some(build) = build {
+            cmd.args(["--build", build]);
+        }
+        let out = cmd.output().unwrap();
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+    let (same, other, nothing) = (
+        replay(None),
+        replay(Some("node other.cjs")),
+        replay(Some("node nothing.cjs")),
+    );
+    std::fs::remove_dir_all(&repo).unwrap();
+    assert!(record.status.success(), "{record:?}");
+    assert!(!printed.contains("Unstable"), "{printed}");
+    assert!(same.starts_with("1/1 cases passed"), "{same}");
+    assert!(other.starts_with("0/1 cases passed"), "{other}");
+    assert!(other.contains("- save: file run-"), "{other}");
+    assert!(nothing.contains("(not written)"), "{nothing}");
+}
+
+#[test]
 fn a_library_front_door_prints_one_export_in_the_singular() {
     let repo = one_off(
         "one-export",
