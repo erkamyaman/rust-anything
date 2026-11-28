@@ -173,7 +173,7 @@ fn select(explicit: Option<&str>) -> Result<String> {
 }
 
 /// d8 from the newest installed build-tools and the newest platform's `android.jar`.
-fn sdk_tools() -> Result<(PathBuf, PathBuf)> {
+pub fn sdk_tools() -> Result<(PathBuf, PathBuf)> {
     let mut candidates: Vec<PathBuf> = ["ANDROID_HOME", "ANDROID_SDK_ROOT"]
         .iter()
         .filter_map(std::env::var_os)

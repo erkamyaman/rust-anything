@@ -214,6 +214,7 @@ pub fn run() -> Report {
         let ndk = s.spawn(android_ndk);
         let android_targets = s.spawn(android_targets);
         let adb = s.spawn(android_adb);
+        let build_tools = s.spawn(android_build_tools);
         let mcp = s.spawn(|| mcp_self_test(&exe));
         let mut checks: Vec<Check> = probes
             .into_iter()
@@ -227,6 +228,7 @@ pub fn run() -> Report {
                 .expect("the Android targets probe panicked"),
         );
         checks.push(adb.join().expect("the adb probe panicked"));
+        checks.push(build_tools.join().expect("the build-tools probe panicked"));
         checks.push(mcp.join().expect("the MCP self-test panicked"));
         checks
     });
@@ -681,6 +683,35 @@ fn android_adb() -> Check {
             // still cannot find `adb`.
             "sdkmanager \"platform-tools\"  (or install Android Studio's SDK tools), then put its \
              platform-tools folder on PATH"
+                .to_string()
+        }),
+    }
+}
+
+/// The SDK's `d8` and `android.jar`, which on-device `record` dexes and compiles against.
+fn android_build_tools() -> Check {
+    build_tools_check(crate::android_device::sdk_tools())
+}
+
+fn build_tools_check(found: anyhow::Result<(PathBuf, PathBuf)>) -> Check {
+    let (status, detail) = match &found {
+        Ok((d8, jar)) => (
+            Status::Ok,
+            format!("{} and {}", d8.display(), jar.display()),
+        ),
+        Err(e) => (
+            Status::Missing,
+            format!("{e:#}; `record --profile android` on a device needs them"),
+        ),
+    };
+    Check {
+        name: "Android build-tools".into(),
+        status,
+        required: false,
+        detail,
+        fix: (status != Status::Ok).then(|| {
+            "sdkmanager \"build-tools;35.0.0\" \"platforms;android-35\"  (d8 comes from \
+             build-tools, android.jar from a platform)"
                 .to_string()
         }),
     }
@@ -1409,6 +1440,23 @@ mod tests {
                 check.fix
             );
         }
+    }
+
+    #[test]
+    fn missing_build_tools_name_the_sdkmanager_fix() {
+        let check = build_tools_check(Err(anyhow::anyhow!("no d8 in the SDK's build-tools")));
+        assert_eq!(check.name, "Android build-tools");
+        assert!(!check.required);
+        assert_eq!(check.status, Status::Missing);
+        assert!(check.detail.contains("no d8"), "{}", check.detail);
+        assert!(
+            check
+                .fix
+                .as_deref()
+                .is_some_and(|f| f.contains("sdkmanager")),
+            "{:?}",
+            check.fix
+        );
     }
 
     #[test]
