@@ -1477,4 +1477,47 @@ mod tests {
         assert!(out.contains("features = [\"async\"]"));
         assert!(out.contains("futures") && out.contains("preserve_order"));
     }
+
+    #[test]
+    fn camel_case_joins_snake_case_words() {
+        assert_eq!(camel_case("a_b_c"), "aBC");
+        assert_eq!(camel_case("snake_case_name"), "snakeCaseName");
+        assert_eq!(camel_case("parse_http_2_xml"), "parseHttp2Xml");
+        assert_eq!(camel_case("a__b"), "aB");
+    }
+
+    #[test]
+    fn camel_case_drops_a_raw_identifier_prefix() {
+        assert_eq!(camel_case("r#type"), "type");
+        assert_eq!(camel_case("r#match_all"), "matchAll");
+    }
+
+    #[test]
+    fn camel_case_keeps_names_without_underscores_and_drops_a_trailing_one() {
+        assert_eq!(camel_case("name"), "name");
+        assert_eq!(camel_case("alreadyCamel"), "alreadyCamel");
+        assert_eq!(camel_case("name_"), "name");
+        assert_eq!(camel_case(""), "");
+    }
+
+    #[test]
+    fn indent_adds_four_spaces_to_every_line() {
+        assert_eq!(indent("a\nb"), "    a\n    b\n");
+        assert_eq!(indent("a\n  b\n"), "    a\n      b\n");
+        assert_eq!(indent(""), "");
+    }
+
+    #[test]
+    fn dedent_removes_four_spaces_and_leaves_shorter_indents_alone() {
+        assert_eq!(dedent("    a\n        b\n"), "a\n    b\n");
+        assert_eq!(dedent("  a\n   b\nc\n"), "  a\n   b\nc\n");
+        assert_eq!(dedent("    a\n  b\n"), "a\n  b\n");
+    }
+
+    #[test]
+    fn dedent_undoes_indent() {
+        let text = "fn f() {\n    1\n}\n";
+        assert_eq!(dedent(&indent(text)), text);
+        assert_eq!(dedent(&indent("a\nb\n")), "a\nb\n");
+    }
 }

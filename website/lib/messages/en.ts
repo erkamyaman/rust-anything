@@ -132,7 +132,7 @@ export const en = {
   },
   home: {
     stats: [
-      { v: '32', unit: 'x', k: 'Fuse.js search per query on 50,000 strings, Apple M4' },
+      { v: '32', unit: 'x', k: 'Fuse.js search per query on 50,000 strings, Apple M4, 10 cores' },
       { v: '3.5', unit: 'MB', k: 'json-server idle memory after the lift, from 74 MB in Node' },
       { v: '514/514', unit: '', k: 'json-server HTTP cases matching on a pure Rust binary' },
       { v: '10', unit: '', k: 'languages: eight with verified ports, Kotlin and PowerShell tested end to end' },
@@ -197,10 +197,10 @@ export const en = {
         href: '/docs/real-world/fuse-js',
         kind: 'Fuse.js · string-list search',
         big: '32x',
-        text: 'Faster per query on 50,000 strings (91.2 ms → 2.8 ms, Apple M4). 3,414/3,414 recorded cases match; results byte-identical to Fuse on 360 searches.',
+        text: 'Faster per query on 50,000 strings (91.2 ms → 2.8 ms, Apple M4, 10 cores). 3,414/3,414 recorded cases match; results byte-identical to Fuse on 360 searches.',
         rows: [
-          { k: '10,000 strings', v: '27 to 30x' },
-          { k: '1,000 strings', v: '18x' },
+          { k: '10,000 strings, all cores', v: '27 to 30x' },
+          { k: '1,000 strings, all cores', v: '18x' },
           { k: '50,000 strings, one core', v: '5.3x', slow: true },
         ],
       },
@@ -211,8 +211,8 @@ export const en = {
         text: 'Cases match, 340 of them captured from its own Jest tests. A good port and a bad speed target, and `bench` says so.',
         rows: [
           { k: 'Per call, over the recorded cases', v: '0.56x', slow: true },
-          { k: 'Batch, parse x100,000', v: '18x' },
-          { k: 'Batch, format x100,000', v: '0.8x', slow: true },
+          { k: 'Batch, parse x100,000, all cores', v: '18x' },
+          { k: 'Batch, format x100,000, all cores', v: '0.8x', slow: true },
         ],
       },
     ],

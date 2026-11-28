@@ -9,7 +9,7 @@
     "type": "git",
     "url": "git+https://github.com/erkamyaman/rust-anything.git"
   },
-  "homepage": "https://github.com/erkamyaman/rust-anything",
+  "homepage": "https://rustanything.ai",
   "author": {
     "name": "Erkam Yaman",
     "email": "hello@rustanything.ai",
