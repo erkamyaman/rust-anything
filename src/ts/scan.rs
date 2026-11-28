@@ -4,12 +4,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
-    Argument, ArrowFunctionExpression, AwaitExpression, BinaryExpression, CallExpression, Class,
-    DoWhileStatement, ExportAllDeclaration, ExportFromDeclaration, Expression, ForInStatement,
-    ForOfStatement, ForStatement, Function, IdentifierReference, ImportDeclaration,
-    ImportExpression, NewExpression, RegExpLiteral, StaticMemberExpression, TSAnyKeyword,
-    TSFunctionType, TSMethodSignature, ThrowStatement, TryStatement, WhileStatement,
-    YieldExpression,
+    Argument, ArrowFunctionExpression, AssignmentExpression, AwaitExpression, BinaryExpression,
+    CallExpression, Class, DoWhileStatement, ExportAllDeclaration, ExportFromDeclaration,
+    Expression, ForInStatement, ForOfStatement, ForStatement, Function, IdentifierReference,
+    ImportDeclaration, ImportExpression, NewExpression, RegExpLiteral, StaticMemberExpression,
+    TSAnyKeyword, TSFunctionType, TSMethodSignature, ThrowStatement, TryStatement, UnaryExpression,
+    WhileStatement, YieldExpression,
 };
 use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
@@ -453,6 +453,20 @@ impl<'a> Visit<'a> for Collector {
         walk::walk_binary_expression(self, it);
     }
 
+    fn visit_unary_expression(&mut self, it: &UnaryExpression<'a>) {
+        if it.operator.is_bitwise() {
+            self.add(Risk::NumberSemantics, it.span);
+        }
+        walk::walk_unary_expression(self, it);
+    }
+
+    fn visit_assignment_expression(&mut self, it: &AssignmentExpression<'a>) {
+        if it.operator.is_bitwise() {
+            self.add(Risk::NumberSemantics, it.span);
+        }
+        walk::walk_assignment_expression(self, it);
+    }
+
     fn visit_ts_any_keyword(&mut self, it: &TSAnyKeyword) {
         self.add(Risk::DynamicTyping, it.span);
     }
@@ -567,10 +581,12 @@ mod tests {
              export const r = (x: number) => Math.round(x)\n\
              export const f = (x: number) => x.toFixed(2)\n\
              export const i = (s: string) => Number.parseInt(s, 10)\n\
-             export const p = (s: string) => Number.parseFloat(s)\n",
+             export const p = (s: string) => Number.parseFloat(s)\n\
+             export const inv = (x: number) => ~x\n\
+             export function mask(x: number) { x &= 0xff; x >>>= 1; return x }\n",
         );
         assert_eq!(facts.risks[&Risk::RegexSyntax], [1]);
-        assert_eq!(facts.risks[&Risk::NumberSemantics], [2, 3, 4, 5]);
+        assert_eq!(facts.risks[&Risk::NumberSemantics], [2, 3, 4, 5, 6, 7, 7]);
     }
 
     #[test]

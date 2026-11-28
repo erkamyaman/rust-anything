@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+- `analyze` also flags TS/JS unary `~` and bitwise assignment operators (`&=`, `|=`, `^=`, `<<=`,
+  `>>=`, `>>>=`) as `Number semantics`, alongside the binary bitwise operators: all of them
+  truncate `f64` numbers to 32-bit integers (#789 by @brixtonpham).
+- `analyze` no longer lists a Python project's own modules as PyPI dependencies when a script
+  imports them from its own folder (`import _kit` next to `_kit.py`) or from a folder it puts on
+  `sys.path` itself. They were reported as packages of unknown fit (`-kit`), each with a "which
+  crate replaces it" decision, and the unit that uses them was not ordered after the unit that
+  holds them (#803, #804 by @AyhamJo7).
+- Python: `pathlib.Path` (and `PurePath`, `os.PathLike`) is a bridged type. A `Path` parameter is
+  `std::path::PathBuf` in `port.rs`, `record` calls the original with real path objects, and a
+  returned path is recorded by its text. Before, the parameter was `serde_json::Value` and every
+  recorded case raised `AttributeError` on the dict, list or string it was given, and every
+  returned path was recorded as the same `{"$repr": "PosixPath"}` (#807, #808 by @AyhamJo7).
+- `record` on Python no longer leaves out the argument of a required parameter typed `T | None`.
+  `def pick(text: str, fallback: str | None)` was called without `fallback` whenever the case's
+  value was `None`, so each of those cases recorded `TypeError: pick() missing 1 required
+  positional argument` and the call callers really make, `pick(text, None)`, was never recorded.
+  A parameter without a default now always gets its argument; trailing `None`s are still left out
+  for parameters that have a default (#809, #810 by @AyhamJo7).
+- `app record` and `app replay` pair a written file by its name with the normalizers applied,
+  so an app that names its output by a time or an id can be replayed. Such a case used to be
+  reported unstable when recorded and then failed every replay, the original's included,
+  with `file <name> (not written)`. `app lift` leaves such a case out of the generated
+  `cargo test`, which compares written files by exact name, and says so in its checklist
+  (#819, #820 by @AyhamJo7).
+- `bridge` on a Python function with an optional list parameter (`paths: Sequence[str] = ()`)
+  writes a PyO3 crate that compiles. The binding was a plain `Bound` with a `=None` default,
+  which PyO3 rejects (`E0308: expected Bound<'_, PyAny>, found Option<_>`); it is `Option<Bound>`
+  now, as for other optional objects (#821, #822 by @AyhamJo7).
+- A port may import `serde_json::Value` or `std::collections::HashMap` and use the short name
+  in its signatures. `refresh` (and every command that regenerates bindings) repeated the
+  short name in `src/lib.rs`, which has none of the port's `use` lines, so the crate stopped
+  compiling (`E0425: cannot find type Value in this scope`). Signatures are now read with the
+  full path, unless the port defines a type of that name itself (#823, #824 by @AyhamJo7).
+- A PyO3 binding takes a dataclass (or any instance that keeps its fields in `__dict__`) where
+  the port declares `serde_json::Value`: it arrives as `{"$object": name, "attrs": {...}}`, the
+  shape `record` writes. The binding used to raise `TypeError: unsupported argument type`, which
+  `diff` did not show, because its driver passes the recorded dict whenever the original module
+  is not loaded (#825, #826 by @AyhamJo7).
+- `bridge` on a Python function with a parameter named like a Rust keyword (`type`, `ref`)
+  writes a PyO3 crate that compiles. The `#[pyo3(signature = ...)]` line named the parameter
+  without its `r#`, which is not Rust (`expected identifier, found keyword`); it keeps the raw
+  identifier now, and Python still calls the parameter by its own name (#827, #828 by @AyhamJo7).
+
+## 5.0.2 (2026-11-28)
+
 - `profile` on Java keeps the samples of every JVM the workload starts. Each one now writes its own
   recording (`profile-<pid>.jfr`) and `profile` reads them all, where they used to share one
   `profile.jfr` and the last JVM to exit replaced the others, so work done in a child JVM (a Gradle

@@ -466,6 +466,16 @@ pub fn resolve(from: &str, spec: &str, index: &HashMap<&str, usize>, ws: &Worksp
         }
     }
     let segments: Vec<&str> = spec.split('.').collect();
+    // A script's own folder is first on `sys.path`: a module beside the importing file is the
+    // workspace's, whatever the package roots are. A module compiled into the interpreter is
+    // found before any path is searched, so a sibling `sys.py` never answers `import sys`.
+    if !BUILT_IN.contains(&segments[0])
+        && let Some((dir, _)) = from.rsplit_once('/')
+        && !in_package(dir, index)
+        && let Some(i) = try_module(&format!("{dir}/{path}"))
+    {
+        return Resolution::File(i);
+    }
     if let Some(known) = (2..=segments.len())
         .rev()
         .map(|k| segments[..k].join("."))
@@ -482,9 +492,56 @@ pub fn resolve(from: &str, spec: &str, index: &HashMap<&str, usize>, ws: &Worksp
     {
         // A local package imported by a shorter path than its files: still local.
         Resolution::Unresolved
+    } else if let Some(module) = module_elsewhere(top, index) {
+        // A module in a folder the code puts on `sys.path` itself.
+        module
     } else {
         Resolution::External(top.to_lowercase().replace('_', "-"))
     }
+}
+
+/// Modules compiled into CPython on Linux, macOS and Windows (`sys.builtin_module_names`): the
+/// import system finds them before it looks at `sys.path`, so no file can stand in for them.
+/// Other standard-library modules are files, and a script's sibling of the same name wins.
+const BUILT_IN: &[&str] = &[
+    "sys",
+    "builtins",
+    "marshal",
+    "gc",
+    "time",
+    "itertools",
+    "errno",
+    "atexit",
+    "_thread",
+];
+
+fn in_package(dir: &str, index: &HashMap<&str, usize>) -> bool {
+    index.contains_key(format!("{dir}/__init__.py").as_str())
+}
+
+/// The workspace's own `<top>.py` in some other folder, for an import no root and no sibling
+/// answered: the file when there is one, unresolved when several share the name. A name the
+/// crate table knows stays the library.
+fn module_elsewhere(top: &str, index: &HashMap<&str, usize>) -> Option<Resolution> {
+    if lookup(top).is_some() {
+        return None;
+    }
+    let file = format!("{top}.py");
+    let nested = format!("/{file}");
+    let mut found = index
+        .iter()
+        .filter(|(path, _)| **path == file || path.ends_with(&nested))
+        .filter(|(path, _)| {
+            !path
+                .rsplit_once('/')
+                .is_some_and(|(dir, _)| in_package(dir, index))
+        })
+        .map(|(_, i)| *i);
+    let first = found.next()?;
+    Some(match found.next() {
+        None => Resolution::File(first),
+        Some(_) => Resolution::Unresolved,
+    })
 }
 
 // The version-agnostic list includes Python 3.12 modules removed in 3.13;
@@ -1391,6 +1448,12 @@ pub fn to_ts_type(hint: &str) -> String {
         "float" => "number".into(),
         "bool" => "boolean".into(),
         "bytes" | "bytearray" | "memoryview" => "pybytes".into(),
+        // A path object, not a string: code calls `.stem` and `.is_dir()` on it. The classes
+        // that name a flavour (`PureWindowsPath`, `PosixPath`, ...) stay named classes: a value
+        // rebuilt as `pathlib.Path` would follow this platform's rules, not theirs.
+        "Path" | "PurePath" | "PathLike" | "pathlib.Path" | "pathlib.PurePath" | "os.PathLike" => {
+            "pypath".into()
+        }
         "None" | "NoneType" => "undefined".into(),
         "list" | "List" | "Sequence" | "Iterable" | "MutableSequence" | "Collection" => {
             format!("{}[]", wrap(&arg(0)))
@@ -1509,6 +1572,71 @@ mod tests {
             resolve("main.py", "site", &local, &ws),
             Resolution::File(0)
         ));
+    }
+
+    #[test]
+    fn a_module_beside_the_script_or_on_its_own_sys_path_is_local() {
+        let ws = Workspace {
+            packages: vec![],
+            files: vec![],
+        };
+        let index = HashMap::from([
+            ("hooks/_kit.py", 0),
+            ("hooks/stop_guard.py", 1),
+            ("bin/gates.py", 2),
+            ("a/util.py", 3),
+            ("b/util.py", 4),
+            ("tools/yaml.py", 5),
+            ("hooks/sys.py", 6),
+            ("hooks/json.py", 7),
+            ("app/__init__.py", 8),
+            ("app/redis.py", 9),
+            ("app/core.py", 10),
+            ("app/boltons.py", 11),
+        ]);
+        match resolve("app/core.py", "redis", &index, &ws) {
+            Resolution::External(name) => assert_eq!(name, "redis"),
+            _ => panic!("redis in a package: not external"),
+        }
+        match resolve("hooks/stop_guard.py", "boltons", &index, &ws) {
+            Resolution::External(name) => assert_eq!(name, "boltons"),
+            _ => panic!("boltons: not external"),
+        }
+        // A module compiled into the interpreter is found before `sys.path` is searched; any
+        // other standard-library module is a file, and the script's sibling comes first.
+        assert!(matches!(
+            resolve("hooks/stop_guard.py", "sys", &index, &ws),
+            Resolution::Stdlib
+        ));
+        assert!(matches!(
+            resolve("hooks/stop_guard.py", "json", &index, &ws),
+            Resolution::File(7)
+        ));
+        // `import _kit` from a script in the same folder: the script's folder is on `sys.path`.
+        assert!(matches!(
+            resolve("hooks/stop_guard.py", "_kit", &index, &ws),
+            Resolution::File(0)
+        ));
+        // `import gates` after `sys.path.insert(0, ".../bin")`: the only `gates.py` there is.
+        assert!(matches!(
+            resolve("hooks/stop_guard.py", "gates", &index, &ws),
+            Resolution::File(2)
+        ));
+        // The sibling wins over a module of the same name elsewhere.
+        assert!(matches!(
+            resolve("b/main.py", "util", &index, &ws),
+            Resolution::File(4)
+        ));
+        // Two candidates and no sibling: local, but not one file.
+        assert!(matches!(
+            resolve("hooks/stop_guard.py", "util", &index, &ws),
+            Resolution::Unresolved
+        ));
+        // A library the crate table knows is not hidden by a file of its name elsewhere.
+        match resolve("hooks/stop_guard.py", "yaml", &index, &ws) {
+            Resolution::External(name) => assert_eq!(name, "yaml"),
+            _ => panic!("yaml: not external"),
+        }
     }
 
     #[test]
@@ -1670,5 +1798,18 @@ mod tests {
         assert_eq!(to_ts_type("Optional[bytes]"), "pybytes | undefined");
         assert_eq!(to_ts_type("list[bytes]"), "pybytes[]");
         assert_eq!(to_ts_type("bytes | None"), "pybytes | undefined");
+        for path in ["Path", "pathlib.Path", "PurePath", "os.PathLike"] {
+            assert_eq!(to_ts_type(path), "pypath", "{path}");
+        }
+        // A class that names its flavour is not rebuilt as this platform's `Path`.
+        for flavour in ["PureWindowsPath", "PosixPath", "pathlib.PurePosixPath"] {
+            assert_eq!(to_ts_type(flavour), flavour);
+        }
+        assert_eq!(to_ts_type("os.PathLike[str]"), "pypath");
+        assert_eq!(to_ts_type("Path | None"), "pypath | undefined");
+        assert_eq!(to_ts_type("Optional[Path]"), "pypath | undefined");
+        assert_eq!(to_ts_type("list[Path]"), "pypath[]");
+        // A project's own class that only ends in `Path` is still a named class.
+        assert_eq!(to_ts_type("DataPath"), "DataPath");
     }
 }
