@@ -92,7 +92,7 @@ export default function Footer({ locale = 'en' }: { locale?: string }) {
             </a>
           </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <a href="https://erkamyaman.dev" className="inline-flex items-center gap-2 hover:text-fg">
+            <a href="/about" className="inline-flex items-center gap-2 hover:text-fg">
               <img src="https://github.com/erkamyaman.png?size=64" width={20} height={20} alt="" className="rounded-full" loading="lazy" />
               {ui.madeBy} erKam Yaman
             </a>
