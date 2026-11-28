@@ -1150,4 +1150,31 @@ fun anyLen(xs: List<*>): Int = xs.size
                 .contains("values of any type")
         );
     }
+
+    #[test]
+    fn is_java_identifier_follows_javas_rules() {
+        for name in ["Text", "_x", "$x", "a1$_"] {
+            assert!(is_java_identifier(name), "{name}");
+        }
+        for name in ["1x", "a-b", "", "é"] {
+            assert!(!is_java_identifier(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn file_jvm_name_reads_the_file_annotation() {
+        let jvm_name = |source: &str| {
+            let tree = syntax::parse(&language(), source).unwrap();
+            file_jvm_name(tree.root_node(), source)
+        };
+        assert_eq!(
+            jvm_name("@file:JvmName(\"Utils\")\npackage text\n\nfun f() = 1\n").as_deref(),
+            Some("Utils")
+        );
+        assert_eq!(
+            jvm_name("@file:Suppress(\"unused\")\npackage text\n\nfun f() = 1\n"),
+            None
+        );
+        assert_eq!(jvm_name("package text\n\nfun f() = 1\n"), None);
+    }
 }

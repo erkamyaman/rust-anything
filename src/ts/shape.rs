@@ -18,6 +18,8 @@ pub enum Shape {
     Bool,
     /// `bytes` in the type dialect.
     Bytes,
+    /// `pypath` in the type dialect: a `pathlib` path.
+    Path,
     Null,
     Undefined,
     LitStr(String),
@@ -67,6 +69,7 @@ pub fn resolve(name: &str, args: &[Shape], types: &[LocalType]) -> Shape {
         },
         ("int", []) => Shape::Int,
         ("pybytes", []) => Shape::Bytes,
+        ("pypath", []) => Shape::Path,
         _ => match types.iter().find(|t| t.name == name) {
             Some(t) if t.alias => parse(&t.text),
             // An interface: its body is a type literal (`extends` is not followed).

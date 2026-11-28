@@ -3217,8 +3217,6 @@ mod tests {
     fn start_ephemeral_retries_when_an_auto_picked_port_is_snatched() {
         let busy = TcpListener::bind("127.0.0.1:0").unwrap();
         let busy_port = busy.local_addr().unwrap().port();
-        let free = free_port().unwrap();
-        assert_ne!(free, busy_port);
 
         let launch = Launch {
             args: &[],
@@ -3240,13 +3238,45 @@ mod tests {
         );
 
         // Ephemeral start retries past the busy port and proceeds to the next port (where empty
-        // command fails after passing the busy-port check).
-        let mut ports = [busy_port, free].into_iter();
-        let err = start_ephemeral(&[], &launch, &repo, || Ok(ports.next().unwrap()))
-            .err()
-            .expect("empty command must fail after retrying past busy port");
+        // command fails after passing the busy-port check). The next port is 0: nothing can
+        // listen on it, so no test running beside this one can take it, as one could take a
+        // port picked by `free_port()`.
+        let mut first = Some(busy_port);
+        let mut picks = 0;
+        let err = start_ephemeral(&[], &launch, &repo, || {
+            picks += 1;
+            Ok(first.take().unwrap_or(0))
+        })
+        .err()
+        .expect("empty command must fail after retrying past busy port");
         assert!(err.downcast_ref::<PortInUse>().is_none(), "{err:#}");
         assert!(format!("{err:#}").contains("empty command"), "{err:#}");
+        assert_eq!(picks, 2, "the busy port, then one retry");
+    }
+
+    #[test]
+    fn percent_encode_keeps_unreserved_bytes_and_escapes_the_rest() {
+        assert_eq!(percent_encode("aZ09-._~"), "aZ09-._~");
+        assert_eq!(percent_encode("a b/c"), "a%20b%2Fc");
+        // one escape per UTF-8 byte, upper-case hex
+        assert_eq!(percent_encode("é"), "%C3%A9");
+        assert_eq!(percent_encode(""), "");
+    }
+
+    #[test]
+    fn infer_mime_reads_the_extension_in_any_case() {
+        assert_eq!(infer_mime("a.JPG"), "image/jpeg");
+        assert_eq!(infer_mime("dir/photo.Png"), "image/png");
+        assert_eq!(infer_mime("notes.csv"), "text/plain");
+        assert_eq!(infer_mime("README"), "application/octet-stream");
+        assert_eq!(infer_mime("archive.xyz"), "application/octet-stream");
+    }
+
+    #[test]
+    fn escape_param_drops_line_breaks_and_escapes_quotes_and_backslashes() {
+        assert_eq!(escape_param(r#"a "b" c\d"#), r#"a \"b\" c\\d"#);
+        assert_eq!(escape_param("line1\r\nline2\n"), "line1line2");
+        assert_eq!(escape_param("plain.txt"), "plain.txt");
     }
 
     #[test]

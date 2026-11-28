@@ -209,3 +209,122 @@ pub fn build(crate_dir: &Path, m: &Manifest) -> Result<PathBuf> {
     std::fs::copy(&lib, &target)?;
     Ok(target)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::Lang;
+
+    const SEP: &str = "\\";
+
+    fn manifest(root: &Path) -> Manifest {
+        Manifest {
+            schema: String::new(),
+            root: root.to_path_buf(),
+            root_written: None,
+            unit: "src/Text.php".into(),
+            language: Lang::Php,
+            kind: crate::bridge::Kind::Ffi,
+            crate_name: "text-tools".into(),
+            exports: Vec::new(),
+            classes: Vec::new(),
+            js_only: Vec::new(),
+            batches: Vec::new(),
+            allocator: Default::default(),
+            float_tolerance: None,
+            ignore_key_order: false,
+            end_state: None,
+        }
+    }
+
+    fn write(root: &Path, rel: &str, text: &str) {
+        let path = root.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    }
+
+    #[test]
+    fn names_are_lower_cased_and_the_ported_file_is_left_out() {
+        let root = crate::app::temp_dir("php-types-a").unwrap();
+        write(&root, "src/Text.php", "<?php\nclass TextTools {}\n");
+        write(
+            &root,
+            "src/Shapes.php",
+            "<?php\ninterface Drawable {}\ntrait HasArea {}\nclass Circle {}\n",
+        );
+        let ported: HashSet<&str> = HashSet::from(["src/Text.php"]);
+        let got = project_types(&manifest(&root), &ported);
+        std::fs::remove_dir_all(&root).ok();
+        let got = got.unwrap();
+        let names: Vec<&str> = got.keys().map(String::as_str).collect();
+        assert_eq!(names, ["circle", "drawable", "hasarea"]);
+        for path in got.values() {
+            assert_eq!(path, &root.join("src/Shapes.php"));
+        }
+    }
+
+    #[test]
+    fn nothing_ported_keeps_every_file() {
+        let root = crate::app::temp_dir("php-types-b").unwrap();
+        write(&root, "src/Text.php", "<?php\nclass TextTools {}\n");
+        write(&root, "src/Shapes.php", "<?php\nclass Circle {}\n");
+        let got = project_types(&manifest(&root), &HashSet::new());
+        std::fs::remove_dir_all(&root).ok();
+        let got = got.unwrap();
+        assert_eq!(got["texttools"], root.join("src/Text.php"));
+        assert_eq!(got["circle"], root.join("src/Shapes.php"));
+        assert_eq!(got.len(), 2);
+    }
+
+    #[test]
+    fn namespaced_names_are_kept_whole_and_lower_cased() {
+        let root = crate::app::temp_dir("php-types-c").unwrap();
+        write(
+            &root,
+            "src/Text.php",
+            "<?php\nnamespace App\\Util;\nclass TextTools {}\n",
+        );
+        let got = project_types(&manifest(&root), &HashSet::new());
+        std::fs::remove_dir_all(&root).ok();
+        let got = got.unwrap();
+        let key = format!("app{SEP}util{SEP}texttools");
+        assert_eq!(got.keys().collect::<Vec<_>>(), [&key]);
+        assert_eq!(got[&key], root.join("src/Text.php"));
+    }
+
+    #[test]
+    fn the_first_file_wins_when_two_declare_the_same_name() {
+        let root = crate::app::temp_dir("php-types-d").unwrap();
+        write(&root, "src/B.php", "<?php\nclass Shared {}\n");
+        write(&root, "src/A.php", "<?php\nclass SHARED {}\n");
+        let got = project_types(&manifest(&root), &HashSet::new());
+        std::fs::remove_dir_all(&root).ok();
+        let got = got.unwrap();
+        assert_eq!(got.len(), 1);
+        assert_eq!(got["shared"], root.join("src/A.php"));
+    }
+
+    #[test]
+    fn test_files_and_non_php_files_are_skipped() {
+        let root = crate::app::temp_dir("php-types-e").unwrap();
+        write(&root, "src/Text.php", "<?php\nclass TextTools {}\n");
+        write(
+            &root,
+            "tests/TextToolsTest.php",
+            "<?php\nclass TextToolsTest {}\n",
+        );
+        write(&root, "notes.txt", "class NotPhp {}\n");
+        let got = project_types(&manifest(&root), &HashSet::new());
+        std::fs::remove_dir_all(&root).ok();
+        let got = got.unwrap();
+        assert_eq!(got.keys().collect::<Vec<_>>(), ["texttools"]);
+    }
+
+    #[test]
+    fn an_empty_project_has_no_types() {
+        let root = crate::app::temp_dir("php-types-f").unwrap();
+        let got = project_types(&manifest(&root), &HashSet::new());
+        std::fs::remove_dir_all(&root).ok();
+        assert!(got.unwrap().is_empty());
+    }
+}

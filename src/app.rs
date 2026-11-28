@@ -299,6 +299,42 @@ impl Normalizers {
         out
     }
 
+    /// Which file of `actual` each file of `expected` is: the one at the same path, or else one
+    /// whose path differs only where a normalizer matches (a file named by a time or an id).
+    /// Several such files with the same shape pair up in sorted order.
+    pub(crate) fn pair_files<'a>(
+        &self,
+        expected: impl Iterator<Item = &'a PathBuf>,
+        actual: impl Iterator<Item = &'a PathBuf> + Clone,
+    ) -> BTreeMap<PathBuf, PathBuf> {
+        let exact: BTreeSet<&PathBuf> = actual.clone().collect();
+        let mut pairs = BTreeMap::new();
+        let mut loose: BTreeMap<String, Vec<&PathBuf>> = BTreeMap::new();
+        for path in expected {
+            if exact.contains(path) {
+                pairs.insert(path.clone(), path.clone());
+            } else {
+                let shape = self.apply(&path.to_string_lossy());
+                if shape != path.to_string_lossy() {
+                    loose.entry(shape).or_default().push(path);
+                }
+            }
+        }
+        for (shape, wanted) in loose {
+            // A file already paired by its exact path is a key of `pairs` (it maps to itself).
+            let found: Vec<&PathBuf> = actual
+                .clone()
+                .filter(|path| {
+                    !pairs.contains_key(*path) && self.apply(&path.to_string_lossy()) == shape
+                })
+                .collect();
+            for (path, other) in wanted.into_iter().zip(found) {
+                pairs.insert(path.clone(), other.clone());
+            }
+        }
+        pairs
+    }
+
     fn canonical(&self, text: &str) -> String {
         if self.key_order {
             sort_json_text(text)
@@ -1844,9 +1880,11 @@ fn settle(norm: &Normalizers, case: &Case, one: &Run, two: &Run) -> Recorded {
         _ => (None, None),
     };
     let (w1, w2) = (one.written(case), two.written(case));
+    let pairs = norm.pair_files(w1.keys(), w2.keys());
     let mut unstable = one.status != two.status
         || one.removed != two.removed
-        || !w1.keys().eq(w2.keys())
+        || w1.len() != w2.len()
+        || pairs.len() != w1.len()
         || (binary && (out_noise.is_some() || err_noise.is_some()));
     let mut noise: Vec<(String, NoiseKind)> = [
         ("stdout", out_noise),
@@ -1858,7 +1896,7 @@ fn settle(norm: &Normalizers, case: &Case, one: &Run, two: &Run) -> Recorded {
     .collect();
     let mut written = BTreeMap::new();
     for (path, a) in &w1 {
-        let b = w2.get(path).unwrap_or(a);
+        let b = pairs.get(path).and_then(|other| w2.get(other)).unwrap_or(a);
         let (bytes, file_noise, file_bin) = settle_text(norm, a, b);
         unstable |= file_bin && file_noise.is_some();
         if let Some(kind) = file_noise {
@@ -2284,6 +2322,36 @@ fn read_files(base: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
             (rel, bytes)
         })
         .collect()
+}
+
+/// The recorded cases that wrote a file whose name a normalizer matches (a file named by a
+/// time or an id). `app replay` pairs such a file by its normalized name; a comparison by
+/// exact path, as trycmd does for the lifted `cargo test`, cannot.
+pub(crate) fn cases_with_normalized_file_names(
+    repo: &Path,
+    config: &Config,
+) -> Result<Vec<String>> {
+    let norm = Normalizers::new(config)?;
+    let mut cases = Vec::new();
+    for entry in std::fs::read_dir(cases_dir(repo))
+        .into_iter()
+        .flatten()
+        .flatten()
+    {
+        let folder = entry.file_name().to_string_lossy().into_owned();
+        let Some(case) = folder.strip_suffix(".out") else {
+            continue;
+        };
+        let renamed = read_files(&entry.path()).keys().any(|path| {
+            let written = path.to_string_lossy();
+            norm.apply(&written) != written
+        });
+        if renamed {
+            cases.push(case.to_string());
+        }
+    }
+    cases.sort();
+    Ok(cases)
 }
 
 fn load_spec(dir: &Path, path: &Path) -> Result<Spec> {
@@ -2756,9 +2824,11 @@ fn check(
         );
     }
     if let Some(out_dir) = &spec.out_dir {
-        for (path, expected) in read_files(out_dir) {
+        let recorded = read_files(out_dir);
+        let pairs = norm.pair_files(recorded.keys(), run.files.keys());
+        for (path, expected) in recorded {
             let field = format!("file {}", path.display());
-            match run.files.get(&path) {
+            match pairs.get(&path).and_then(|other| run.files.get(other)) {
                 None => problems.push(
                     Problem::new(field, "not written\n")
                         .at(crate::mismatch::At::new("not written")),
@@ -3435,6 +3505,34 @@ mod tests {
             norm.canonical("{\"b\":1,\"a\":{\"d\":2,\"c\":3}}\nplain"),
             "{\"a\":{\"c\":3,\"d\":2},\"b\":1}\nplain"
         );
+        let paths = |names: &[&str]| names.iter().map(PathBuf::from).collect::<Vec<_>>();
+        let recorded = paths(&["a.txt", "req-1.log", "req-2.log", "gone.txt"]);
+        let written = paths(&["a.txt", "req-8.log", "req-9.log", "new.txt"]);
+        assert_eq!(
+            norm.pair_files(recorded.iter(), written.iter()),
+            BTreeMap::from([
+                (PathBuf::from("a.txt"), PathBuf::from("a.txt")),
+                (PathBuf::from("req-1.log"), PathBuf::from("req-8.log")),
+                (PathBuf::from("req-2.log"), PathBuf::from("req-9.log")),
+            ])
+        );
+        // A case counts when a file it wrote is named by a normalized value, at any depth;
+        // what it printed does not matter.
+        let repo = temp_dir("normalized-names").unwrap();
+        let dir = cases_dir(&repo);
+        for (file, text) in [
+            ("named.out/logs/req-7.log", "x"),
+            ("plain.out/result.txt", "x"),
+            ("plain.out/at 2026-11-16T10:00:00Z.txt", "x"),
+            ("stdout-only.stdout", "req-9\n"),
+        ] {
+            let path = dir.join(file);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        }
+        let found = cases_with_normalized_file_names(&repo, &config).unwrap();
+        std::fs::remove_dir_all(&repo).unwrap();
+        assert_eq!(found, ["named", "plain"]);
         config.normalize.push("nope".into());
         assert!(Normalizers::new(&config).is_err());
     }
@@ -3770,5 +3868,66 @@ mod tests {
         );
 
         std::fs::remove_dir_all(repo).unwrap();
+    }
+
+    fn f64s(values: &[f64]) -> Vec<u8> {
+        values.iter().flat_map(|v| v.to_le_bytes()).collect()
+    }
+
+    #[test]
+    fn float_width_knows_f32le_and_f64le() {
+        assert_eq!(float_width("f32le").unwrap(), 4);
+        assert_eq!(float_width("f64le").unwrap(), 8);
+        let err = float_width("f16le").unwrap_err().to_string();
+        assert!(err.contains("`f16le`"), "{err}");
+        assert!(err.contains("f32le") && err.contains("f64le"), "{err}");
+    }
+
+    #[test]
+    fn compare_floats_matches_equal_values_and_nan() {
+        let same = f64s(&[1.0, -2.5, 1e300]);
+        assert_eq!(compare_floats(&same, &same, 8, None), None);
+        let nan = f64s(&[f64::NAN, 3.0]);
+        assert_eq!(compare_floats(&nan, &nan, 8, None), None);
+    }
+
+    #[test]
+    fn compare_floats_names_the_first_difference_unless_the_tolerance_covers_it() {
+        let expected = f64s(&[1.0, 2.0, 3.0]);
+        let actual = f64s(&[1.0, 2.5, 3.0]);
+        let line = compare_floats(&expected, &actual, 8, None).unwrap();
+        assert!(line.starts_with("1 of 3 values differ"), "{line}");
+        assert!(
+            line.contains("first at index 1: 2 expected, 2.5 got"),
+            "{line}"
+        );
+        assert!(line.contains("max abs diff 5e-1"), "{line}");
+        assert!(line.contains("max rel diff 2e-1"), "{line}");
+        assert_eq!(compare_floats(&expected, &actual, 8, Some(0.3)), None);
+        assert!(compare_floats(&expected, &actual, 8, Some(0.1)).is_some());
+    }
+
+    #[test]
+    fn compare_floats_reads_f32le() {
+        let f32s = |v: &[f32]| v.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>();
+        let expected = f32s(&[1.5, -0.25]);
+        assert_eq!(compare_floats(&expected, &expected, 4, None), None);
+        let line = compare_floats(&expected, &f32s(&[1.5, 0.25]), 4, None).unwrap();
+        assert!(line.starts_with("1 of 2 values differ"), "{line}");
+        assert!(
+            line.contains("first at index 1: -0.25 expected, 0.25 got"),
+            "{line}"
+        );
+    }
+
+    #[test]
+    fn compare_floats_reports_a_length_mismatch() {
+        let two = f64s(&[1.0, 2.0]);
+        assert_eq!(
+            compare_floats(&two, &two[..8], 8, None).as_deref(),
+            Some("2 values expected, 8 bytes got (8 bytes per value)\n")
+        );
+        // A partial value in the expected file is a mismatch too, even against itself.
+        assert!(compare_floats(&two[..12], &two[..12], 8, None).is_some());
     }
 }

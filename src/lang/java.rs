@@ -861,4 +861,69 @@ public class Totals {
                 .contains("unordered collection")
         );
     }
+
+    #[test]
+    fn a_stripped_keyword_needs_whitespace_after_it() {
+        // The keyword must start the text and be followed by whitespace (a tab counts); the
+        // caller gets the rest with that whitespace trimmed.
+        for (s, kw, expected) in [
+            ("static int x", "static", Some("int x")),
+            ("static\tint x", "static", Some("int x")),
+            ("static  int x", "static", Some("int x")),
+            ("final List<String> xs", "final", Some("List<String> xs")),
+            // A longer word that merely starts with the keyword is not that keyword.
+            ("statical", "static", None),
+            ("finalize", "final", None),
+            // A keyword at the end of the line has no whitespace after it.
+            ("static", "static", None),
+            ("int x", "static", None),
+        ] {
+            assert_eq!(strip_kw(s, kw), expected, "{s}");
+        }
+    }
+
+    #[test]
+    fn only_an_unqualified_or_java_util_set_is_the_jdks() {
+        // An unqualified name is the JDK's: the project would have to qualify its own class.
+        assert!(jdk_set("Set"));
+        assert!(jdk_set("TreeSet"));
+        // So is anything under `java.util`, whatever the set is called.
+        assert!(jdk_set("java.util.Set"));
+        assert!(jdk_set("java.util.TreeSet"));
+        // Any other package is the project's own, even when the last segment is `Set`.
+        assert!(!jdk_set("com.example.Set"));
+        assert!(!jdk_set("com.google.common.collect.ImmutableSet"));
+        assert!(!jdk_set("acme.util.TreeSet"));
+    }
+
+    #[test]
+    fn a_package_line_names_the_dotted_package() {
+        let src = "package a.b.c;\n\npublic class C {}\n";
+        let tree = syntax::parse(&language(), src).unwrap();
+        assert_eq!(
+            package_name_in(tree.root_node(), src).as_deref(),
+            Some("a.b.c")
+        );
+
+        // A one-segment package is named the same way.
+        let src = "package acme;\nclass C {}\n";
+        let tree = syntax::parse(&language(), src).unwrap();
+        assert_eq!(
+            package_name_in(tree.root_node(), src).as_deref(),
+            Some("acme")
+        );
+
+        // Comments before the declaration do not hide it.
+        let src = "// header\n/* block */\npackage a.b;\nclass C {}\n";
+        let tree = syntax::parse(&language(), src).unwrap();
+        assert_eq!(
+            package_name_in(tree.root_node(), src).as_deref(),
+            Some("a.b")
+        );
+
+        // The default package has no package line, so there is no name to report.
+        let src = "public class C {}\n";
+        let tree = syntax::parse(&language(), src).unwrap();
+        assert_eq!(package_name_in(tree.root_node(), src), None);
+    }
 }
