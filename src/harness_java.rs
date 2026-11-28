@@ -246,3 +246,45 @@ pub fn bench(crate_dir: &Path, m: &Manifest, min_ms: u64) -> Result<Vec<BenchRow
     }
     Ok(crate::harness::bench_rows(m, &timings[0], &timings[1]))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_classes_spots_the_two_javac_errors_a_classpath_fixes() {
+        assert!(missing_classes(
+            "src/Text.java:3: error: cannot find symbol\n  symbol: class StringUtils\n1 error"
+        ));
+        assert!(missing_classes(
+            "src/Text.java:1: error: package org.apache.commons.lang3 does not exist\nimport org.apache.commons.lang3.StringUtils;"
+        ));
+        assert!(!missing_classes(
+            "src/Text.java:5: error: incompatible types: int cannot be converted to String\n1 error"
+        ));
+        assert!(!missing_classes(""));
+    }
+
+    #[test]
+    fn java_files_finds_nested_java_files_without_git() {
+        let dir = std::env::temp_dir().join(format!("ra-java-files-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("com").join("example")).unwrap();
+        std::fs::write(dir.join("Text.java"), "class Text {}").unwrap();
+        std::fs::write(dir.join("com/example/Util.java"), "class Util {}").unwrap();
+        std::fs::write(dir.join("com/example/Other.kt"), "object Other").unwrap();
+        let mut found: Vec<PathBuf> = java_files(&dir)
+            .into_iter()
+            .map(|p| p.strip_prefix(&dir).unwrap().to_path_buf())
+            .collect();
+        found.sort();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(
+            found,
+            [
+                Path::new("Text.java").to_path_buf(),
+                Path::new("com").join("example").join("Util.java"),
+            ]
+        );
+    }
+}

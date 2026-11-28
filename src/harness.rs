@@ -1384,6 +1384,22 @@ pub fn generate_salted(
     out
 }
 
+/// Paths for a `pathlib` parameter: relative and absolute, with no suffix, one and several, a
+/// dot file, a trailing slash, `..` and `.` segments, spaces and non-ASCII names, and the empty
+/// path (`Path("")` is `.`). None of them has to exist.
+const PATHS: &[&str] = &[
+    "",
+    ".",
+    "notes.txt",
+    "src/main.py",
+    "/tmp/report.tar.gz",
+    ".hidden",
+    "dir/",
+    "a/../b/./c.txt",
+    "my docs/ünïcödé 文件.md",
+    "/",
+];
+
 /// The semantic traps for a value of type `t`: what most often behaves differently once ported
 /// (string length and case, signed division and overflow, float printing, map and sort order).
 fn trap_values(t: &RType) -> Vec<Value> {
@@ -1456,6 +1472,7 @@ fn trap_values(t: &RType) -> Vec<Value> {
             json!({ "$bytes": [0, 1, 255] }),
             json!({ "$bytes": [104, 101, 108, 108, 111] }),
         ],
+        RType::Path => PATHS.iter().map(|p| json!({ "$path": p })).collect(),
         RType::Bool | RType::Unit => Vec::new(),
     }
 }
@@ -1655,6 +1672,8 @@ fn args_for(
     rng: &mut Rng,
 ) -> Vec<Value> {
     let mut args: Vec<Value> = Vec::new();
+    // The arguments before this index belong to parameters a call cannot leave out.
+    let mut required = 0;
     for p in params {
         match p.ts_type.as_str() {
             t if t.starts_with("len:") => continue,
@@ -1663,6 +1682,7 @@ fn args_for(
                 || t.starts_with("struct:") =>
             {
                 args.push(c_pointer_value(&p.ts_type, rng));
+                required = args.len();
                 continue;
             }
             _ => {}
@@ -1695,6 +1715,9 @@ fn args_for(
         } else {
             args.push(value(&t, rng));
         }
+        if !p.optional && !p.rest {
+            required = args.len();
+        }
     }
     // Search-like functions rarely hit on random text: often derive one string from another.
     let strings: Vec<usize> = (0..args.len()).filter(|&i| args[i].is_string()).collect();
@@ -1714,8 +1737,13 @@ fn args_for(
             }
         }
     }
-    // Trailing optional arguments: sometimes omit them, the way JS callers do.
-    while args.last().is_some_and(|a| a.get("$undefined").is_some()) && rng.below(2) == 0 {
+    // Trailing optional arguments: sometimes omit them, the way JS callers do. A parameter with
+    // no default keeps its argument: `def find(start, stop: Path | None)` cannot be called
+    // without `stop`, so leaving it out records a `TypeError` no caller sees.
+    while args.len() > required
+        && args.last().is_some_and(|a| a.get("$undefined").is_some())
+        && rng.below(2) == 0
+    {
         args.pop();
     }
     args
@@ -1788,6 +1816,7 @@ fn shaped(s: &Shape, types: &[LocalType], rng: &mut Rng, depth: usize) -> Value 
         Shape::Int => value(&RType::Int, rng),
         Shape::Bool => value(&RType::Bool, rng),
         Shape::Bytes => value(&RType::Bytes, rng),
+        Shape::Path => value(&RType::Path, rng),
         Shape::Null => Value::Null,
         Shape::Undefined => json!({ "$undefined": true }),
         Shape::LitStr(text) => Value::String(text.clone()),
@@ -1893,6 +1922,7 @@ fn value(t: &RType, rng: &mut Rng) -> Value {
             let bytes: Vec<u64> = (0..len).map(|_| rng.below(256) as u64).collect();
             json!({ "$bytes": bytes })
         }
+        RType::Path => json!({ "$path": PATHS[rng.below(PATHS.len())] }),
         RType::Unit => json!({ "$undefined": true }),
         RType::Vec(inner) => Value::Array((0..rng.below(4)).map(|_| value(inner, rng)).collect()),
         RType::Opt(inner) => {
@@ -2758,6 +2788,110 @@ assert(round(new Uint8Array([1])) instanceof Uint8Array, 'bytes stay bytes')
         );
         assert!(msg.contains("rust-anything doctor"), "{msg}");
         assert!(!msg.contains("os error"), "{msg}");
+    }
+
+    fn param(name: &str, ts_type: &str, keyword_only: bool) -> crate::ts::exports::Param {
+        crate::ts::exports::Param {
+            name: name.into(),
+            ts_type: ts_type.into(),
+            keyword_only,
+            ..Default::default()
+        }
+    }
+
+    fn number_params(n: usize) -> Vec<crate::ts::exports::Param> {
+        (0..n)
+            .map(|i| param(&format!("p{i}"), "number", false))
+            .collect()
+    }
+
+    #[test]
+    fn intify_turns_integral_floats_into_ints() {
+        let mut args = serde_json::json!([3.0, -4.0, 0.0, 12345.0]);
+        super::intify(&number_params(4), &mut args);
+        assert_eq!(args.to_string(), "[3,-4,0,12345]");
+    }
+
+    #[test]
+    fn intify_keeps_fractions_negative_zero_and_huge_values() {
+        let mut args = serde_json::json!([2.5, -0.0, 1e15, -1e15, 999999999999999.0]);
+        super::intify(&number_params(5), &mut args);
+        let items = args.as_array().unwrap();
+        for item in &items[..4] {
+            assert!(item.is_f64(), "{item} should stay a float");
+        }
+        assert_eq!(items[0].as_f64(), Some(2.5));
+        assert!(items[1].as_f64().unwrap().is_sign_negative());
+        assert_eq!(items[2].as_f64(), Some(1e15));
+        assert_eq!(items[3].as_f64(), Some(-1e15));
+        assert!(items[4].is_i64());
+    }
+
+    #[test]
+    fn intify_leaves_other_types_and_non_arrays_alone() {
+        let params = vec![
+            param("s", "string", false),
+            param("n", "number", false),
+            param("u", "unknown", false),
+        ];
+        let mut args = serde_json::json!([3.0, 4.0, 5.0]);
+        super::intify(&params, &mut args);
+        assert_eq!(args.to_string(), "[3.0,4,5.0]");
+        let mut extra = serde_json::json!([1.0, 2.0]);
+        super::intify(&number_params(1), &mut extra);
+        assert_eq!(extra.to_string(), "[1,2.0]");
+        let mut not_array = serde_json::json!({"a": 1.0});
+        super::intify(&number_params(1), &mut not_array);
+        assert_eq!(not_array, serde_json::json!({"a": 1.0}));
+        let mut strings = serde_json::json!(["3.0"]);
+        super::intify(&number_params(1), &mut strings);
+        assert_eq!(strings, serde_json::json!(["3.0"]));
+    }
+
+    #[test]
+    fn split_keyword_only_moves_named_arguments_into_kwargs() {
+        let params = vec![
+            param("a", "number", false),
+            param("sep", "string", true),
+            param("b", "number", false),
+            param("end", "string", true),
+        ];
+        let mut case = serde_json::json!({"args": [1, "-", 2, "!"]});
+        super::split_keyword_only(&params, &mut case);
+        assert_eq!(
+            case,
+            serde_json::json!({"args": [1, 2], "kwargs": {"sep": "-", "end": "!"}})
+        );
+    }
+
+    #[test]
+    fn split_keyword_only_leaves_out_an_undefined_keyword_argument() {
+        let params = vec![param("a", "number", false), param("sep", "string", true)];
+        let mut case = serde_json::json!({"args": [1, {"$undefined": true}]});
+        super::split_keyword_only(&params, &mut case);
+        assert_eq!(case, serde_json::json!({"args": [1], "kwargs": {}}));
+    }
+
+    #[test]
+    fn split_keyword_only_changes_nothing_without_keyword_only_params() {
+        let params = vec![param("a", "number", false), param("b", "number", false)];
+        let mut case = serde_json::json!({"args": [1, 2]});
+        super::split_keyword_only(&params, &mut case);
+        assert_eq!(case, serde_json::json!({"args": [1, 2]}));
+    }
+
+    #[test]
+    fn split_keyword_only_keeps_extra_arguments_and_skips_a_case_without_args() {
+        let params = vec![param("sep", "string", true)];
+        let mut case = serde_json::json!({"args": ["-", 9]});
+        super::split_keyword_only(&params, &mut case);
+        assert_eq!(
+            case,
+            serde_json::json!({"args": [9], "kwargs": {"sep": "-"}})
+        );
+        let mut no_args = serde_json::json!({"name": "f"});
+        super::split_keyword_only(&params, &mut no_args);
+        assert_eq!(no_args, serde_json::json!({"name": "f"}));
     }
 }
 

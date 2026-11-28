@@ -679,6 +679,13 @@ pub fn lift(opts: &LiftOptions) -> Result<LiftOutcome> {
         .as_ref()
         .map(|c| c.unordered.keys().collect())
         .unwrap_or_default();
+    // Cases trycmd cannot check: it compares written files by their exact paths.
+    let renamed = match &config {
+        Some(config) => app::cases_with_normalized_file_names(&repo, config)?,
+        None => Vec::new(),
+    };
+    let mut skipped: Vec<&String> = unordered.clone();
+    skipped.extend(renamed.iter().filter(|case| !unordered.contains(case)));
     let app_dir = repo.join(APP_DIR);
     let rust_dir = repo.join("rust");
     let mut blockers = Vec::new();
@@ -844,7 +851,7 @@ pub fn lift(opts: &LiftOptions) -> Result<LiftOutcome> {
         staged_deps.push((dir, staged));
     }
     let stage_app = stage_rust.join("app");
-    lift_app(&stage_app, &mut state, &case_bin, &unordered)?;
+    lift_app(&stage_app, &mut state, &case_bin, &skipped)?;
 
     let mut checklist = Vec::new();
     for (unit, dir, staged) in &staged_units {
@@ -865,7 +872,7 @@ pub fn lift(opts: &LiftOptions) -> Result<LiftOutcome> {
     }
     checklist.push(Item::new(
         "replay in CI",
-        if state.kind != AppKind::Cli || key_order || !unordered.is_empty() {
+        if state.kind != AppKind::Cli || key_order || !skipped.is_empty() {
             Mark::Warn
         } else {
             Mark::Pass
@@ -876,6 +883,8 @@ pub fn lift(opts: &LiftOptions) -> Result<LiftOutcome> {
             "trycmd runs command lines only: run `rust-anything app replay <repo> --build <the binary>` in CI for the HTTP cases"
         } else if !unordered.is_empty() {
             "rust/app/tests/app_cases.rs runs the cases with trycmd on `cargo test`, which compares line order exactly, so it skips the cases whose order the original's own runs disagreed on: also run `rust-anything app replay` in CI for them"
+        } else if !renamed.is_empty() {
+            "rust/app/tests/app_cases.rs runs the cases with trycmd on `cargo test`, which compares written files by their exact names, so it skips the cases that wrote a file named by a normalized value (a time, an id): also run `rust-anything app replay` in CI for them"
         } else if key_order {
             "rust/app/tests/app_cases.rs runs the cases with trycmd on `cargo test`, which compares JSON as text: also run `rust-anything app replay` in CI for the key-order normalizer"
         } else {
