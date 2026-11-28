@@ -1024,4 +1024,29 @@ func Echo(p Point) Point { return p }"#,
             ]
         );
     }
+
+    #[test]
+    fn unquotes_errors_new_literals() {
+        fn unquote(arg: &str) -> Option<String> {
+            let source = format!("package x\n\nvar ErrX = errors.New({arg})\n");
+            let tree = syntax::parse(&language(), &source).unwrap();
+            let mut literal = None;
+            syntax::walk(tree.root_node(), |node| {
+                if literal.is_none() && node.kind().ends_with("string_literal") {
+                    literal = Some(node);
+                }
+            });
+            unquote_go_string(literal.expect("no string literal"), &source)
+        }
+
+        assert_eq!(unquote("`raw\r\n\\n`").as_deref(), Some("raw\n\\n"));
+        assert_eq!(unquote(r#""plain""#).as_deref(), Some("plain"));
+        assert_eq!(
+            unquote(r#""a\\b \"q\" n\n r\r t\t""#).as_deref(),
+            Some("a\\b \"q\" n\n r\r t\t")
+        );
+        assert_eq!(unquote(r#""caf\u00e9""#), None);
+        assert_eq!(unquote(r#""\x41""#), None);
+        assert_eq!(unquote(r#""\101""#), None);
+    }
 }

@@ -117,7 +117,7 @@
       {
         "v": "32",
         "unit": "x",
-        "k": "pencarian Fuse.js per permintaan atas 50,000 string, Apple M4"
+        "k": "pencarian Fuse.js per permintaan atas 50,000 string, Apple M4, 10 inti"
       },
       {
         "v": "3.5",
@@ -207,14 +207,14 @@
         "href": "/docs/real-world/fuse-js",
         "kind": "Fuse.js · pencarian daftar string",
         "big": "32x",
-        "text": "Lebih cepat per permintaan atas 50,000 string (91.2 ms → 2.8 ms, Apple M4). 3,414/3,414 kasus rekaman cocok; hasil identik byte demi byte dengan Fuse pada 360 pencarian.",
+        "text": "Lebih cepat per permintaan atas 50,000 string (91.2 ms → 2.8 ms, Apple M4, 10 inti). 3,414/3,414 kasus rekaman cocok; hasil identik byte demi byte dengan Fuse pada 360 pencarian.",
         "rows": [
           {
-            "k": "10,000 string",
+            "k": "10,000 string, semua inti",
             "v": "27 hingga 30x"
           },
           {
-            "k": "1,000 string",
+            "k": "1,000 string, semua inti",
             "v": "18x"
           },
           {
@@ -236,11 +236,11 @@
             "slow": true
           },
           {
-            "k": "Batch, parse x100,000",
+            "k": "Batch, parse x100,000, semua inti",
             "v": "18x"
           },
           {
-            "k": "Batch, format x100,000",
+            "k": "Batch, format x100,000, semua inti",
             "v": "0.8x",
             "slow": true
           }
