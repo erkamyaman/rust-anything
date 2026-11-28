@@ -45,6 +45,10 @@
   writes a PyO3 crate that compiles. The `#[pyo3(signature = ...)]` line named the parameter
   without its `r#`, which is not Rust (`expected identifier, found keyword`); it keeps the raw
   identifier now, and Python still calls the parameter by its own name (#827, #828 by @AyhamJo7).
+- `bridge` reads a TypeScript union that holds an arrow, such as `(() => void) | null`, as
+  `Option<serde_json::Value>`, where it gave a bare `serde_json::Value`: the `>` of `=>` closed a
+  bracket, so the `|` after it was never split (the same for `Map<string, () => number> |
+  undefined`) (#776, #815 by @Layfate).
 
 ## 5.0.2 (2026-11-28)
 
