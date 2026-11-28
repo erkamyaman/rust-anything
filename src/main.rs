@@ -1370,11 +1370,18 @@ fn run() -> Result<ExitCode> {
                     .map(|m| m.language)
                     .unwrap_or_default();
                 let v = harness::verdict(&rows, lang);
+                let compared = rows.len() - v.left_out.len();
+                let noun = if compared == 1 {
+                    "function"
+                } else {
+                    "functions"
+                };
                 say!(
-                    "\nTimed as callers call it, crossing included. Overall {} (geometric mean); {} of {} functions at least 1.1x faster.",
+                    "\nTimed as callers call it, crossing included. Overall {} (geometric mean); {} of {} {} at least 1.1x faster.",
                     harness::speed_phrase(v.speedup),
                     v.faster.len(),
-                    rows.len() - v.left_out.len()
+                    compared,
+                    noun
                 );
                 if !v.left_out.is_empty() {
                     say!(
