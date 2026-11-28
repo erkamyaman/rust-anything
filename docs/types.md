@@ -72,6 +72,8 @@ Types are read from the hints. `typing.` and quotes around a forward reference a
 | `float` | `f64` | |
 | `bool` | `bool` | |
 | `bytes`, `bytearray`, `memoryview` | `Vec<u8>` | |
+| `Path`, `pathlib.Path`, `PurePath`, `os.PathLike` | `std::path::PathBuf` | the port gets the path's text (`os.fspath`); a result goes back as a `pathlib.Path` |
+| `Optional[Path]`, `Path \| None` | `Option<std::path::PathBuf>` | |
 | `None` | `()` | |
 | `list[str]`, `List[str]`, `Sequence[str]`, `Iterable[str]` | `Vec<String>` | |
 | `list` | `Vec<serde_json::Value>` | |

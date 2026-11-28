@@ -353,7 +353,64 @@ pub fn parse_port(source: &str) -> PortApi {
             });
         }
     }
+    // The type names the port declares itself: structs, enums and aliases.
+    let own: Vec<String> = lines
+        .iter()
+        .filter_map(|line| {
+            ["pub struct ", "pub enum ", "pub type "]
+                .iter()
+                .find_map(|keyword| line.trim_start().strip_prefix(keyword))
+        })
+        .map(|rest| {
+            rest.chars()
+                .take_while(|c| c.is_alphanumeric() || *c == '_')
+                .collect()
+        })
+        .collect();
+    let functions = api.functions.iter_mut();
+    let in_classes = api.classes.iter_mut().flat_map(|class| {
+        let methods = class.methods.iter_mut().map(|(method, _)| method);
+        std::iter::once(&mut class.constructor).chain(methods)
+    });
+    for function in functions.chain(in_classes) {
+        function.ret = with_paths(&function.ret, &own);
+        for (_, ty) in &mut function.params {
+            *ty = with_paths(ty, &own);
+        }
+    }
     api
+}
+
+/// Type names a port may import instead of spelling out. The bindings repeat a port's types
+/// in files that have none of its `use` lines, so they need the path.
+const IMPORTABLE: [(&str, &str); 2] = [
+    ("Value", "serde_json::Value"),
+    ("HashMap", "std::collections::HashMap"),
+];
+
+/// `ty` with each bare [`IMPORTABLE`] name given its path. A name already behind a path
+/// (`serde_json::Value`) and a name the port defines itself (`own`) stay as written.
+fn with_paths(ty: &str, own: &[String]) -> String {
+    let mut out = String::new();
+    let mut word = String::new();
+    let flush = |out: &mut String, word: &mut String| {
+        let path = IMPORTABLE
+            .iter()
+            .find(|(name, _)| name == word)
+            .filter(|_| !out.trim_end().ends_with("::") && !own.contains(word));
+        out.push_str(path.map_or(word.as_str(), |(_, path)| path));
+        word.clear();
+    };
+    for c in ty.chars() {
+        if c.is_alphanumeric() || c == '_' {
+            word.push(c);
+        } else {
+            flush(&mut out, &mut word);
+            out.push(c);
+        }
+    }
+    flush(&mut out, &mut word);
+    out
 }
 
 fn doc_name(before: &[&str], prefix: &str) -> Option<String> {
@@ -1457,6 +1514,49 @@ mod tests {
     }
 
     #[test]
+    fn type_names_a_port_imports_are_read_with_their_paths() {
+        // The bindings repeat these types in another file, which has none of the port's
+        // `use` lines.
+        let api = parse_port(
+            "use std::collections::HashMap;\nuse serde_json::Value;\n\n\
+             /// Port of `merge`.\n\
+             pub fn merge(\n    base: Value,\n    extra: Option<HashMap<String, Value>>,\n    \
+             raw: serde_json::Value,\n) -> Result<Vec<Value>, String> {\n    todo!()\n}\n",
+        );
+        let merge = &api.functions[0];
+        let types: Vec<&str> = merge.params.iter().map(|(_, ty)| ty.as_str()).collect();
+        assert_eq!(
+            types,
+            [
+                "serde_json::Value",
+                "Option<std::collections::HashMap<String, serde_json::Value>>",
+                "serde_json::Value",
+            ]
+        );
+        assert_eq!(merge.ret, "Vec<serde_json::Value>");
+
+        // A type the port defines under one of those names is the port's own.
+        let own = parse_port(
+            "pub struct Value {\n    pub n: i64,\n}\n\n\
+             /// Port of `wrap`.\npub fn wrap(n: i64) -> Result<Value, String> {\n    todo!()\n}\n",
+        );
+        assert_eq!(own.functions[0].ret, "Value");
+        for declared in ["pub type Value = i64;", "pub enum Value {\n    One,\n}"] {
+            let own = parse_port(&format!(
+                "{declared}\n\n/// Port of `wrap`.\npub fn wrap(n: i64) -> Result<Value, String> {{\n    todo!()\n}}\n"
+            ));
+            assert_eq!(own.functions[0].ret, "Value", "{declared}");
+        }
+
+        // `::` may have whitespace after it: the name behind it already has its path.
+        let spaced = parse_port(
+            "/// Port of `keep`.\npub fn keep(x: serde_json:: Value) -> Result<serde_json ::Value, String> {\n    todo!()\n}\n",
+        );
+        assert_eq!(spaced.functions[0].params[0].1, "serde_json:: Value");
+        assert_eq!(spaced.functions[0].ret, "serde_json ::Value");
+    }
+
+    #[test]
     fn picks_wires() {
         assert_eq!(wire("Vec<String>"), Wire::Native);
         assert_eq!(wire("Option < f64 >"), Wire::Native);
@@ -1476,5 +1576,48 @@ mod tests {
         assert!(out.contains("indexmap = \"2\" # mine"));
         assert!(out.contains("features = [\"async\"]"));
         assert!(out.contains("futures") && out.contains("preserve_order"));
+    }
+
+    #[test]
+    fn camel_case_joins_snake_case_words() {
+        assert_eq!(camel_case("a_b_c"), "aBC");
+        assert_eq!(camel_case("snake_case_name"), "snakeCaseName");
+        assert_eq!(camel_case("parse_http_2_xml"), "parseHttp2Xml");
+        assert_eq!(camel_case("a__b"), "aB");
+    }
+
+    #[test]
+    fn camel_case_drops_a_raw_identifier_prefix() {
+        assert_eq!(camel_case("r#type"), "type");
+        assert_eq!(camel_case("r#match_all"), "matchAll");
+    }
+
+    #[test]
+    fn camel_case_keeps_names_without_underscores_and_drops_a_trailing_one() {
+        assert_eq!(camel_case("name"), "name");
+        assert_eq!(camel_case("alreadyCamel"), "alreadyCamel");
+        assert_eq!(camel_case("name_"), "name");
+        assert_eq!(camel_case(""), "");
+    }
+
+    #[test]
+    fn indent_adds_four_spaces_to_every_line() {
+        assert_eq!(indent("a\nb"), "    a\n    b\n");
+        assert_eq!(indent("a\n  b\n"), "    a\n      b\n");
+        assert_eq!(indent(""), "");
+    }
+
+    #[test]
+    fn dedent_removes_four_spaces_and_leaves_shorter_indents_alone() {
+        assert_eq!(dedent("    a\n        b\n"), "a\n    b\n");
+        assert_eq!(dedent("  a\n   b\nc\n"), "  a\n   b\nc\n");
+        assert_eq!(dedent("    a\n  b\n"), "a\n  b\n");
+    }
+
+    #[test]
+    fn dedent_undoes_indent() {
+        let text = "fn f() {\n    1\n}\n";
+        assert_eq!(dedent(&indent(text)), text);
+        assert_eq!(dedent(&indent("a\nb\n")), "a\nb\n");
     }
 }

@@ -1009,6 +1009,41 @@ fn a_python_library_imported_as_yaml_and_declared_as_pyyaml_is_one_dependency() 
 }
 
 #[test]
+fn python_scripts_importing_modules_from_their_own_folders_have_no_dependencies() {
+    let on_path = "import sys\nfrom pathlib import Path\n\nsys.path.insert(0, str(Path(__file__).resolve().parent))\n";
+    let root = scratch(
+        "script-folders",
+        &[
+            ("hooks/_kit.py", "def now() -> str:\n    return \"now\"\n"),
+            (
+                "hooks/stop_guard.py",
+                &format!(
+                    "{on_path}sys.path.insert(0, str(Path(__file__).resolve().parent.parent / \"bin\"))\nimport _kit\nimport gates\n\nif __name__ == \"__main__\":\n    print(_kit.now(), gates.status())\n"
+                ),
+            ),
+            ("bin/gates.py", "def status() -> str:\n    return \"ok\"\n"),
+            (
+                "bin/probe.py",
+                &format!(
+                    "{on_path}import gates\n\nif __name__ == \"__main__\":\n    print(gates.status())\n"
+                ),
+            ),
+        ],
+    );
+    let report = analyze(&root).unwrap();
+    let w = rust_anything::whole_app::whole_app(&root, &report);
+    std::fs::remove_dir_all(&root).unwrap();
+    assert!(
+        w.dependencies.is_empty(),
+        "the app's own modules are not libraries: {:?}",
+        w.dependencies
+    );
+    let unit = |id: &str| report.units.iter().find(|u| u.id == id).unwrap();
+    assert!(unit("hooks/").external_deps.is_empty());
+    assert_eq!(unit("hooks/").internal_deps, ["bin/"]);
+}
+
+#[test]
 fn a_kotlin_import_and_its_gradle_coordinates_are_one_dependency() {
     let root = scratch(
         "room-join",
