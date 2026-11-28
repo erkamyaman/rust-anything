@@ -3248,4 +3248,36 @@ mod tests {
         assert!(err.downcast_ref::<PortInUse>().is_none(), "{err:#}");
         assert!(format!("{err:#}").contains("empty command"), "{err:#}");
     }
+
+    #[test]
+    fn split_form_segments_splits_outside_quotes() {
+        assert_eq!(
+            split_form_segments(r#"form-data; name="a;b"; filename="x.txt""#),
+            ["form-data", r#" name="a;b""#, r#" filename="x.txt""#]
+        );
+        assert_eq!(
+            split_form_segments(r#"name="a\";b"; x"#),
+            [r#"name="a\";b""#, " x"]
+        );
+        assert_eq!(
+            split_form_segments("text/plain; charset=utf-8"),
+            ["text/plain", " charset=utf-8"]
+        );
+        assert_eq!(
+            split_form_segments(r#"a; name="open;b"#),
+            ["a", r#" name="open;b"#]
+        );
+        assert_eq!(split_form_segments(""), [""]);
+    }
+
+    #[test]
+    fn unquote_form_value_unescapes_a_whole_quoted_value() {
+        assert_eq!(unquote_form_value(r#""a\"b""#), r#"a"b"#);
+        assert_eq!(unquote_form_value(r#""a\b""#), r"a\b");
+        assert_eq!(unquote_form_value(r#""a\nb""#), r"a\nb");
+        assert_eq!(unquote_form_value("x.txt"), "x.txt");
+        for kept in [r#""abc"#, r#""a"b"#, r#""a\"#] {
+            assert_eq!(unquote_form_value(kept), kept);
+        }
+    }
 }
