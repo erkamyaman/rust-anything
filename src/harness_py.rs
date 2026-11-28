@@ -628,3 +628,51 @@ if __name__ == "__main__":
     elif mode == "bench":
         bench(rest[0], rest[1], rest[2], rest[3], rest[4], int(rest[5]))
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::Lang;
+
+    fn manifest(crate_name: &str) -> Manifest {
+        Manifest {
+            schema: String::new(),
+            root: PathBuf::new(),
+            root_written: None,
+            unit: "text_tools.py".into(),
+            language: Lang::Python,
+            kind: crate::bridge::Kind::Pyo3,
+            crate_name: crate_name.into(),
+            exports: Vec::new(),
+            classes: Vec::new(),
+            js_only: Vec::new(),
+            batches: Vec::new(),
+            allocator: Default::default(),
+            float_tolerance: None,
+            ignore_key_order: false,
+            end_state: None,
+        }
+    }
+
+    #[test]
+    fn the_package_is_named_after_the_lib_not_the_crate() {
+        let crate_dir = Path::new("units").join("text-tools-rs");
+        let (dir, name) = package(&crate_dir, &manifest("text-tools-rs"));
+        assert_eq!(dir, crate_dir.join("python"));
+        assert_eq!(name, "text_tools_rs");
+    }
+
+    #[test]
+    fn the_native_file_sits_in_the_package_with_the_platform_suffix() {
+        let crate_dir = Path::new("units").join("text-tools-rs");
+        let file = if cfg!(windows) {
+            "_native.pyd"
+        } else {
+            "_native.abi3.so"
+        };
+        assert_eq!(
+            native_file(&crate_dir, &manifest("text-tools-rs")),
+            crate_dir.join("python").join("text_tools_rs").join(file)
+        );
+    }
+}
